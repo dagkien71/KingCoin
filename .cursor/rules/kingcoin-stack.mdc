@@ -1,0 +1,39 @@
+---
+description: KingCoin monorepo — stack local, cổng, env và lệnh «chuẩn bị»
+alwaysApply: true
+---
+
+# KingCoin — bối cảnh dự án
+
+Monorepo: `frontend/` (Next.js), `backend/` (NestJS + Prisma + MongoDB). Tài liệu setup: [docs/DEV_SETUP.md](docs/DEV_SETUP.md).
+
+## Cổng & URL
+
+- **Web:** http://localhost:3000 (`frontend`)
+- **API:** http://localhost:3001/api/v1 (`backend`, `APP_PORT=3001` trong `backend/.env`)
+- **Swagger:** http://localhost:3001/docs
+- **Mongo dev (Docker):** `127.0.0.1:27018`, replica set `rs0` — compose: `backend/docker-compose.dev.yml`
+
+## Frontend → backend
+
+Trong `frontend/.env` (hoặc tương đương): `NEXT_PUBLIC_API_URL=http://localhost:3001/api/v1`. Code đọc `NEXT_PUBLIC_API_URL` từ [frontend/src/constant/config.ts](frontend/src/constant/config.ts), không dùng biến `API_URL` thô nếu không map vào Next.
+
+## Chuẩn bị môi trường («chuẩn bị», prepare dev, start full stack)
+
+Tuân thủ [.cursor/skills/kingcoin-workspace/SKILL.md](.cursor/skills/kingcoin-workspace/SKILL.md). **Một lệnh** từ gốc repo: `npm run dev:all` (Mongo + seed + API + web) hoặc `npm run start:all` / `npm start` (chỉ Nest :3001 + Next :3000, sau khi đã `dev:up`). Xác minh `GET /api/v1/health` và `/api/v1/token-crypto/all`.
+
+## Bảo mật & Git
+
+Không commit file chứa secret thật (`.env` production, key Cloudinary, v.v.). Chỉ commit mẫu nếu cần (`*.example`).
+
+## Prisma + Mongo
+
+Prisma Mongo trong repo cần **replica set**. Môi trường nhanh: `./scripts/dev-up.sh`. Standalone Mongo không replSet thường gây lỗi ghi/transaction.
+
+## KC stablecoin & NAV
+
+KC = quote như USDT. NAV và giá alt **luôn quy KC** theo giá `TOKEN/KC` hiện tại. Xem [docs/STABLECOIN_KC_SPEC.md](docs/STABLECOIN_KC_SPEC.md) và rule `kc-stablecoin-nav.mdc`.
+
+## UI — cập nhật dữ liệu
+
+Mỗi khối UI từ API: có cần đổi khi WS/mutation không? Nếu có → `useLiveTicker` / `useLiveFetch` / `refetch`. [docs/UI_DATA_FRESHNESS_SPEC.md](docs/UI_DATA_FRESHNESS_SPEC.md), rule `ui-data-freshness.mdc`.

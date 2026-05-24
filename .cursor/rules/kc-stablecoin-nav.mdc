@@ -1,0 +1,30 @@
+---
+description: KC = stablecoin quote (như USDT); NAV và giá alt luôn quy đổi qua KC
+alwaysApply: true
+---
+
+# KingCoin (KC) — stablecoin & quy đổi vốn
+
+Đọc đầy đủ: [docs/STABLECOIN_KC_SPEC.md](docs/STABLECOIN_KC_SPEC.md).
+
+## Ghi nhớ bắt buộc
+
+- **KC** = stablecoin nội bộ, vai trò tương tự **USDT** trên sàn ngoài (`tokenKind: stablecoin`, peg ~1 USD).
+- Cặp giao dịch: `BASE/KC` (vd `SLR/KC`). Giá token = **số KC cho 1 token**.
+- Khi user **dùng KC mua alt** (vd SLR): trừ KC, cộng SLR. **Vốn / NAV** phải quy đổi alt theo **giá SLR→KC hiện tại** (spot / live ticker), không theo giá khớp cũ.
+
+## Công thức NAV
+
+```
+NAV_KC = quoteKc + Σ (balance_token × price_in_KC)
+```
+
+- `quoteKc`: số dư KC (không nhân giá).
+- `price_in_KC`: `TokenCrypto.price` hoặc live WS.
+- Implement: `frontend/src/modules/account/portfolio.ts` → `buildPortfolio()`.
+
+## Không làm
+
+- Định giá alt bằng USD tách khỏi KC cho NAV mặc định.
+- Pump/dump / lịch giá PP1–PP2 trên KC (API từ chối).
+- Liệt kê KC trong bảng alt holdings (KC là hàng quote riêng).

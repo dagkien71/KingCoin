@@ -1,0 +1,494 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String        @id @default(auto()) @map("_id") @db.ObjectId
+  email             String        @unique
+  phone             String?
+  username          String?
+  password          String
+  walletAddress     String?       @unique
+  avatar            String?
+  balance           Balance?
+  balanceId         String?       @db.ObjectId
+  birthDate         DateTime?
+  status            String        @default("active")
+  socialLinks       String[]
+  introduction      String?
+  role              Roles         @default(user)
+  dailyPnL          Float?        @default(0)
+  weeklyPnL         Float?        @default(0)
+  monthlyPnL        Float?        @default(0)
+  yearPnL           Float?        @default(0)
+  dailyPnLPercent   Float?        @default(0)
+  weeklyPnLPercent  Float?        @default(0)
+  /** NAV (KC) mốc đầu ngày/tuần — dùng tính PnL hiển thị */
+  navBaselineDayKc  Float?        @default(0)
+  navBaselineWeekKc Float?        @default(0)
+  navBaselineDayAt  DateTime?
+  navBaselineWeekAt DateTime?
+  monthlyPnLPercent Float?        @default(0)
+  yearPnLPercent    Float?        @default(0)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @default(now()) @updatedAt
+  TokenCrypto       TokenCrypto[]
+  watchList         String[]
+  completedTours    String[]      @default([])
+  orders            Order[]
+  TokenComment      TokenComment[]
+}
+
+model Balance {
+  id         String         @id @default(auto()) @map("_id") @db.ObjectId
+  user       User           @relation(fields: [userId], references: [id])
+  userId     String         @unique @db.ObjectId
+  stableCoin Float          @default(0) // Số dư stable coin
+  tokens     BalanceToken[]
+}
+
+model BalanceToken {
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  balance   Balance @relation(fields: [balanceId], references: [id])
+  balanceId String  @db.ObjectId
+  tokenId   String // khớp TokenCrypto.id (UUID)
+  amount    Float   @default(0) // Số lượng đang giữ
+}
+
+model TokenWhiteList {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId         String
+  accessToken    String?
+  refreshToken   String?
+  refreshTokenId String?
+  expiredAt      DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now())
+}
+
+enum Roles {
+  admin
+  user
+  agent
+}
+
+model TokenCrypto {
+  id                String   @id @default(uuid()) @map("_id")
+  name              String?
+  logo              String?
+  symbol            String? // Make sure this field exists
+  decimals          Int?
+  status            String?
+  price             Float?
+  marketCap         Float?
+  totalSupply       Float?
+  maxSupply         Float?
+  rank              Int?
+  follower          Int?
+  rating            Float?
+  circulatingSupply Float?
+  launchDate        String?
+  whitepaperUrl     String?
+  owner             User?    @relation(fields: [ownerId], references: [id])
+  ownerId           String?  @db.ObjectId
+  isVerified        Boolean?
+  description       String?
+  initialPrice      Float?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  communityLinks    Json?
+
+  athPrice         Float? // All-Time High Price
+  athPercentage    Float? // Percentage relative to the current price
+  atlPrice         Float? // All-Time Low Price
+  atlPercentage    Float? // Percentage relative to the current price
+  athPriceDay      Float? // All-Time High Price
+  athPercentageDay Float? // Percentage relative to the current price
+  atlPriceDay      Float? // All-Time Low Price
+  atlPercentageDay Float? // Percentage relative to the current price
+  TokenCryptoLog   TokenCryptoLog[]
+  volumes          Json?
+  /** % thay đổi giá so với 1h / 24h / 7d trước — xem docs/PRICE_CHANGE_PCT_SPEC.md */
+  priceChange1h    Float?
+  priceChange24h   Float?
+  priceChange7d    Float?
+  /** stablecoin | volatile — KC mặc định stablecoin */
+  tokenKind        String?
+  /** Đặc tả stablecoin (peg, dự trữ, độ lệch cho phép…) — xem docs/STABLECOIN_KC_SPEC.md */
+  stablecoinSpec   Json?
+}
+
+/** Token sắp niêm yết — countdown, đặc tả, chưa giao dịch Spot */
+model UpcomingListing {
+  id                String   @id @default(uuid()) @map("_id")
+  name              String
+  symbol            String
+  logo              String?
+  tagline           String?
+  description       String?
+  /** review | scheduled | announced */
+  status            String   @default("scheduled")
+  listingAt         DateTime
+  initialPrice      Float?
+  totalSupply       Float?
+  category          String?
+  features          String[] @default([])
+  /** [{ label, value }] — đặc tả hiển thị UI */
+  specs             Json?
+  sortOrder         Int      @default(0)
+  isFeatured        Boolean  @default(false)
+  ownerId           String?  @db.ObjectId
+  listingRequestId  String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  preorders         UpcomingListingPreorder[]
+}
+
+/** Đặt trước token sắp list — user đăng ký số KC dự kiến mua khi mở cửa */
+model UpcomingListingPreorder {
+  id                String   @id @default(uuid()) @map("_id")
+  userId            String   @db.ObjectId
+  upcomingListingId String
+  amountKc          Float    @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  upcomingListing   UpcomingListing @relation(fields: [upcomingListingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, upcomingListingId])
+  @@index([upcomingListingId])
+}
+
+model ListingRequest {
+  id                String    @id @default(uuid()) @map("_id")
+  userId            String    @db.ObjectId
+  name              String
+  symbol            String
+  logo              String?
+  decimals          Int       @default(6)
+  totalSupply       Float
+  initialPrice      Float?
+  description       String?
+  communityLinks    Json?
+  /** pending | approved | rejected | live */
+  status            String    @default("pending")
+  listingFeeKc      Float     @default(0)
+  reviewedById      String?   @db.ObjectId
+  reviewedAt        DateTime?
+  rejectionReason   String?
+  upcomingListingId String?
+  tokenId           String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model TokenCryptoLog {
+  id        String      @id @default(auto()) @map("_id") @db.ObjectId
+  tokenId   String
+  price     Float
+  volume    Float
+  timestamp DateTime    @default(now())
+  hash      String
+  token     TokenCrypto @relation(fields: [tokenId], references: [id])
+}
+
+model Order {
+  id              String      @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String      @db.ObjectId
+  user            User        @relation(fields: [userId], references: [id])
+  tokenId         String
+  type            OrderType
+  price           Float
+  quantity        Float
+  matchedQuantity Int         @default(0)
+  pair            String
+  status          OrderStatus @default(pending)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+enum OrderType {
+  buy
+  sell
+}
+
+enum OrderStatus {
+  pending
+  completed
+  canceled
+}
+
+model TradeFill {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  tokenId     String
+  buyOrderId  String   @db.ObjectId
+  sellOrderId String   @db.ObjectId
+  buyerId     String   @db.ObjectId
+  sellerId    String   @db.ObjectId
+  price       Float
+  quantity    Float
+  createdAt   DateTime @default(now())
+}
+
+model LedgerEntry {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String   @db.ObjectId
+  amount       Float
+  currency     String
+  tokenId      String?
+  refType      String
+  refId        String?
+  balanceAfter Float?
+  note         String?
+  createdAt    DateTime @default(now())
+}
+
+model QuestDefinition {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  slug             String   @unique
+  title            String
+  description      String?
+  rewardKc         Float
+  type             String
+  category         String   @default("onboarding")
+  sortOrder        Int      @default(0)
+  ctaLabel         String?
+  externalUrl      String?
+  icon             String?
+  verifyMode       String   @default("auto")
+  meta             Json?
+  active           Boolean  @default(true)
+  cooldownHours    Int?
+  maxClaimsPerUser Int      @default(1)
+  createdAt        DateTime @default(now())
+}
+
+model QuestCompletion {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @db.ObjectId
+  questId     String   @db.ObjectId
+  status      String   @default("completed")
+  completedAt DateTime @default(now())
+
+  @@unique([userId, questId])
+}
+
+model QuestEngagement {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  questId   String   @db.ObjectId
+  startedAt DateTime @default(now())
+
+  @@unique([userId, questId])
+}
+
+model ReferralCode {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @unique @db.ObjectId
+  code      String   @unique
+  createdAt DateTime @default(now())
+}
+
+model ReferralAttribution {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  referrerId String   @db.ObjectId
+  refereeId  String   @unique @db.ObjectId
+  createdAt  DateTime @default(now())
+}
+
+model TokenComment {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  tokenId   String
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  body      String
+  parentId  String?  @db.ObjectId
+  status    String   @default("visible")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tokenId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+enum FuturesSide {
+  long
+  short
+}
+
+enum FuturesPositionStatus {
+  open
+  closed
+  liquidated
+}
+
+enum FuturesOrderType {
+  open_market
+  close_market
+}
+
+enum FuturesOrderStatus {
+  pending
+  filled
+  canceled
+  rejected
+}
+
+model FuturesPosition {
+  id            String                  @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String                  @db.ObjectId
+  tokenId       String
+  side          FuturesSide
+  size          Float
+  entryPrice    Float
+  leverage      Int
+  marginKc      Float
+  takeProfitPrice Float?
+  stopLossPrice   Float?
+  realizedPnlKc Float                   @default(0)
+  /** Size tại thời điểm đóng hết / thanh lý (để lịch sử). */
+  closedSize    Float?
+  exitPrice     Float?
+  status        FuturesPositionStatus   @default(open)
+  openedAt      DateTime                @default(now())
+  closedAt      DateTime?
+  liquidatedAt  DateTime?
+  updatedAt     DateTime                @updatedAt
+
+  @@index([userId, status])
+  @@index([tokenId, status])
+  @@index([userId, tokenId, side, status])
+}
+
+model FuturesOrder {
+  id          String             @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String             @db.ObjectId
+  positionId  String?            @db.ObjectId
+  tokenId     String
+  side        FuturesSide
+  type        FuturesOrderType
+  status      FuturesOrderStatus @default(pending)
+  size        Float
+  leverage    Int?
+  marginKc    Float?
+  filledPrice Float?
+  filledAt    DateTime?
+  createdAt   DateTime           @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model FuturesConfig {
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  tokenId           String  @unique
+  enabled           Boolean @default(true)
+  maxLeverage       Int     @default(10)
+  minMarginKc       Float   @default(10)
+  minSize           Float   @default(0.0001)
+  maintenanceRate   Float   @default(0.005)
+  liquidationFeeRate Float  @default(0.002)
+  openFeeRate       Float   @default(0.0004)
+  closeFeeRate      Float   @default(0.0004)
+  fundingRate       Float   @default(0.0001)
+}
+
+enum NotificationType {
+  ORDER_PLACED
+  ORDER_PARTIAL_FILL
+  ORDER_FILLED
+  ORDER_CANCELLED
+  FUTURES_OPENED
+  FUTURES_CLOSED
+  FUTURES_LIQUIDATED
+  FUTURES_MARGIN_WARNING
+  CONVERT_SUCCESS
+  CONVERT_FAILED
+  QUEST_CLAIMABLE
+  QUEST_CLAIMED
+  REFERRAL_MILESTONE
+  SIGNUP_BONUS
+  LISTING_FEE
+  TOKEN_LISTED
+  LISTING_REQUEST_SUBMITTED
+  LISTING_REQUEST_APPROVED
+  LISTING_REQUEST_REJECTED
+  PRICE_ALERT
+}
+
+enum NotificationPriority {
+  critical
+  high
+  normal
+  low
+}
+
+enum PriceAlertDirection {
+  above
+  below
+}
+
+enum PriceAlertMarketKind {
+  spot
+  futures
+}
+
+model Notification {
+  id         String                 @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String                 @db.ObjectId
+  type       NotificationType
+  priority   NotificationPriority   @default(normal)
+  title      String
+  body       String
+  payload    Json?
+  dedupeKey  String?
+  readAt     DateTime?
+  createdAt  DateTime               @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, readAt])
+  @@index([userId, dedupeKey])
+}
+
+model PriceAlert {
+  id           String               @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String               @db.ObjectId
+  tokenId      String
+  marketKind   PriceAlertMarketKind @default(spot)
+  direction    PriceAlertDirection
+  targetPrice  Float
+  active       Boolean              @default(true)
+  triggeredAt  DateTime?
+  createdAt    DateTime             @default(now())
+
+  @@index([userId, active])
+  @@index([tokenId, active])
+}
+
+model PushSubscription {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model NotificationPreference {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String   @unique @db.ObjectId
+  webPushEnabled  Boolean  @default(true)
+  disabledTypes   String[] @default([])
+  updatedAt       DateTime @default(now()) @updatedAt
+}

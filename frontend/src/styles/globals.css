@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply min-h-screen bg-kc-bg text-kc-fg antialiased;
+  }
+
+  .num {
+    @apply font-mono tabular-nums;
+  }
+
+  ::selection {
+    @apply bg-kc-accent/30 text-kc-fg;
+  }
+}
+
+@layer utilities {
+  .text-gradient-kc {
+    @apply bg-gradient-to-r from-kc-accent to-amber-300 bg-clip-text text-transparent;
+  }
+}
+
+/* Range input for trade quantity slider — migrated from trade.style.css */
+@layer components {
+  .kc-range {
+    @apply w-full cursor-pointer bg-transparent;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .kc-range::-webkit-slider-runnable-track {
+    height: 8px;
+    border-radius: 9999px;
+    @apply bg-kc-surface;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  }
+  .kc-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    margin-top: -4px;
+    border-radius: 9999px;
+    @apply bg-kc-up;
+  }
+  .kc-range::-moz-range-track {
+    height: 8px;
+    border-radius: 9999px;
+    @apply bg-kc-surface;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  }
+  .kc-range::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border: 0;
+    border-radius: 9999px;
+    @apply bg-kc-up;
+  }
+}

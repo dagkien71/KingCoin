@@ -1,0 +1,21 @@
+# Dependencies & build output
+**/node_modules/
+**/.next/
+**/dist/
+**/coverage/
+**/.nyc_output/
+
+# IDE / OS
+**/.idea/
+**/.vscode/
+**/.DS_Store
+
+# Seed / generated scripts (low signal for architecture graph)
+backend/scripts/data-*.js
+backend/scripts/reset-*.js
+
+# Husky internals
+backend/.husky/_/
+
+# Optional: keep graph focused on app source + docs
+# (frontend/src, backend/src, backend/prisma, docs/ are included by default)

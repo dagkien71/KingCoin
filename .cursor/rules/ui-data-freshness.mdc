@@ -1,0 +1,28 @@
+---
+description: Khi làm UI — checklist data có cần cập nhật khi API/WS đổi; nếu có thì implement refetch/live
+alwaysApply: true
+---
+
+# UI — Data freshness (bắt buộc khi làm màn hình)
+
+Đọc: [docs/UI_DATA_FRESHNESS_SPEC.md](docs/UI_DATA_FRESHNESS_SPEC.md).
+
+## Trước khi xong task UI
+
+Với **mỗi khối hiển thị số liệu từ API**, trả lời: *Khi backend/WS/mutation đổi, UI này có phải đổi theo không?*
+
+- **Có** → implement (không bắt user F5):
+  - Giá/vol: `useLiveTicker` + `applyTickerPatch`
+  - Book/trades/logs/balances: `useLiveFetch` + stream đúng, hoặc `refetch()` sau `mutate`
+  - Admin trạng thái: `refreshInterval` (+ `silentOnPoll` nếu có chart)
+- **Không** (copy tĩnh) → một lần `useFetchApi` mount là đủ
+
+## Cấm / tránh
+
+- Dùng `/token-crypto` để giá alt user **đã mua** → dùng `/token-crypto/all`
+- Poll/refetch làm chart **remount** (loading gắn lifecycle chart)
+- Quên `refetch` balances sau swap/trade/claim
+
+## File tham chiếu
+
+`useFetchApi.ts`, `useLiveFetch.ts`, `market-live-context.tsx`, `FRONTEND-realtime.md`

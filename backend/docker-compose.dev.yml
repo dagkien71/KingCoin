@@ -1,0 +1,19 @@
+# MongoDB một node — Prisma cần replica set; cổng host = cổng trong container
+# để driver nhận đúng topology (tránh ReplicaSetNoPrimary khi map 27018:27017).
+#
+# Chạy: docker compose -f docker-compose.dev.yml up -d
+# Một lần: docker compose -f docker-compose.dev.yml exec mongo-dev mongosh --port 27018 --eval 'rs.initiate({_id:"rs0",members:[{_id:0,host:"127.0.0.1:27018"}]})'
+
+services:
+  mongo-dev:
+    image: mongo:7
+    container_name: kingcoin-mongo-dev
+    hostname: mongo-dev
+    ports:
+      - "27018:27018"
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all", "--port", "27018"]
+    volumes:
+      - kingcoin_mongo_dev_data:/data/db
+
+volumes:
+  kingcoin_mongo_dev_data:

@@ -1,0 +1,14 @@
+# Graphify — local-only artifacts (commit graphify-out/ if team shares the map)
+graphify-out/manifest.json
+graphify-out/cost.json
+
+# Dependencies
+node_modules/
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store

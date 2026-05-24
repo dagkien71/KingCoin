@@ -1,0 +1,33 @@
+import { IOrder } from "./order.type";
+
+export enum ERoles {
+  ADMIN = "admin",
+  USER = "user",
+  AGENT = "agent",
+}
+
+export interface IUser {
+  id: string;
+  email: string;
+  phone?: string;
+  username?: string;
+  password: string;
+  walletAddress?: string;
+  avatar?: string;
+  balance?: number;
+  dailyPnL?: number;
+  weeklyPnL?: number;
+  monthlyPnL?: number;
+  dailyPnLPercent?: number;
+  weeklyPnLPercent?: number;
+  isVerified?: boolean;
+  birthDate?: string;
+  createdAt?: string;
+  status?: string;
+  socialLinks?: string[];
+  introduction?: string | null;
+  role: ERoles;
+  watchList?: string[];
+  completedTours?: string[];
+  orders: IOrder[];
+}
