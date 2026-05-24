@@ -1,0 +1,6 @@
+{
+  "env": {
+    "NEXT_PUBLIC_API_URL": "https://kingcoin-mlnz.onrender.com/api/v1",
+    "NEXT_PUBLIC_API_ORIGIN": "https://kingcoin-mlnz.onrender.com"
+  }
+}
