@@ -11,8 +11,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || "KingCoin", {
       body: data.body || "",
-      icon: "/favicon.ico",
-      badge: "/favicon.ico",
+      icon: "/favicon.svg",
+      badge: "/favicon.svg",
       data: { deeplink: data.deeplink || "/notifications" },
     })
   );
