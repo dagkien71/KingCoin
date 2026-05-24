@@ -19,5 +19,7 @@ COPY prisma ./prisma/
 RUN npm ci --omit=dev --legacy-peer-deps
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/scripts ./scripts
+RUN chmod +x scripts/render-start.sh
 EXPOSE 3001
-CMD ["node", "dist/main.js"]
+CMD ["sh", "scripts/render-start.sh"]
