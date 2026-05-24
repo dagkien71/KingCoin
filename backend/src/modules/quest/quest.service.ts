@@ -46,42 +46,35 @@ export class QuestService {
 
   async ensureDefaultQuests(): Promise<void> {
     for (const q of buildMarketingQuestCatalog()) {
-      await this.prisma.questDefinition.upsert({
+      const data = {
+        title: q.title,
+        description: q.description,
+        rewardKc: q.rewardKc,
+        type: q.type,
+        category: q.category,
+        sortOrder: q.sortOrder,
+        ctaLabel: q.ctaLabel,
+        externalUrl: q.externalUrl,
+        icon: q.icon,
+        verifyMode: q.verifyMode,
+        meta: q.meta,
+        active: q.active,
+        cooldownHours: q.cooldownHours,
+        maxClaimsPerUser: q.maxClaimsPerUser,
+      };
+      const existing = await this.prisma.questDefinition.findUnique({
         where: { slug: q.slug },
-        create: {
-          slug: q.slug,
-          title: q.title,
-          description: q.description,
-          rewardKc: q.rewardKc,
-          type: q.type,
-          category: q.category,
-          sortOrder: q.sortOrder,
-          ctaLabel: q.ctaLabel,
-          externalUrl: q.externalUrl,
-          icon: q.icon,
-          verifyMode: q.verifyMode,
-          meta: q.meta,
-          active: q.active,
-          cooldownHours: q.cooldownHours,
-          maxClaimsPerUser: q.maxClaimsPerUser,
-        },
-        update: {
-          title: q.title,
-          description: q.description,
-          rewardKc: q.rewardKc,
-          type: q.type,
-          category: q.category,
-          sortOrder: q.sortOrder,
-          ctaLabel: q.ctaLabel,
-          externalUrl: q.externalUrl,
-          icon: q.icon,
-          verifyMode: q.verifyMode,
-          meta: q.meta,
-          active: q.active,
-          cooldownHours: q.cooldownHours,
-          maxClaimsPerUser: q.maxClaimsPerUser,
-        },
       });
+      if (existing) {
+        await this.prisma.questDefinition.update({
+          where: { slug: q.slug },
+          data,
+        });
+      } else {
+        await this.prisma.questDefinition.create({
+          data: { slug: q.slug, ...data },
+        });
+      }
     }
   }
 

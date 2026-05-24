@@ -17,10 +17,11 @@ Stack gợi ý **0 đồng** cho demo / MVP, phù hợp monorepo Next.js + NestJ
 1. Tạo cluster **M0 FREE** (region gần Singapore nếu user VN).
 2. Database Access → user + password.
 3. Network Access → **Allow access from anywhere** (`0.0.0.0/0`) hoặc IP Render sau khi có.
-4. Connect → Drivers → copy URI, dạng:
+4. Connect → Drivers → copy URI. **Bắt buộc** cluster **M0 (Replica Set)**, không dùng Serverless/Flex nếu app dùng transaction Prisma.
    ```
    mongodb+srv://USER:PASS@cluster0.xxxxx.mongodb.net/kingcoin?retryWrites=true&w=majority
    ```
+   Trên Render, `DATABASE_URL` phải có **tên DB** (`/kingcoin`) và user/pass **URL-encode** nếu có ký tự đặc biệt.
 5. Lần đầu deploy backend, chạy (local hoặc Render Shell):
    ```bash
    cd backend && npx prisma db push
