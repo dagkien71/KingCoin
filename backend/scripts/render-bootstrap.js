@@ -71,11 +71,14 @@ async function main() {
     if (tokenCount === 0) {
       runSafe("reset-seed", () => run("node scripts/reset-seed-10-tokens.js"));
       runSafe("market-maker", () => run("node scripts/ensure-market-maker-user.js"));
+      runSafe("flow-trader", () => run("node scripts/ensure-flow-trader-user.js"));
       runSafe("bot-inventory", () => run("node scripts/ensure-bot-inventory.js"));
       runSafe("demo-kc", () => run("node scripts/ensure-demo-user-kc.js"));
     } else {
       runSafe("kingcoin", () => run("node scripts/ensure-kingcoin-token.js"));
       runSafe("market-maker", () => run("node scripts/ensure-market-maker-user.js"));
+      runSafe("flow-trader", () => run("node scripts/ensure-flow-trader-user.js"));
+      runSafe("bot-inventory", () => run("node scripts/ensure-bot-inventory.js"));
     }
   } finally {
     await prisma.$disconnect();

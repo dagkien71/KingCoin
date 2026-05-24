@@ -15,7 +15,10 @@ import { AllocationDonut } from "@/modules/account/components/AllocationDonut";
 import { buildPortfolio, formatPnLLine } from "@/modules/account/portfolio";
 import type { IBalanceSnapshot, ILedgerEntry } from "@/types/trade.type";
 import { ITokenCrypto } from "@/types/token.type";
-import { formatTokenPrice } from "@/utils/format-number";
+import {
+  formatSignedKcAmount,
+  formatTokenPrice,
+} from "@/utils/format-number";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useMemo, useState } from "react";
@@ -307,7 +310,6 @@ export default function Dashboard() {
                     : h.symbol
                       ? tradeHref({
                           id: h.tokenId,
-                          name: null,
                           symbol: h.symbol,
                         })
                       : null;
@@ -455,7 +457,7 @@ export default function Dashboard() {
                     >
                       {hideBalances
                         ? "******"
-                        : `${e.amount >= 0 ? "+" : ""}${formatTokenPrice(2, e.amount)} ${e.currency}`}
+                        : `${e.amount >= 0 ? "+" : ""}${formatSignedKcAmount(e.amount, 2)} ${e.currency}`}
                     </span>
                   </div>
                 ))}

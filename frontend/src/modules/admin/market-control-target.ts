@@ -17,6 +17,16 @@ export function targetLabel(
   return "Một mã (dropdown)";
 }
 
+export function applyTargetLabel(
+  target: ApplyTarget,
+  groupCount: number,
+  allCount: number
+): string {
+  if (target.mode === "all_alts") return targetLabel("all", groupCount, allCount);
+  if (target.mode === "group") return targetLabel("group", groupCount, allCount);
+  return targetLabel("single", groupCount, allCount);
+}
+
 export function filterAlts<T extends { id: string; symbol?: string; tokenKind?: string }>(
   tokens: T[]
 ): T[] {

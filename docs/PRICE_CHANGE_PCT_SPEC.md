@@ -48,7 +48,7 @@ Cùng công thức; quanh peg 1.0 % thường rất nhỏ (±0.1%).
 ## Hiển thị frontend
 
 - Bảng markets: cột **1h % / 24h % / 7d %** đọc `priceChange*`, màu xanh/đỏ.
-- **KL (24h)** = `volumes.volume24h` (tổng volume khớp 24h), đơn vị KC — tách riêng.
+- **KL (24h)** = `volumes.volume24h` — tổng **giá trị khớp theo KC** (`Σ price × quantity`) trong 24h rolling; mỗi lệnh khớp chỉ cộng **một lần** (không cộng riêng phía mua và phía bán).
 
 ## Unit test
 

@@ -635,7 +635,7 @@ export class OrderService {
       void this.tokenCryptoService
         .updatePrice(tokenId, matchPrice, {
           writeLog: true,
-          logVolume: tradeQuantity,
+          logVolume: matchPrice * tradeQuantity,
         })
         .catch((err) => console.error('TokenCrypto price after match:', err));
 

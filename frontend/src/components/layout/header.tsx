@@ -15,6 +15,7 @@ import {
   HiX,
 } from "react-icons/hi";
 import HeaderUserMenu from "@/components/layout/HeaderUserMenu";
+import NotificationBell from "@/components/notifications/NotificationBell";
 import SearchForm from "../search";
 import useAuth from "@/hooks/useAuth";
 import { cn } from "@/lib/cn";
@@ -137,7 +138,10 @@ export default function Header() {
 
           <div className="hidden sm:flex items-center gap-2">
             {auth?.isLogin ? (
-              <HeaderUserMenu />
+              <>
+                <NotificationBell />
+                <HeaderUserMenu />
+              </>
             ) : (
               <>
                 <Button variant="ghost" size="sm" onClick={goLogin}>
@@ -151,6 +155,11 @@ export default function Header() {
             )}
           </div>
 
+          {auth?.isLogin ? (
+            <div className="sm:hidden">
+              <NotificationBell />
+            </div>
+          ) : null}
           <button
             type="button"
             className="flex h-10 w-10 items-center justify-center rounded-lg border border-kc-border text-kc-fg lg:hidden"
@@ -241,20 +250,6 @@ export default function Header() {
                   <HiOutlineQuestionMarkCircle className="h-5 w-5" />
                   Hướng dẫn sử dụng
                 </Button>
-              </div>
-            ) : null}
-            {auth?.isLogin ? (
-              <div className="border-b border-kc-border p-3 sm:hidden">
-                <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-kc-muted">
-                  Thông báo
-                </p>
-                <Link
-                  href="/notifications"
-                  onClick={() => setOpen(false)}
-                  className="flex items-center justify-center rounded-lg border border-kc-border py-2.5 text-sm text-violet-400"
-                >
-                  Xem thông báo
-                </Link>
               </div>
             ) : null}
             <div className="mt-auto border-t border-kc-border p-4">

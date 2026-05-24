@@ -3,6 +3,7 @@ import {
   HiOutlineClipboardList,
   HiOutlineHome,
   HiOutlineTrendingUp,
+  HiOutlineUserGroup,
 } from "react-icons/hi";
 
 export type AdminNavItem = {
@@ -14,6 +15,11 @@ export type AdminNavItem = {
 
 export const ADMIN_NAV: AdminNavItem[] = [
   { label: "Tổng quan", href: "/admin", icon: HiOutlineHome, exact: true },
+  {
+    label: "Người dùng",
+    href: "/admin/users",
+    icon: HiOutlineUserGroup,
+  },
   {
     label: "Duyệt niêm yết",
     href: "/admin/listing-requests",

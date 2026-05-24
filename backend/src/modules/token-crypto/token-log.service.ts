@@ -17,6 +17,7 @@ export class TokenCryptoLogService {
     return crypto.createHash('sha256').update(data).digest('hex');
   }
 
+  /** `volume` = giá trị khớp theo KC (price × số token), không phải số token thuần. */
   async createLog(tokenId: string, price: number, volume: number) {
     const safePrice = assertPositiveSpotPrice(price, 'Giá log');
     const timestamp = new Date(Date.now());

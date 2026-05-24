@@ -3,19 +3,26 @@ import { setAuthState } from "@/store/slice/authSlice";
 import { RootState } from "@/store/store";
 import { ERoles, IUser } from "@/types/user.type";
 import { useEffect } from "react";
-import useLiveFetch from "./useLiveFetch";
+import useFetchApi from "./useFetchApi";
 
 const useAuth = () => {
   const dispatch = useAppDispatch();
   const { sessionToken } = useAppSelector(
     (state: RootState) => state.sessionToken
   );
-  const { data, refetch } = useLiveFetch<IUser | null>(
-    sessionToken ? "/users/me" : "",
-    { stream: "trades" }
+  const persistedAuth = useAppSelector((state: RootState) => state.auth);
+  const { data, refetch, loading } = useFetchApi<IUser>(
+    sessionToken ? "/users/me" : ""
   );
 
-  const user = sessionToken && data?.id ? data : null;
+  const user =
+    sessionToken && data?.id
+      ? data
+      : sessionToken && persistedAuth.userInfo?.id
+        ? persistedAuth.userInfo
+        : null;
+
+  const authLoading = Boolean(sessionToken && loading && !data?.id);
 
   useEffect(() => {
     if (!sessionToken) {
@@ -24,13 +31,12 @@ const useAuth = () => {
     }
     if (data?.id) {
       dispatch(setAuthState({ userInfo: data, isLogin: true }));
-    } else if (data === null) {
-      dispatch(setAuthState({ userInfo: null, isLogin: false }));
     }
   }, [data, sessionToken, dispatch]);
 
   return {
-    isLogin: Boolean(sessionToken && user?.id),
+    isLogin: Boolean(sessionToken && (user?.id || authLoading)),
+    authLoading,
     role: user?.role,
     user,
     isAdmin: user?.role === ERoles.ADMIN,

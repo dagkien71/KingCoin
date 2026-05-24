@@ -24,3 +24,5 @@ services:
         value: https://frontend-two-steel-25.vercel.app
       - key: BASE_URL
         value: https://kingcoin-mlnz.onrender.com
+      - key: MARKET_MAKER_ENABLED
+        value: "true"

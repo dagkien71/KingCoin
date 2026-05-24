@@ -1,5 +1,10 @@
+import { deriveMarketCapKc, tokenSupplyForMarketCap } from "@/lib/token-market";
 import type { ITokenCrypto } from "@/types/token.type";
 import { isStablecoinToken } from "@/types/token.type";
+
+function capKc(t: ITokenCrypto): number {
+  return deriveMarketCapKc(t.price, tokenSupplyForMarketCap(t));
+}
 
 export type MarketCategoryId =
   | "all"
@@ -134,7 +139,7 @@ export function computeMarketOverview(tokens: ITokenCrypto[]): MarketOverview {
   let hotScore = -1;
 
   for (const t of alts) {
-    totalMarketCap += t.marketCap ?? 0;
+    totalMarketCap += capKc(t);
     totalVolume24h += vol24(t);
     const c = ch24(t);
     if (c > 0) gainerCount += 1;

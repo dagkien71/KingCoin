@@ -36,8 +36,8 @@ import { toast } from "react-toastify";
 export default function MarketsHub() {
   const [category, setCategory] = useState<MarketCategoryId>("all");
   const [searchLocal, setSearchLocal] = useState("");
-  const [sortColumn, setSortColumn] = useState("rank");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [sortColumn, setSortColumn] = useState("marketCap");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   const { watchList, updateUserInfo, isLogin } = useAuth();
   const {
@@ -90,8 +90,14 @@ export default function MarketsHub() {
       setSortDirection(direction);
     } else {
       setSortColumn(column);
-      direction = "asc";
-      setSortDirection("asc");
+      direction =
+        column === "marketCap" ||
+        column === "price" ||
+        column.startsWith("priceChange") ||
+        column === "volume24h"
+          ? "desc"
+          : "asc";
+      setSortDirection(direction);
     }
     setQueryParams({ orderBy: `${column}:${direction}` });
   };

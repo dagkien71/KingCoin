@@ -32,20 +32,20 @@ export default function App({ Component, pageProps }: AppProps) {
         />
       </Head>
       <div
-      className={`${geistSans.variable} ${geistMono.variable} font-sans min-h-screen`}
-    >
-      <StoreProvider>
-        <MarketLiveProvider>
-          <NotificationProvider>
-            <TourProvider>
-              <Layout>
-                <Component {...pageProps} />
-              </Layout>
-            </TourProvider>
-          </NotificationProvider>
-        </MarketLiveProvider>
-      </StoreProvider>
-    </div>
+        className={`${geistSans.variable} ${geistMono.variable} font-sans min-h-screen`}
+      >
+        <StoreProvider>
+          <MarketLiveProvider>
+            <NotificationProvider>
+              <TourProvider>
+                <Layout>
+                  <Component {...pageProps} />
+                </Layout>
+              </TourProvider>
+            </NotificationProvider>
+          </MarketLiveProvider>
+        </StoreProvider>
+      </div>
     </>
   );
 }

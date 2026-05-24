@@ -34,6 +34,7 @@ export type TickerFlash = "up" | "down";
 export type TickerPatch = {
   tokenId: string;
   price?: number;
+  marketCap?: number;
   volumes?: TokenVolumes;
   priceChange1h?: number;
   priceChange24h?: number;

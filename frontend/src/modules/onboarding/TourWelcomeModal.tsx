@@ -45,12 +45,12 @@ export default function TourWelcomeModal({ open, onStart, onLater }: Props) {
           Chúng tôi sẽ chỉ từng bước: tìm token, giao dịch Spot, ví, nhiệm vụ và
           chuyển đổi — phù hợp nếu bạn mới tham gia thị trường KingCoin.
         </p>
-        <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
+        <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button variant="ghost" type="button" onClick={onLater}>
             Để sau
           </Button>
           <Button variant="primary" type="button" onClick={onStart}>
-            Bắt đầu
+            Tiếp theo
           </Button>
         </div>
       </div>

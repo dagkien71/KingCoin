@@ -23,6 +23,7 @@ import { QuestModule } from '@modules/quest/quest.module';
 import { TokenCryptoModule } from '@modules/token-crypto/token.module';
 import { UploadModule } from '@modules/upload/upload.module';
 import { UserModule } from '@modules/user/user.module';
+import { UserAdminModule } from '@modules/user/user-admin.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
@@ -61,6 +62,7 @@ import { PrismaModule } from '@providers/prisma/prisma.module';
     HealthModule,
     UploadModule,
     UserModule,
+    UserAdminModule,
     AuthModule,
     TokenCryptoModule,
     OrderModule,

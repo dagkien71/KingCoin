@@ -3,6 +3,8 @@
 import { Button } from "@/components/ui/button";
 import useAuth from "@/hooks/useAuth";
 import useFetchApi from "@/hooks/useFetchApi";
+import { unwrapPaginatedData } from "@/lib/unwrap-paginated";
+import { isTraderUser } from "@/lib/system-accounts";
 import { ADMIN_TAGLINE } from "@/modules/admin/constants";
 import { AdminDataTable } from "@/modules/admin/AdminDataTable";
 import { AdminStatCard } from "@/modules/admin/AdminStatCard";
@@ -29,16 +31,20 @@ type Dashboard = {
 export function AdminOverview() {
   const router = useRouter();
   const { user } = useAuth();
-  const { data: users } = useFetchApi<{ data: UserRow[] }>("/admin/users");
-  const { data: tokens } = useFetchApi<{ data: ITokenCrypto[] }>(
-    "/admin/token-crypto"
+  const { data: users } = useFetchApi<{ data: UserRow[] } | UserRow[]>(
+    "/admin/users",
+    { defaultParams: { perPage: 100 } }
   );
+  const { data: tokens } = useFetchApi<
+    { data: ITokenCrypto[] } | ITokenCrypto[]
+  >("/admin/token-crypto");
   const { data: dashboard } = useFetchApi<Dashboard>("/admin/market-control", {
     refreshInterval: 10_000,
   });
 
-  const userRows = users?.data ?? [];
-  const tokenRows = tokens?.data ?? [];
+  const allUsers = unwrapPaginatedData(users);
+  const userRows = allUsers.filter(isTraderUser);
+  const tokenRows = unwrapPaginatedData(tokens);
   const altCount =
     dashboard?.tokens?.filter((t) => !isStablecoinToken(t)).length ?? 0;
 
@@ -77,7 +83,11 @@ export function AdminOverview() {
       </motion.header>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <AdminStatCard label="Người dùng" value={userRows.length} />
+        <AdminStatCard
+          label="Trader"
+          value={userRows.length}
+          hint={`${allUsers.length - userRows.length} bot MM không tính`}
+        />
         <AdminStatCard label="Token" value={tokenRows.length} />
         <AdminStatCard
           label="MM runtime"
@@ -114,13 +124,30 @@ export function AdminOverview() {
 
       <AdminDataTable
         title="Người dùng"
-        rows={userRows}
+        rows={userRows.slice(0, 8)}
         rowKey={(u) => u.id}
         columns={[
-          { key: "email", header: "Email", render: (u) => u.email },
+          {
+            key: "email",
+            header: "Email",
+            render: (u) => (
+              <Link
+                href={`/admin/users/${u.id}`}
+                className="text-violet-300 hover:underline"
+              >
+                {u.email}
+              </Link>
+            ),
+          },
           { key: "role", header: "Vai trò", render: (u) => u.role },
         ]}
       />
+      <p className="text-center text-xs text-kc-muted">
+        <Link href="/admin/users" className="text-violet-400 hover:underline">
+          Quản lý user đầy đủ →
+        </Link>{" "}
+        (số dư, lệnh mở, PnL, futures)
+      </p>
 
       <AdminDataTable
         title="Token niêm yết"

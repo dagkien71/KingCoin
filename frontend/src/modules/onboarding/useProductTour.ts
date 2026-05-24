@@ -97,6 +97,10 @@ export function useProductTour() {
       const isFirst = index === 0;
       const isLast = index === steps.length - 1;
       const total = steps.length;
+      /** driver.highlight() merge popover với showButtons: [] — phải set lại trên từng popover */
+      const stepShowButtons: ("next" | "previous" | "close")[] = isFirst
+        ? ["next", "close"]
+        : ["previous", "next", "close"];
 
       const drv = driver({
         animate: true,
@@ -138,6 +142,7 @@ export function useProductTour() {
           title: step.title,
           description: step.description,
           side: step.side ?? (element ? "bottom" : "over"),
+          showButtons: stepShowButtons,
           showProgress: true,
           progressText: progressLabel(index, total),
           nextBtnText: isLast ? "Hoàn tất" : "Tiếp theo",

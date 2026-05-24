@@ -103,4 +103,9 @@ export default class UserBaseEntity extends PartialType(UserEntity) {
   })
   @Expose()
   declare readonly orders: Order[] | null;
+
+  /** `liquidity_bot` = MM/flow — không tính thống kê trader trên admin. */
+  @ApiProperty({ type: [String], required: false })
+  @Expose()
+  declare readonly accountTags?: string[];
 }

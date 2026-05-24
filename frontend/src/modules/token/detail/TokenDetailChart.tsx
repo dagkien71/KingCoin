@@ -18,7 +18,6 @@ function TokenDetailChartInner({ token }: { token: ITokenCrypto }) {
   );
   const { data: logs, loading } = useLiveFetch<ITokenCryptoLog[]>(logPath, {
     stream: ["logs", "trades"],
-    silentOnPoll: true,
   });
 
   return (

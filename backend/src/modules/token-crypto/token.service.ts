@@ -10,6 +10,13 @@ import {
   buildPriceChangePercents,
   PRICE_CHANGE_WINDOWS_MS,
 } from '@modules/token-crypto/price-change.util';
+import {
+  deriveMarketCapKc,
+  tokenSupplyForMarketCap,
+  tradeVolumeKc,
+  withDerivedMarketCap,
+  withDerivedMarketCapList,
+} from '@modules/token-crypto/token-market.util';
 import { assertPositiveSpotPrice } from '../../common/spot-price.util';
 import {
   BadRequestException,
@@ -104,7 +111,8 @@ export class TokenCryptoService {
   }
 
   async findById(id: string): Promise<TokenCrypto> {
-    return this.tokenRepository.findById(id);
+    const token = await this.tokenRepository.findById(id);
+    return token ? withDerivedMarketCap(token) : token;
   }
 
   /**
@@ -115,11 +123,13 @@ export class TokenCryptoService {
   findOne(idOrName: string): Promise<TokenCrypto | null> {
     const key = idOrName?.trim();
     if (!key) return Promise.resolve(null);
-    return this.tokenRepository.findOne({
-      where: {
-        OR: [{ id: key }, { name: key }, { symbol: key }],
-      },
-    });
+    return this.tokenRepository
+      .findOne({
+        where: {
+          OR: [{ id: key }, { name: key }, { symbol: key }],
+        },
+      })
+      .then((t) => (t ? withDerivedMarketCap(t) : null));
   }
 
   /**
@@ -141,7 +151,14 @@ export class TokenCryptoService {
       ];
     }
 
-    return this.tokenRepository.findAll(where, orderBy);
+    const result = await this.tokenRepository.findAll(
+      where,
+      orderBy ?? { marketCap: 'desc' },
+    );
+    return {
+      ...result,
+      data: withDerivedMarketCapList(result.data),
+    };
   }
 
   /**
@@ -166,7 +183,14 @@ export class TokenCryptoService {
       ];
     }
 
-    return this.tokenRepository.findAll(where, orderBy);
+    const result = await this.tokenRepository.findAll(
+      where,
+      orderBy ?? { marketCap: 'desc' },
+    );
+    return {
+      ...result,
+      data: withDerivedMarketCapList(result.data),
+    };
   }
 
   /**
@@ -212,8 +236,9 @@ export class TokenCryptoService {
       assertPositiveSpotPrice(Number(initialPrice), 'Giá khởi điểm');
     }
     const calculatedPrice = initialPrice;
-    const calculatedMarketCap =
-      totalSupply && calculatedPrice ? totalSupply * calculatedPrice : 0;
+    const supply =
+      createTokenCryptoDto.circulatingSupply ?? totalSupply ?? 0;
+    const calculatedMarketCap = deriveMarketCapKc(calculatedPrice, supply);
 
     const updatedDto = {
       ...createTokenCryptoDto,
@@ -280,16 +305,33 @@ export class TokenCryptoService {
     return newToken;
   }
 
-  async updateRanks(): Promise<void> {
-    const tokens = await this.tokenRepository.findMany({
-      orderBy: { marketCap: 'desc' },
+  /** Tổng hợp volume từ TokenCryptoLog → ghi `TokenCrypto.volumes` (cron + sau khớp lệnh). */
+  async syncVolumesFromLogs(tokenId: string): Promise<Record<string, number>> {
+    const volumes = await this.tokenLogService.getVolumes(tokenId);
+    const payload = {
+      volume1h: volumes.volume1h,
+      volume24h: volumes.volume24h,
+      volume1w: volumes.volume1w,
+      volume1m: volumes.volume1m,
+      volume1y: volumes.volume1y,
+    };
+    await this.tokenRepository.update(tokenId, {
+      volumes: payload as unknown as Prisma.InputJsonValue,
     });
+    return payload;
+  }
 
-    // Cập nhật thứ hạng từng token
+  async updateRanks(): Promise<void> {
+    const tokens = await this.tokenRepository.findMany({});
+    const ranked = withDerivedMarketCapList(tokens).sort(
+      (a, b) => (b.marketCap ?? 0) - (a.marketCap ?? 0),
+    );
+
     await Promise.all(
-      tokens.map((token, index) =>
+      ranked.map((token, index) =>
         this.tokenRepository.update(token.id, {
           rank: index + 1,
+          marketCap: token.marketCap,
         }),
       ),
     );
@@ -345,8 +387,11 @@ export class TokenCryptoService {
         ? ((price - allTimeLowPrice) / allTimeLowPrice) * 100
         : 0;
 
+    const marketCap = deriveMarketCapKc(price, tokenSupplyForMarketCap(token));
+
     const updated = await this.tokenRepository.update(tokenId, {
       price,
+      marketCap,
       athPriceDay: highestPriceToday,
       athPrice: allTimeHighPrice,
       atlPriceDay: lowestPriceToday,
@@ -357,28 +402,40 @@ export class TokenCryptoService {
       atlPercentage: percentAllTimeLow,
     });
 
+    let volumesPayload: Record<string, number> | null = null;
     if (options?.writeLog) {
       const vol =
-        options.logVolume != null && Number.isFinite(options.logVolume)
+        options.logVolume != null &&
+        Number.isFinite(options.logVolume) &&
+        options.logVolume > 0
           ? options.logVolume
-          : 0.01;
+          : tradeVolumeKc(price, 0.01);
       await this.tokenLogService
         .createLog(tokenId, price, vol)
         .catch(() => undefined);
+      volumesPayload = await this.syncVolumesFromLogs(tokenId).catch(
+        () => null,
+      );
     }
 
     const pct = await this.syncPriceChangePercents(tokenId, price);
 
     this.realtimeService.broadcastTicker(tokenId, {
       price: updated.price,
-      volumes: updated.volumes,
+      marketCap: updated.marketCap,
+      volumes: volumesPayload ?? updated.volumes,
       priceChange1h: pct.priceChange1h,
       priceChange24h: pct.priceChange24h,
       priceChange7d: pct.priceChange7d,
     });
 
+    void this.updateRanks().catch((err) => {
+      console.error('updateRanks after price:', err);
+    });
+
     return {
       ...updated,
+      ...(volumesPayload ? { volumes: volumesPayload } : {}),
       ...pct,
     };
   }

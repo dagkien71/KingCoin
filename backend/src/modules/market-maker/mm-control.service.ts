@@ -792,12 +792,16 @@ export class MmControlService implements OnModuleInit, OnModuleDestroy {
       this.setMid(token.id, price);
     }
     const updated = await this.tokenService.updatePrice(token.id, price);
+    let volumes = updated.volumes;
     if (logVolume > 0) {
       await this.tokenLogService.createLog(token.id, price, logVolume);
+      volumes = (await this.tokenService
+        .syncVolumesFromLogs(token.id)
+        .catch(() => null)) as typeof volumes;
     }
     this.realtimeService.broadcastTicker(token.id, {
       price,
-      volumes: updated.volumes,
+      volumes: volumes ?? updated.volumes,
     });
     return updated;
   }

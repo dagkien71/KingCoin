@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { targetLabel, type ApplyTarget } from "@/modules/admin/market-control-target";
+import { applyTargetLabel, type ApplyTarget } from "@/modules/admin/market-control-target";
 import {
   buildScenarioRunPlan,
   clampDurationMin,
@@ -144,11 +144,7 @@ export default function ScenarioLauncher({
     [refSpot, config]
   );
 
-  const targetSummary = targetLabel(
-    applyTarget.mode,
-    groupCount,
-    altCount
-  );
+  const targetSummary = applyTargetLabel(applyTarget, groupCount, altCount);
 
   const nudgeBlocked =
     (prefs.kind === "nudge_up" || prefs.kind === "nudge_down") &&

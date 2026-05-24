@@ -7,7 +7,10 @@ import { ITokenCrypto } from "@/types/token.type";
 import { useMemo } from "react";
 import { ledgerEntryLabel } from "@/lib/ledger-labels";
 import type { IBalanceSnapshot, ILedgerEntry } from "@/types/trade.type";
-import { formatTokenPrice } from "@/utils/format-number";
+import {
+  formatSignedKcAmount,
+  formatTokenPrice,
+} from "@/utils/format-number";
 import { QUOTE_SYMBOL } from "@/constants/quote";
 import Link from "next/link";
 
@@ -118,7 +121,7 @@ export default function WalletPage() {
                   }`}
                 >
                   {e.amount >= 0 ? "+" : ""}
-                  {formatTokenPrice(2, e.amount)} {e.currency}
+                  {formatSignedKcAmount(e.amount, 2)} {e.currency}
                 </span>
               </div>
             ))}
