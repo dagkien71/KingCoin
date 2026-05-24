@@ -6,6 +6,7 @@ import StoreProvider from "@/store/storeProvider";
 import "@/styles/globals.css";
 import "@/modules/onboarding/tour-theme.css";
 import type { AppProps } from "next/app";
+import Head from "next/head";
 import { Geist, Geist_Mono } from "next/font/google";
 import "driver.js/dist/driver.css";
 import "react-toastify/dist/ReactToastify.css";
@@ -22,7 +23,15 @@ const geistMono = Geist_Mono({
 
 export default function App({ Component, pageProps }: AppProps) {
   return (
-    <div
+    <>
+      <Head>
+        <title>KingCoin</title>
+        <meta
+          name="description"
+          content="KingCoin — giao dịch spot, futures và phát hành token trên KC."
+        />
+      </Head>
+      <div
       className={`${geistSans.variable} ${geistMono.variable} font-sans min-h-screen`}
     >
       <StoreProvider>
@@ -37,5 +46,6 @@ export default function App({ Component, pageProps }: AppProps) {
         </MarketLiveProvider>
       </StoreProvider>
     </div>
+    </>
   );
 }

@@ -2,8 +2,12 @@ import { Html, Head, Main, NextScript } from "next/document";
 
 export default function Document() {
   return (
-    <Html lang="en">
-      <Head />
+    <Html lang="vi">
+      <Head>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/favicon.svg" />
+        <meta name="theme-color" content="#06080a" />
+      </Head>
       <body className="antialiased">
         <Main />
         <NextScript />
