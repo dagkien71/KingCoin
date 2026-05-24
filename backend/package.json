@@ -23,7 +23,7 @@
     "db:push": "npx prisma db push",
     "db:migrate:up": "npx migrate-mongo up",
     "db:migrate:down": "npx migrate-mongo down",
-    "prepare": "husky install",
+    "prepare": "husky install || true",
     "seed": "ts-node --require tsconfig-paths/register prisma/seed.ts",
     "seed:demo": "node scripts/seed-demo-token.js",
     "seed:kingcoin": "node scripts/ensure-kingcoin-token.js",
