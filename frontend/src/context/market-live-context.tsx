@@ -148,11 +148,10 @@ export function MarketLiveProvider({
         newPrice !== prevTarget
       ) {
         uiFlashRef.current[id] = newPrice > prevTarget ? "up" : "down";
-        bumpRef.current("ticker");
         clearFlashLater([id]);
-      } else if (changedIds.length > 0) {
-        bumpRef.current("ticker");
       }
+
+      bumpRef.current("ticker");
 
       if (newPrice != null) {
         targetPricesRef.current[id] = newPrice;

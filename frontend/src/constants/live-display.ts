@@ -3,17 +3,17 @@ export const DISPLAY_TICKER_MS = Number(
   process.env.NEXT_PUBLIC_DISPLAY_TICKER_MS ?? "300"
 );
 
-/** Hằng số lerp V2 — thời gian đạt ~63% target (ms) */
+/** Thời gian lerp tùy chọn (ms). `0` = nhảy thẳng tới giá WS (mặc định). */
 export const SMOOTH_TAU_UI_MS = Number(
-  process.env.NEXT_PUBLIC_SMOOTH_TAU_UI_MS ?? "180"
+  process.env.NEXT_PUBLIC_SMOOTH_TAU_UI_MS ?? "0"
 );
 
 export const SMOOTH_TAU_CHART_MS = Number(
-  process.env.NEXT_PUBLIC_SMOOTH_TAU_CHART_MS ?? "420"
+  process.env.NEXT_PUBLIC_SMOOTH_TAU_CHART_MS ?? "0"
 );
 
 export const SMOOTH_TAU_NAV_MS = Number(
-  process.env.NEXT_PUBLIC_SMOOTH_TAU_NAV_MS ?? "550"
+  process.env.NEXT_PUBLIC_SMOOTH_TAU_NAV_MS ?? "0"
 );
 
 /** @deprecated V2 dùng SMOOTH_TAU_NAV_MS */

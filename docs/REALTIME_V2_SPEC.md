@@ -13,7 +13,7 @@ Tham chiếu:
 
 | Trong V2 | Ngoài V2 |
 |----------|----------|
-| Lerp giá hiển thị (UI, chart forming bar, NAV) | Book delta WS |
+| Lerp giá (tùy chọn, `tau>0`) + snap mặc định | Book delta WS |
 | Tách ingest raw / display smoothed | Redis Socket.IO scale |
 | Fallback REST khi WS mất | Thay Lightweight Charts |
 | Phase 2: emit WS trước, persist DB sau | |
@@ -26,26 +26,21 @@ Tham chiếu:
 
 ```
 Layer 1 — Ingest:  WS ticker/markets → rawTargetsRef (merge ngay, không throttle)
-Layer 2 — Smooth:  PriceSmootherEngine + requestAnimationFrame → lerp tới target
-Layer 3 — Display:  useSmoothedPrice(profile) / useLiveTicker (profile ui)
+Layer 2 — Display:  PriceSmootherEngine — snap tới giá WS (lerp tùy chọn)
                     revisions → useLiveFetch (orderbook, trades, logs)
 ```
 
-### Smoothing (exponential lerp)
+### Hiển thị giá (mặc định: **snap**)
 
-```
-alpha = 1 - exp(-dt / tau)
-current += (target - current) * alpha
-```
+Giá **nhảy thẳng** tới giá WS mới — không đếm từng đơn vị. Flash xanh/đỏ khi target đổi.
 
-| Profile | tau mặc định | Dùng cho |
+| Profile | `tau` mặc định | Dùng cho |
 |---------|--------------|----------|
-| `ui` | 180 ms | Markets, toolbar, mid price |
-| `chart` | 420 ms | Forming bar OHLC |
-| `nav` | 550 ms | NAV dashboard |
+| `ui` | 0 | Markets, toolbar, mid price |
+| `chart` | 0 | Forming bar OHLC |
+| `nav` | 0 | NAV dashboard |
 
-- **Flash** (up/down): khi **target** price đổi, không phải mỗi frame lerp.
-- `prefers-reduced-motion`: `current = target` ngay.
+Lerp (tùy chọn): set `NEXT_PUBLIC_SMOOTH_TAU_*` > 0 (vd. 180 / 420 / 550).
 
 ---
 
