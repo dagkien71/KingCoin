@@ -1,5 +1,33 @@
 import type { FuturesSide } from "@/types/futures.type";
 
+/** Khớp backend `futures-math.util.ts` — dùng cho uPnL live trên UI. */
+export function notionalKc(size: number, markPrice: number): number {
+  return Math.abs(size) * markPrice;
+}
+
+export function unrealizedPnlKc(
+  side: FuturesSide,
+  size: number,
+  entryPrice: number,
+  markPrice: number
+): number {
+  if (side === "long") {
+    return size * (markPrice - entryPrice);
+  }
+  return size * (entryPrice - markPrice);
+}
+
+export function marginRatio(
+  marginKc: number,
+  uPnl: number,
+  size: number,
+  markPrice: number
+): number {
+  const notional = notionalKc(size, markPrice);
+  if (notional <= 0) return 0;
+  return (marginKc + uPnl) / notional;
+}
+
 export function sizeFromMargin(
   marginKc: number,
   leverage: number,

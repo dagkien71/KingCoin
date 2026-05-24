@@ -10,6 +10,7 @@ import { MarketFlowService } from './market-flow.service';
 import { MarketMakerService } from './market-maker.service';
 import { MmControlService } from './mm-control.service';
 import { MmInstantFillService } from './mm-instant-fill.service';
+import { OrderbookPathService } from './orderbook-path.service';
 
 @Module({
   imports: [
@@ -25,7 +26,13 @@ import { MmInstantFillService } from './mm-instant-fill.service';
     MarketMakerService,
     MarketFlowService,
     MmInstantFillService,
+    OrderbookPathService,
   ],
-  exports: [MmInstantFillService, MmControlService, MarketMakerService],
+  exports: [
+    MmInstantFillService,
+    MmControlService,
+    MarketMakerService,
+    OrderbookPathService,
+  ],
 })
 export class MarketMakerModule {}

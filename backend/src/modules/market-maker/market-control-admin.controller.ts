@@ -36,6 +36,7 @@ import {
   SetSpotPriceDto,
   StartPriceModelRunDto,
 } from './dto/market-control.dto';
+import { OrderbookPathService } from './orderbook-path.service';
 import { resolveBulkTargetTokens } from './market-control-bulk.util';
 import { modelParamsFromPreset } from './model-preset-params.util';
 import { resolvePathTimeWindow } from './resolve-path-window.util';
@@ -49,6 +50,7 @@ export class MarketControlAdminController {
     private readonly mmControl: MmControlService,
     private readonly marketMaker: MarketMakerService,
     private readonly tokenService: TokenCryptoService,
+    private readonly orderbookPath: OrderbookPathService,
   ) {}
 
   @Get()
@@ -121,15 +123,23 @@ export class MarketControlAdminController {
     @Body() dto: SetSpotPriceDto,
   ) {
     const token = await this.ensureToken(tokenId);
-    const updated = await this.mmControl.setSpotPrice(
+    const result = await this.orderbookPath.setPriceWithBookPath(
       token,
       dto.price,
       dto.logVolume ?? 0,
     );
-    await this.marketMaker.triggerRefresh();
+    if (result.pathMode === 'instant') {
+      await this.marketMaker.triggerRefresh();
+    } else {
+      await this.marketMaker.triggerRefreshForToken(tokenId);
+    }
     return {
-      price: updated.price,
+      price: result.price,
+      previous: result.previous,
+      pathMode: result.pathMode,
+      pathSteps: result.pathSteps,
       mid: this.mmControl.getMid(tokenId),
+      spotAnchor: this.mmControl.getSpotAnchor(tokenId),
     };
   }
 
@@ -140,15 +150,22 @@ export class MarketControlAdminController {
   ) {
     const token = await this.ensureToken(tokenId);
     const pct = dto.pct ?? 0.01;
-    const result = await this.mmControl.nudgeSpotPrice(
+    const result = await this.orderbookPath.nudgeWithBookPath(
       token,
       dto.direction,
       pct,
       dto.logVolume ?? 0,
     );
-    await this.marketMaker.triggerRefresh();
+    if (result.pathMode === 'instant') {
+      await this.marketMaker.triggerRefresh();
+    } else {
+      await this.marketMaker.triggerRefreshForToken(tokenId);
+    }
     return {
-      ...result,
+      price: result.price,
+      previous: result.previous,
+      pathMode: result.pathMode,
+      pathSteps: result.pathSteps,
       mid: this.mmControl.getMid(tokenId),
       spotAnchor: this.mmControl.getSpotAnchor(tokenId),
     };

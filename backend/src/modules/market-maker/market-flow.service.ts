@@ -65,6 +65,87 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /**
+   * Khớp vài lệnh MM theo hướng path (pump → mua ask, dump → bán bid).
+   * Gọi từ OrderbookPathService hoặc hook path driver.
+   */
+  async sweepAlongPath(
+    tokenId: string,
+    direction: 'up' | 'down',
+    maxFills = 2,
+  ): Promise<number> {
+    if (!this.mmControl.isFlowEnabled() || maxFills < 1) return 0;
+
+    const mmEmail =
+      process.env.MARKET_MAKER_EMAIL ?? 'marketmaker@kingcoin.local';
+    const flowEmail = process.env.MARKET_FLOW_EMAIL ?? 'flow@kingcoin.local';
+    const qtyFlow = this.flowQty();
+
+    const [mmUser, flowUser, token] = await Promise.all([
+      this.prisma.user.findFirst({ where: { email: mmEmail } }),
+      this.prisma.user.findFirst({ where: { email: flowEmail } }),
+      this.prisma.tokenCrypto.findUnique({ where: { id: tokenId } }),
+    ]);
+
+    if (!mmUser || !flowUser || !token?.id) return 0;
+    if (this.mmControl.shouldProtectSpot(tokenId)) return 0;
+
+    const pair = this.quotePair(token);
+    let fills = 0;
+
+    for (let i = 0; i < maxFills; i++) {
+      if (direction === 'up') {
+        const bestSell = await this.prisma.order.findFirst({
+          where: {
+            userId: mmUser.id,
+            tokenId,
+            type: 'sell',
+            status: 'pending',
+            quantity: { gt: 0 },
+          },
+          orderBy: { price: 'asc' },
+        });
+        if (!bestSell) break;
+        const q = Math.min(qtyFlow, bestSell.quantity);
+        if (q <= 0) break;
+        await this.orderService.create({
+          tokenId,
+          type: 'buy',
+          price: bestSell.price,
+          quantity: q,
+          pair,
+          user: { connect: { id: flowUser.id } },
+        });
+        fills++;
+      } else {
+        const bestBuy = await this.prisma.order.findFirst({
+          where: {
+            userId: mmUser.id,
+            tokenId,
+            type: 'buy',
+            status: 'pending',
+            quantity: { gt: 0 },
+          },
+          orderBy: { price: 'desc' },
+        });
+        if (!bestBuy) break;
+        const q = Math.min(qtyFlow, bestBuy.quantity);
+        if (q <= 0) break;
+        await this.orderService.create({
+          tokenId,
+          type: 'sell',
+          price: bestBuy.price,
+          quantity: q,
+          pair,
+          user: { connect: { id: flowUser.id } },
+        });
+        fills++;
+      }
+    }
+
+    return fills;
+  }
+
   private async runTick(): Promise<void> {
     if (!this.mmControl.isFlowEnabled() || this.runInFlight) return;
     this.runInFlight = true;

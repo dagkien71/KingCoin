@@ -59,7 +59,8 @@ function FuturesTerminalInner({
   const { data: markData, refetch: refetchMark } = useFetchApi<{
     markPrice: number;
   }>(markUrl, {
-    refreshInterval: cryptoData?.id ? 2000 : undefined,
+    refreshInterval: cryptoData?.id ? 60_000 : undefined,
+    silentOnPoll: true,
   });
 
   const tickerPatch = useLiveTicker(cryptoData?.id ?? null);
@@ -70,8 +71,11 @@ function FuturesTerminalInner({
     [cryptoData, tickerPatch]
   );
 
-  const markPrice =
-    markData?.markPrice ?? liveToken?.price ?? cryptoData?.price ?? 0;
+  const liveSpot =
+    liveToken?.price != null && liveToken.price > 0
+      ? liveToken.price
+      : null;
+  const markPrice = liveSpot ?? markData?.markPrice ?? cryptoData?.price ?? 0;
   const chartSpotPrice = chartPatch?.price ?? markPrice;
 
   const logPath =

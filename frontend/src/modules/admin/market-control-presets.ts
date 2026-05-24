@@ -202,7 +202,7 @@ export const MARKET_PRESETS: MarketPreset[] = [
     group: "instant",
     scope: "token",
     title: "+3% ngay",
-    desc: "Hủy lệnh MM cũ → spot +3% → treo sổ mới (một mã)",
+    desc: "Đi bước giá + lấp sổ MM dọc đường (≥~2.5% biến động)",
     tone: "up",
     disabled: (c) => c.applyTarget.mode !== "single",
     run: (c) =>
@@ -216,7 +216,7 @@ export const MARKET_PRESETS: MarketPreset[] = [
     group: "instant",
     scope: "token",
     title: "−3% ngay",
-    desc: "Hủy lệnh MM cũ → spot −3% → treo sổ mới (một mã)",
+    desc: "Đi bước giá + lấp sổ MM dọc đường (≥~2.5% biến động)",
     tone: "down",
     disabled: (c) => c.applyTarget.mode !== "single",
     run: (c) =>

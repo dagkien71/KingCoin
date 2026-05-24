@@ -76,6 +76,12 @@ export class MmControlService implements OnModuleInit, OnModuleDestroy {
   private readonly manualLockUntilByToken = new Map<string, number>();
   private scheduleTickHandle: NodeJS.Timeout | null = null;
   private scheduleTickInFlight = false;
+  /** Admin walk đang chạy — không neo spotAnchor giữa chừng */
+  private readonly pathWalkActive = new Set<string>();
+  private readonly lastPathBookMidByToken = new Map<string, number>();
+  private readonly pathBookRefreshHooks: Array<
+    (tokenId: string, target: number, spot: number) => Promise<void>
+  > = [];
 
   constructor(
     private readonly prisma: PrismaService,
@@ -121,9 +127,68 @@ export class MmControlService implements OnModuleInit, OnModuleDestroy {
 
   /** Flow / lịch không được kéo giá khi admin vừa neo spot. */
   shouldProtectSpot(tokenId: string): boolean {
+    if (this.pathWalkActive.has(tokenId)) {
+      return false;
+    }
     return (
       this.spotAnchorByToken.has(tokenId) || this.isManualPriceLocked(tokenId)
     );
+  }
+
+  isPathWalkActive(tokenId: string): boolean {
+    return this.pathWalkActive.has(tokenId);
+  }
+
+  beginPathWalk(tokenId: string): void {
+    this.pathWalkActive.add(tokenId);
+    this.cancelPriceSchedule(tokenId);
+    this.cancelPriceModelRun(tokenId);
+    this.spotAnchorByToken.delete(tokenId);
+    this.manualLockUntilByToken.set(
+      tokenId,
+      Date.now() + 10 * 60 * 1000,
+    );
+  }
+
+  endPathWalk(tokenId: string): void {
+    this.pathWalkActive.delete(tokenId);
+    this.manualLockUntilByToken.delete(tokenId);
+  }
+
+  setLastPathBookMid(tokenId: string, mid: number): void {
+    if (mid > 0) {
+      this.lastPathBookMidByToken.set(tokenId, mid);
+    }
+  }
+
+  getLastPathBookMid(tokenId: string): number | undefined {
+    return this.lastPathBookMidByToken.get(tokenId);
+  }
+
+  clearPathBookMid(tokenId: string): void {
+    this.lastPathBookMidByToken.delete(tokenId);
+  }
+
+  registerPathBookRefreshHook(
+    fn: (tokenId: string, target: number, spot: number) => Promise<void>,
+  ): void {
+    this.pathBookRefreshHooks.push(fn);
+  }
+
+  private async notifyPathBookRefresh(
+    tokenId: string,
+    target: number,
+    spot: number,
+  ): Promise<void> {
+    for (const fn of this.pathBookRefreshHooks) {
+      try {
+        await fn(tokenId, target, spot);
+      } catch (e) {
+        this.logger.warn(
+          `pathBookRefresh hook ${tokenId}: ${(e as Error).message}`,
+        );
+      }
+    }
   }
 
   onModuleInit(): void {
@@ -582,11 +647,15 @@ export class MmControlService implements OnModuleInit, OnModuleDestroy {
     const nextSpot = floorSpotPrice(
       Number((spot * (1 - blend) + safeTarget * blend).toFixed(8)),
     );
-    if (Math.abs(nextSpot - spot) / spot < 1e-6) return;
+    if (Math.abs(nextSpot - spot) / spot < 1e-6) {
+      await this.notifyPathBookRefresh(tokenId, safeTarget, spot);
+      return;
+    }
 
-    this.tokenService.updatePriceLive(tokenId, nextSpot, {
+    await this.tokenService.updatePriceLive(tokenId, nextSpot, {
       volumes: token.volumes,
     });
+    await this.notifyPathBookRefresh(tokenId, safeTarget, nextSpot);
   }
 
   private resolveFinalModelPrice(run: PriceModelRun, token: TokenCrypto): number {

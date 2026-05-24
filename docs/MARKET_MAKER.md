@@ -16,6 +16,7 @@ Trang **`/admin/market-control`** (tài khoản `role=admin`):
 - Chỉnh **spread step**, **số bậc** sổ lệnh (global / từng token)
 - **Lịch điều giá A→B**: trong khoảng thời gian, giá dao động sóng sin giữa `priceMin`–`priceMax`; MM treo sổ theo mục tiêu; hết B khôi phục giá trước lịch
 - **Tăng/giảm giá spot** (+/− %), **đặt giá** cố định, **đẩy mid** sổ lệnh (không đổi DB)
+- **Đường giá + sổ lệnh:** biến động lớn (≥ ~2.5%) đi **nhiều bước** thay vì teleport; mỗi bước refresh MM + flow sweep — [ORDERBOOK_PRICE_PATH_SPEC.md](./ORDERBOOK_PRICE_PATH_SPEC.md)
 - **Bias mid** mỗi refresh, **kéo mid** về `targetPrice`, tạm dừng MM theo token
 - API: `GET/PATCH /api/v1/admin/market-control`, `POST .../refresh`, `.../tokens/:id/nudge`, v.v.
 - **Phương pháp 2 (mô hình đường giá):** `GET .../models`, `POST .../tokens/:id/model-run` — xem [MARKET_CONTROL_MODELS.md](./MARKET_CONTROL_MODELS.md) (GBM, OU, ramp, test plan QA).

@@ -11,8 +11,9 @@ import {
 } from "@/lib/futures-math";
 import { futuresHref } from "@/lib/token-routes";
 import { LiquidationEmphasis } from "@/modules/futures/LiquidationEmphasis";
-import useFetchApi from "@/hooks/useFetchApi";
+import { FuturesTpSlModal } from "@/modules/futures/FuturesTpSlModal";
 import useLiveFetch from "@/hooks/useLiveFetch";
+import { useLiveFuturesPositions } from "@/hooks/useLiveFuturesPositions";
 import useMutation from "@/hooks/useMutation";
 import type { IBalanceSnapshot } from "@/types/trade.type";
 import type {
@@ -73,19 +74,18 @@ export function FuturesMyPanel({ tokenId, refreshKey = 0, onRefetch }: Props) {
   const [tab, setTab] = useState<Tab>("open");
 
   const { data: openPos, loading: openLoading, refetch: refetchOpen } =
-    useFetchApi<FuturesPositionView[]>("/futures/positions", {
-      refreshInterval: tab === "open" ? 5000 : undefined,
-      silentOnPoll: true,
+    useLiveFetch<FuturesPositionView[]>("/futures/positions", {
+      stream: "trades",
     });
 
   const { data: history, loading: histLoading, refetch: refetchHist } =
-    useFetchApi<ClosedPositionView[]>("/futures/positions/history?limit=80", {
-      silentOnPoll: true,
+    useLiveFetch<ClosedPositionView[]>("/futures/positions/history?limit=80", {
+      stream: "trades",
     });
 
   const { data: orders, loading: ordersLoading, refetch: refetchOrders } =
-    useFetchApi<FuturesOrderView[]>("/futures/orders?limit=80", {
-      silentOnPoll: true,
+    useLiveFetch<FuturesOrderView[]>("/futures/orders?limit=80", {
+      stream: "trades",
     });
 
   const { data: balances } = useLiveFetch<IBalanceSnapshot>(
@@ -98,7 +98,8 @@ export function FuturesMyPanel({ tokenId, refreshKey = 0, onRefetch }: Props) {
     "/futures/positions/_/close"
   );
 
-  const openList = useMemo(() => openPos ?? [], [openPos]);
+  const openListRaw = useMemo(() => openPos ?? [], [openPos]);
+  const openList = useLiveFuturesPositions(openListRaw);
 
   const histList = useMemo(() => {
     const all = history ?? [];
@@ -201,6 +202,7 @@ export function FuturesMyPanel({ tokenId, refreshKey = 0, onRefetch }: Props) {
           closing={closing}
           highlightTokenId={tokenId}
           onClose={handleClose}
+          onTpSlSaved={refetchAll}
         />
       )}
 
@@ -240,12 +242,14 @@ function OpenPositionsView({
   closing,
   highlightTokenId,
   onClose,
+  onTpSlSaved,
 }: {
   list: FuturesPositionView[];
   initialLoading: boolean;
   closing: boolean;
   highlightTokenId?: string;
   onClose: (id: string) => void;
+  onTpSlSaved?: () => void;
 }) {
   if (initialLoading) {
     return (
@@ -283,6 +287,7 @@ function OpenPositionsView({
               highlightTokenId != null && p.tokenId === highlightTokenId
             }
             onClose={() => void onClose(p.id)}
+            onTpSlSaved={onTpSlSaved}
           />
         ))}
       </div>
@@ -295,12 +300,19 @@ function OpenPositionCard({
   closing,
   highlighted,
   onClose,
+  onTpSlSaved,
 }: {
   position: FuturesPositionView;
   closing: boolean;
   highlighted?: boolean;
   onClose: () => void;
+  onTpSlSaved?: () => void;
 }) {
+  const [tpSlOpen, setTpSlOpen] = useState(false);
+  const { mutate: saveTpSl, loading: savingTpSl } = useMutation(
+    "PATCH",
+    "/futures/positions/_/tp-sl"
+  );
   const isLong = p.side === "long";
   const up = p.unrealizedPnlKc >= 0;
   const roe = roePercent(p.unrealizedPnlKc, p.marginKc);
@@ -314,6 +326,7 @@ function OpenPositionCard({
   const openedAgo = moment(p.openedAt).fromNow();
 
   return (
+    <>
     <article
       className={clsx(
         "overflow-hidden rounded-xl border bg-gradient-to-br from-kc-bg/80 to-kc-surface/20 shadow-sm transition hover:border-kc-border-strong",
@@ -390,26 +403,41 @@ function OpenPositionCard({
         />
       </div>
 
-        {(p.takeProfitPrice != null || p.stopLossPrice != null) && (
-          <div className="border-t border-kc-border/50 px-4 py-2">
-            <p className="text-[10px] text-kc-muted">TP / SL</p>
-            <p className="num mt-0.5 text-[11px]">
-              {p.takeProfitPrice != null ? (
-                <span className="text-kc-up">
-                  TP {formatFixedPrice(PRICE_DECIMALS, p.takeProfitPrice)}
-                </span>
-              ) : null}
-              {p.takeProfitPrice != null && p.stopLossPrice != null ? (
-                <span className="text-kc-muted"> · </span>
-              ) : null}
-              {p.stopLossPrice != null ? (
-                <span className="text-kc-down">
-                  SL {formatFixedPrice(PRICE_DECIMALS, p.stopLossPrice)}
-                </span>
-              ) : null}
-            </p>
-          </div>
-        )}
+      <div className="flex items-center justify-between gap-2 border-t border-kc-border/50 px-4 py-2.5">
+        <div className="min-w-0">
+          <p className="text-[10px] font-medium text-kc-muted">TP / SL</p>
+          <p className="num mt-0.5 truncate text-[11px] text-kc-fg">
+            {p.takeProfitPrice != null || p.stopLossPrice != null ? (
+              <>
+                {p.takeProfitPrice != null ? (
+                  <span className="text-kc-up">
+                    TP {formatFixedPrice(PRICE_DECIMALS, p.takeProfitPrice)}
+                  </span>
+                ) : null}
+                {p.takeProfitPrice != null && p.stopLossPrice != null ? (
+                  <span className="text-kc-muted"> · </span>
+                ) : null}
+                {p.stopLossPrice != null ? (
+                  <span className="text-kc-down">
+                    SL {formatFixedPrice(PRICE_DECIMALS, p.stopLossPrice)}
+                  </span>
+                ) : null}
+              </>
+            ) : (
+              <span className="text-kc-muted">Chưa đặt</span>
+            )}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setTpSlOpen(true)}
+          className="shrink-0 rounded-md border border-kc-border px-2 py-1 text-[10px] font-semibold text-kc-accent hover:border-kc-accent/40"
+        >
+          {p.takeProfitPrice != null || p.stopLossPrice != null
+            ? "Sửa"
+            : "Thêm"}
+        </button>
+      </div>
 
       {/* Health bar */}
       <div
@@ -451,28 +479,58 @@ function OpenPositionCard({
       </div>
 
       {/* Actions */}
-      <div className="flex gap-2 border-t border-kc-border/50 bg-kc-bg/30 px-4 py-3">
+      <div className="flex flex-wrap gap-2 border-t border-kc-border/50 bg-kc-bg/30 px-4 py-3">
         <Link
           href={futuresHref({
             id: p.tokenId,
             symbol: p.symbol ?? undefined,
             name: undefined,
           })}
-          className="flex-1 inline-flex h-8 items-center justify-center rounded-lg px-3 text-sm font-medium text-kc-muted transition hover:bg-white/[0.04] hover:text-kc-fg"
+          className="inline-flex h-8 flex-1 min-w-[5rem] items-center justify-center rounded-lg px-3 text-sm font-medium text-kc-muted transition hover:bg-white/[0.04] hover:text-kc-fg"
         >
           Xem cặp
         </Link>
         <Button
           type="button"
           size="sm"
+          variant="secondary"
+          className="h-8 flex-1 min-w-[5rem]"
+          onClick={() => setTpSlOpen(true)}
+        >
+          TP / SL
+        </Button>
+        <Button
+          type="button"
+          size="sm"
           disabled={closing}
-          className="flex-1 bg-kc-down/15 text-kc-down hover:bg-kc-down/25 hover:text-kc-down"
+          className="h-8 flex-1 min-w-[5rem] bg-kc-down/15 text-kc-down hover:bg-kc-down/25 hover:text-kc-down"
           onClick={onClose}
         >
-          {closing ? "Đang đóng…" : "Đóng market"}
+          {closing ? "Đang đóng…" : "Đóng"}
         </Button>
       </div>
     </article>
+
+    <FuturesTpSlModal
+      open={tpSlOpen}
+      onClose={() => setTpSlOpen(false)}
+      side={p.side}
+      markPrice={p.markPrice}
+      initialTakeProfit={p.takeProfitPrice}
+      initialStopLoss={p.stopLossPrice}
+      saving={savingTpSl}
+      onSave={async (values) => {
+        const res = await saveTpSl(
+          values,
+          `/futures/positions/${p.id}/tp-sl`
+        );
+        if (res === undefined) return;
+        toast.success("Đã cập nhật TP/SL");
+        setTpSlOpen(false);
+        onTpSlSaved?.();
+      }}
+    />
+    </>
   );
 }
 

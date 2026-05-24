@@ -96,6 +96,27 @@ export class TokenCryptoService {
     this.schedulePricePersist(tokenId, price);
   }
 
+  /** Hủy ghi DB debounce đang chờ — tránh giá cũ ghi đè sau pump/admin. */
+  cancelPricePersist(tokenId: string): void {
+    const existing = this.pricePersistTimers.get(tokenId);
+    if (existing) clearTimeout(existing);
+    this.pricePersistTimers.delete(tokenId);
+    this.pricePersistPending.delete(tokenId);
+  }
+
+  /** Ghi DB ngay, bỏ queue debounce (cuối path walk / set giá admin). */
+  async flushPricePersist(
+    tokenId: string,
+    price: number,
+  ): Promise<TokenCrypto> {
+    this.cancelPricePersist(tokenId);
+    return this.updatePrice(tokenId, price, {
+      skipTicker: true,
+      skipPct: true,
+      skipRanks: true,
+    });
+  }
+
   private schedulePricePersist(tokenId: string, price: number): void {
     this.pricePersistPending.set(tokenId, price);
     const existing = this.pricePersistTimers.get(tokenId);
@@ -413,6 +434,7 @@ export class TokenCryptoService {
     options?: UpdatePriceOptions,
   ): Promise<TokenCrypto> {
     const price = assertPositiveSpotPrice(currentPrice, 'Giá spot');
+    this.cancelPricePersist(tokenId);
     const token = await this.tokenRepository.findById(tokenId);
 
     if (!token) {

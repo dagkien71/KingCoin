@@ -9,7 +9,16 @@ import UserEntity from '@modules/user/entities/user.entity';
 import ApiBaseResponses from '@decorators/api-base-response.decorator';
 import { SkipAuth } from '@modules/auth/skip-auth.guard';
 import TokenCryptoEntity from '@modules/token-crypto/entities/token-crypto.entity';
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { FuturesSide, User } from '@prisma/client';
 import { FuturesConfigService } from './futures-config.service';
@@ -123,6 +132,39 @@ export class FuturesController {
           : undefined,
       stopLossPrice:
         body.stopLossPrice != null ? Number(body.stopLossPrice) : undefined,
+    });
+  }
+
+  @Patch('positions/:id/tp-sl')
+  @ApiBearerAuth()
+  @UseGuards(AccessGuard)
+  @UseAbility(Actions.update, UserEntity)
+  async updateTpSl(
+    @Param('id') id: string,
+    @Body()
+    body: {
+      takeProfitPrice?: number | null;
+      stopLossPrice?: number | null;
+    },
+    @CaslUser() userProxy: UserProxy<User>,
+  ) {
+    const user = await userProxy.get();
+    if (!user?.id) return null;
+    const takeProfitPrice =
+      body.takeProfitPrice === undefined
+        ? undefined
+        : body.takeProfitPrice === null
+          ? null
+          : Number(body.takeProfitPrice);
+    const stopLossPrice =
+      body.stopLossPrice === undefined
+        ? undefined
+        : body.stopLossPrice === null
+          ? null
+          : Number(body.stopLossPrice);
+    return this.engine.updatePositionTpSl(user.id, id, {
+      takeProfitPrice,
+      stopLossPrice,
     });
   }
 

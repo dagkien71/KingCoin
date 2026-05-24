@@ -540,6 +540,59 @@ export class FuturesEngineService {
     };
   }
 
+  /** Cập nhật / thêm / xoá TP-SL trên vị thế đang mở (không đóng vị thế). */
+  async updatePositionTpSl(
+    userId: string,
+    positionId: string,
+    input: {
+      takeProfitPrice?: number | null;
+      stopLossPrice?: number | null;
+    },
+  ): Promise<PositionView> {
+    const position = await this.prisma.futuresPosition.findFirst({
+      where: {
+        id: positionId,
+        userId,
+        status: FuturesPositionStatus.open,
+      },
+    });
+    if (!position) {
+      throw new NotFoundException('Không tìm thấy vị thế mở.');
+    }
+
+    const mark = await this.markPrice.getMarkPrice(position.tokenId);
+    const nextTp =
+      input.takeProfitPrice !== undefined
+        ? input.takeProfitPrice
+        : position.takeProfitPrice;
+    const nextSl =
+      input.stopLossPrice !== undefined
+        ? input.stopLossPrice
+        : position.stopLossPrice;
+
+    let tpSl: { takeProfitPrice: number | null; stopLossPrice: number | null };
+    try {
+      tpSl = validateTpSlPrices(position.side, mark, {
+        takeProfitPrice: nextTp,
+        stopLossPrice: nextSl,
+      });
+    } catch (e) {
+      throw new BadRequestException(
+        e instanceof Error ? e.message : 'TP/SL không hợp lệ.',
+      );
+    }
+
+    const updated = await this.prisma.futuresPosition.update({
+      where: { id: position.id },
+      data: {
+        takeProfitPrice: tpSl.takeProfitPrice,
+        stopLossPrice: tpSl.stopLossPrice,
+      },
+    });
+
+    return this.toPositionView(updated);
+  }
+
   async closeMarket(params: {
     userId: string;
     positionId: string;

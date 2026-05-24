@@ -2,6 +2,8 @@ import { OrderService } from '@modules/order/order.service';
 import { RealtimeService } from '@modules/realtime/realtime.service';
 import { TokenCryptoService } from '@modules/token-crypto/token.service';
 import { MmControlService } from '@modules/market-maker/mm-control.service';
+import { pathBookRefreshMinPct } from '@modules/market-maker/orderbook-path.util';
+import { MarketFlowService } from '@modules/market-maker/market-flow.service';
 import {
   isQuoteToken,
   resolveMmTargetTokenNames,
@@ -33,6 +35,7 @@ export class MarketMakerService implements OnModuleInit {
     private readonly realtimeService: RealtimeService,
     private readonly mmControl: MmControlService,
     private readonly tokenCryptoService: TokenCryptoService,
+    private readonly marketFlow: MarketFlowService,
   ) {}
 
   /** Gọi từ admin — refresh sổ lệnh mọi token MM. */
@@ -118,10 +121,40 @@ export class MarketMakerService implements OnModuleInit {
 
     setTimeout(() => void this.refreshLiquidity(), 400);
 
+    this.mmControl.registerPathBookRefreshHook((tokenId, target) =>
+      this.onPathTargetBookRefresh(tokenId, target),
+    );
+
     // Chạy liên tục để luôn có lệnh treo gần giá hiện tại
     this.intervalHandle = setInterval(() => {
       void this.refreshLiquidity();
     }, intervalMs);
+  }
+
+  /** PP1/PP2: refresh sổ + sweep khi target path lệch đủ so với lần treo sổ trước. */
+  private async onPathTargetBookRefresh(
+    tokenId: string,
+    target: number,
+  ): Promise<void> {
+    if (!this.mmControl.hasActivePathDriver(tokenId)) return;
+
+    const last =
+      this.mmControl.getLastPathBookMid(tokenId) ??
+      this.mmControl.getMid(tokenId) ??
+      target;
+    const pct = Math.abs(target - last) / Math.max(last, 1e-12);
+    if (pct < pathBookRefreshMinPct()) return;
+
+    this.mmControl.setLastPathBookMid(tokenId, target);
+    await this.triggerRefreshForToken(tokenId);
+
+    const run = this.mmControl.getModelRun(tokenId);
+    const schedule = this.mmControl.getSchedule(tokenId);
+    let from = last;
+    if (run?.priceAtStart) from = run.priceAtStart;
+    else if (schedule?.priceAtStart) from = schedule.priceAtStart;
+    const direction = target >= from ? 'up' : 'down';
+    await this.marketFlow.sweepAlongPath(tokenId, direction, 1);
   }
 
   /** Mặc định 45 giây / lần — @Cron phải literal. */
@@ -231,14 +264,14 @@ export class MarketMakerService implements OnModuleInit {
           ? token.price
           : 1;
     const tick = this.priceTick(baseMid);
-    const scheduledMid = this.mmControl.getScheduledMid(token.id);
+    const pathMid = this.mmControl.getPathMid(token.id);
     const spotAnchor = this.mmControl.getSpotAnchor(token.id);
     let mid: number;
     let modeLabel = 'thường';
 
-    if (scheduledMid != null) {
-      mid = scheduledMid;
-      modeLabel = 'lịch giá';
+    if (pathMid != null) {
+      mid = pathMid;
+      modeLabel = 'đường giá';
     } else if (spotAnchor != null && spotAnchor > 0) {
       const t = Date.now() / 120000;
       const drift =
@@ -309,8 +342,13 @@ export class MarketMakerService implements OnModuleInit {
     this.realtimeService.broadcastOrderbook(token.id);
 
     const pathActive = this.mmControl.hasActivePathDriver(token.id);
+    const pathWalkActive = this.mmControl.isPathWalkActive(token.id);
     const volumes = fresh?.volumes ?? token.volumes;
-    if (!pathActive && !this.mmControl.shouldProtectSpot(token.id)) {
+    if (
+      !pathActive &&
+      !pathWalkActive &&
+      !this.mmControl.shouldProtectSpot(token.id)
+    ) {
       const blend = 0.14;
       const nextSpot = Number((baseMid * (1 - blend) + mid * blend).toFixed(8));
       if (Math.abs(nextSpot - baseMid) / baseMid > 1e-7) {
@@ -325,8 +363,10 @@ export class MarketMakerService implements OnModuleInit {
         });
       }
     } else {
+      const tickerPrice =
+        spotAnchor != null && spotAnchor > 0 ? spotAnchor : mid;
       this.realtimeService.emitTickerFast(token.id, {
-        price: mid,
+        price: tickerPrice,
         volumes,
       });
     }

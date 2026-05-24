@@ -4,6 +4,42 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT/backend"
 
+PRISMA_VERSION="6.19.3"
+
+clean_node_modules() {
+  if [[ -d node_modules ]]; then
+    chmod -R u+w node_modules 2>/dev/null || true
+    rm -rf node_modules
+  fi
+}
+
+install_backend_deps() {
+  if [[ -f node_modules/@prisma/client/package.json ]] && [[ -x node_modules/.bin/prisma ]]; then
+    return 0
+  fi
+  echo "==> npm install (backend — cần @prisma/client + prisma CLI)..."
+  if ! npm install; then
+    echo "==> npm install lỗi — xóa node_modules và thử lại..."
+    clean_node_modules
+    npm install
+  fi
+  if [[ ! -f node_modules/@prisma/client/package.json ]]; then
+    echo "ERROR: Thiếu @prisma/client sau npm install."
+    echo "  cd backend && chmod -R u+w node_modules 2>/dev/null; rm -rf node_modules && npm install"
+    exit 1
+  fi
+}
+
+prisma_generate() {
+  if [[ -x node_modules/.bin/prisma ]]; then
+    npm exec prisma generate
+  else
+    npx --yes "prisma@${PRISMA_VERSION}" generate
+  fi
+}
+
+install_backend_deps
+
 echo "==> Starting MongoDB (docker-compose.dev.yml)..."
 docker compose -f docker-compose.dev.yml up -d
 
@@ -29,8 +65,17 @@ docker compose -f docker-compose.dev.yml exec -T mongo-dev mongosh --port 27018 
 
 export DATABASE_URL="${DATABASE_URL:-mongodb://127.0.0.1:27018/starter?replicaSet=rs0}"
 
-echo "==> prisma db push..."
-npx prisma db push
+PUSH_FLAGS=(db push --skip-generate)
+if [[ -x node_modules/.bin/prisma ]]; then
+  echo "==> prisma db push (local ${PRISMA_VERSION})..."
+  npm exec prisma "${PUSH_FLAGS[@]}"
+else
+  echo "==> prisma db push (npx prisma@${PRISMA_VERSION})..."
+  npx --yes "prisma@${PRISMA_VERSION}" "${PUSH_FLAGS[@]}"
+fi
+
+echo "==> prisma generate (@prisma/client)..."
+prisma_generate
 
 echo "==> Seed demo (skip nếu đã có token)..."
 node scripts/seed-demo-token.js
