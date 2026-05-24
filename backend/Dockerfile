@@ -16,7 +16,8 @@ ENV HUSKY=0
 RUN apk add --no-cache python3 make g++
 COPY package.json package-lock.json ./
 COPY prisma ./prisma/
-RUN npm ci --omit=dev --legacy-peer-deps && npx prisma generate
+RUN npm ci --omit=dev --legacy-peer-deps
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/dist ./dist
 EXPOSE 3001
 CMD ["node", "dist/main.js"]
