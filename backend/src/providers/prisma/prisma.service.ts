@@ -9,6 +9,7 @@ import {
 import { Prisma, PrismaClient } from '@prisma/client';
 import { PrismaServiceOptions } from './interfaces';
 import { PRISMA_SERVICE_OPTIONS } from './prisma.constants';
+import type { PrismaClientWithUse } from './legacy-prisma-middleware';
 
 @Injectable()
 export class PrismaService
@@ -26,9 +27,12 @@ export class PrismaService
     super(prismaServiceOptions.prismaOptions);
 
     if (this.prismaServiceOptions.middlewares) {
-      this.prismaServiceOptions.middlewares.forEach((middleware) =>
-        this.$use(middleware),
-      );
+      const use = (this as unknown as PrismaClientWithUse).$use;
+      if (typeof use === 'function') {
+        this.prismaServiceOptions.middlewares.forEach((middleware) =>
+          use(middleware),
+        );
+      }
     }
   }
 

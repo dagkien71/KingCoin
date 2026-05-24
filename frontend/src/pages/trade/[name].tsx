@@ -7,7 +7,7 @@ import useAuth from "@/hooks/useAuth";
 import useGlobalTradingNotify from "@/hooks/useGlobalTradingNotify";
 import useMyOrderFillNotify from "@/hooks/useMyOrderFillNotify";
 import PriceAlertPanel from "@/components/notifications/PriceAlertPanel";
-import { MarketLiveProvider, useLiveTicker } from "@/context/market-live-context";
+import { MarketLiveProvider, useLiveTicker, useSmoothedPrice } from "@/context/market-live-context";
 import {
   LivePairTradePriceBlock,
   LivePairTradeSubtitle,
@@ -187,11 +187,13 @@ function TradeTerminal({
   } = useFetchApi<ITokenCrypto>(tokenPath);
   const cryptoData = cryptoBase ?? seedToken;
   const tickerPatch = useLiveTicker(cryptoData?.id);
+  const chartPatch = useSmoothedPrice(cryptoData?.id, "chart");
   const liveCrypto = useMemo(
     () => applyTickerPatch(cryptoData, tickerPatch) ?? cryptoData,
     [cryptoData, tickerPatch]
   );
-  const chartSpotPrice = liveCrypto?.price ?? cryptoData?.price;
+  const chartSpotPrice =
+    chartPatch?.price ?? liveCrypto?.price ?? cryptoData?.price;
   const logPath =
     cryptoData?.id != null ? `/crypto-logs/${cryptoData.id}` : "";
   const {

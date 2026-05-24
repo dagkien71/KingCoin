@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import PriceAlertPanel from "@/components/notifications/PriceAlertPanel";
 import useAuth from "@/hooks/useAuth";
 import useGlobalTradingNotify from "@/hooks/useGlobalTradingNotify";
-import { MarketLiveProvider, useLiveTicker } from "@/context/market-live-context";
+import { MarketLiveProvider, useLiveTicker, useSmoothedPrice } from "@/context/market-live-context";
 import { applyTickerPatch } from "@/lib/apply-ticker-patch";
 import useFetchApi from "@/hooks/useFetchApi";
 import { tokenCryptoApiPath } from "@/lib/token-routes";
@@ -63,6 +63,7 @@ function FuturesTerminalInner({
   });
 
   const tickerPatch = useLiveTicker(cryptoData?.id ?? null);
+  const chartPatch = useSmoothedPrice(cryptoData?.id ?? null, "chart");
   const liveToken = useMemo(
     () =>
       cryptoData ? applyTickerPatch(cryptoData, tickerPatch) ?? cryptoData : null,
@@ -71,7 +72,7 @@ function FuturesTerminalInner({
 
   const markPrice =
     markData?.markPrice ?? liveToken?.price ?? cryptoData?.price ?? 0;
-  const chartSpotPrice = markPrice;
+  const chartSpotPrice = chartPatch?.price ?? markPrice;
 
   const logPath =
     cryptoData?.id != null ? `/crypto-logs/${cryptoData.id}` : "";

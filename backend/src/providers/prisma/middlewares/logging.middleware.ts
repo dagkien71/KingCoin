@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import type { LegacyPrismaMiddleware } from '../legacy-prisma-middleware';
 
 export interface LoggingMiddlewareOptions {
   logger: Console | Logger;
@@ -39,7 +39,7 @@ export function loggingMiddleware(
     logger: console,
     logLevel: 'debug',
   },
-): Prisma.Middleware {
+): LegacyPrismaMiddleware {
   return async (params, next) => {
     const before = Date.now();
 

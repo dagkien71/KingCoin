@@ -15,7 +15,7 @@ Với **mỗi khối** (bảng, NAV, chart, form read-only, badge số dư, …)
 |---|---------|----------------------|
 | 1 | Số liệu có **đổi khi user khác / MM / admin** thao tác không? | WS hoặc poll hoặc refetch theo stream |
 | 2 | Số liệu có **đổi sau mutation** của chính user (đặt lệnh, swap, claim quest)? | `refetch()` / `updateUserInfo()` / invalidate sau `mutate` thành công |
-| 3 | Chỉ **giá / % / volume** đổi, cấu trúc JSON giữ nguyên? | `useLiveTicker` / `useLiveTokenDisplay` + `applyTickerPatch` — **không** refetch cả object; UI throttle ~300ms + flash |
+| 3 | Chỉ **giá / % / volume** đổi, cấu trúc JSON giữ nguyên? | `useSmoothedPrice` / `useLiveTicker` + `applyTickerPatch` — lerp V2 + flash |
 | 4 | **Sổ lệnh, lịch sử khớp, log chart, ví** đổi khi có trade? | `useLiveFetch` + stream `orderbook` / `trades` / `logs` |
 | 5 | Dữ liệu **tĩnh** (FAQ, label, preset admin một lần)? | Chỉ fetch mount; không poll |
 | 6 | Refetch định kỳ có làm **nháy loading / remount** component nặng (chart)? | `silentOnPoll` / `silentOnLive`; không gắn `loading` vào lifecycle chart |

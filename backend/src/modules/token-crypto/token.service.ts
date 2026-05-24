@@ -37,8 +37,25 @@ export type PriceChangePercentsStored = {
   priceChange7d: number | null;
 };
 
+export type UpdatePriceOptions = {
+  writeLog?: boolean;
+  logVolume?: number;
+  /** Không broadcast WS (sau emitTickerFast / updatePriceLive). */
+  skipTicker?: boolean;
+  /** Bỏ sync % — cron 60s hoặc sau trade. */
+  skipPct?: boolean;
+  /** Bỏ updateRanks — giảm tải MM tick. */
+  skipRanks?: boolean;
+};
+
 @Injectable()
 export class TokenCryptoService {
+  private readonly pricePersistTimers = new Map<
+    string,
+    ReturnType<typeof setTimeout>
+  >();
+  private readonly pricePersistPending = new Map<string, number>();
+
   constructor(
     private readonly tokenRepository: TokenCryptoRepository,
     private readonly userRepository: UserRepository,
@@ -48,6 +65,55 @@ export class TokenCryptoService {
     private readonly tokenLogService: TokenCryptoLogService,
     private readonly notifications: NotificationService,
   ) {}
+
+  private pricePersistDebounceMs(): number {
+    const raw = Number(process.env.PRICE_PERSIST_DEBOUNCE_MS ?? '800');
+    return Number.isFinite(raw) ? Math.max(200, raw) : 800;
+  }
+
+  /**
+   * Emit WS ngay, ghi DB debounced — MM / lịch giá (Realtime V2).
+   */
+  updatePriceLive(
+    tokenId: string,
+    persistPrice: number,
+    tickerExtra?: Record<string, unknown> & {
+      /** Giá gửi WS nếu khác giá persist (vd MM mid vs spot blend). */
+      tickerPrice?: number;
+    },
+  ): void {
+    const price = assertPositiveSpotPrice(persistPrice, 'Giá spot');
+    const emitPrice =
+      tickerExtra?.tickerPrice != null &&
+      Number.isFinite(Number(tickerExtra.tickerPrice))
+        ? assertPositiveSpotPrice(Number(tickerExtra.tickerPrice), 'Giá ticker')
+        : price;
+    const { tickerPrice: _tp, ...rest } = tickerExtra ?? {};
+    this.realtimeService.emitTickerFast(tokenId, {
+      price: emitPrice,
+      ...rest,
+    });
+    this.schedulePricePersist(tokenId, price);
+  }
+
+  private schedulePricePersist(tokenId: string, price: number): void {
+    this.pricePersistPending.set(tokenId, price);
+    const existing = this.pricePersistTimers.get(tokenId);
+    if (existing) clearTimeout(existing);
+    const timer = setTimeout(() => {
+      this.pricePersistTimers.delete(tokenId);
+      const pending = this.pricePersistPending.get(tokenId);
+      if (pending == null) return;
+      void this.updatePrice(tokenId, pending, {
+        skipTicker: true,
+        skipPct: true,
+        skipRanks: true,
+      }).catch((err) => {
+        console.error(`persistPrice debounced ${tokenId}:`, err);
+      });
+    }, this.pricePersistDebounceMs());
+    this.pricePersistTimers.set(tokenId, timer);
+  }
 
   /**
    * Tính lại % 1h / 24h / 7d từ log giá — @see docs/PRICE_CHANGE_PCT_SPEC.md
@@ -344,7 +410,7 @@ export class TokenCryptoService {
   async updatePrice(
     tokenId: string,
     currentPrice: number,
-    options?: { writeLog?: boolean; logVolume?: number },
+    options?: UpdatePriceOptions,
   ): Promise<TokenCrypto> {
     const price = assertPositiveSpotPrice(currentPrice, 'Giá spot');
     const token = await this.tokenRepository.findById(tokenId);
@@ -418,20 +484,30 @@ export class TokenCryptoService {
       );
     }
 
-    const pct = await this.syncPriceChangePercents(tokenId, price);
+    const pct = options?.skipPct
+      ? {
+          priceChange1h: updated.priceChange1h ?? null,
+          priceChange24h: updated.priceChange24h ?? null,
+          priceChange7d: updated.priceChange7d ?? null,
+        }
+      : await this.syncPriceChangePercents(tokenId, price);
 
-    this.realtimeService.broadcastTicker(tokenId, {
-      price: updated.price,
-      marketCap: updated.marketCap,
-      volumes: volumesPayload ?? updated.volumes,
-      priceChange1h: pct.priceChange1h,
-      priceChange24h: pct.priceChange24h,
-      priceChange7d: pct.priceChange7d,
-    });
+    if (!options?.skipTicker) {
+      this.realtimeService.broadcastTicker(tokenId, {
+        price: updated.price,
+        marketCap: updated.marketCap,
+        volumes: volumesPayload ?? updated.volumes,
+        priceChange1h: pct.priceChange1h,
+        priceChange24h: pct.priceChange24h,
+        priceChange7d: pct.priceChange7d,
+      });
+    }
 
-    void this.updateRanks().catch((err) => {
-      console.error('updateRanks after price:', err);
-    });
+    if (!options?.skipRanks) {
+      void this.updateRanks().catch((err) => {
+        console.error('updateRanks after price:', err);
+      });
+    }
 
     return {
       ...updated,

@@ -584,10 +584,8 @@ export class MmControlService implements OnModuleInit, OnModuleDestroy {
     );
     if (Math.abs(nextSpot - spot) / spot < 1e-6) return;
 
-    const updated = await this.tokenService.updatePrice(tokenId, nextSpot);
-    this.realtimeService.broadcastTicker(tokenId, {
-      price: nextSpot,
-      volumes: updated.volumes,
+    this.tokenService.updatePriceLive(tokenId, nextSpot, {
+      volumes: token.volumes,
     });
   }
 
@@ -792,17 +790,16 @@ export class MmControlService implements OnModuleInit, OnModuleDestroy {
       this.setMid(token.id, price);
     }
     const updated = await this.tokenService.updatePrice(token.id, price);
-    let volumes = updated.volumes;
     if (logVolume > 0) {
       await this.tokenLogService.createLog(token.id, price, logVolume);
-      volumes = (await this.tokenService
+      const volumes = (await this.tokenService
         .syncVolumesFromLogs(token.id)
-        .catch(() => null)) as typeof volumes;
+        .catch(() => null)) as typeof updated.volumes;
+      this.realtimeService.emitTickerFast(token.id, {
+        price,
+        volumes: volumes ?? updated.volumes,
+      });
     }
-    this.realtimeService.broadcastTicker(token.id, {
-      price,
-      volumes: volumes ?? updated.volumes,
-    });
     return updated;
   }
 

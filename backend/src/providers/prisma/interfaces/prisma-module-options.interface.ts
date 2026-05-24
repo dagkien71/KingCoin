@@ -1,5 +1,6 @@
 import { ModuleMetadata, Type } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import type { LegacyPrismaMiddleware } from '../legacy-prisma-middleware';
 
 export interface PrismaModuleOptions {
   /**
@@ -31,7 +32,7 @@ export interface PrismaServiceOptions {
    *
    * See: https://www.prisma.io/docs/concepts/components/prisma-client/middleware
    */
-  middlewares?: Array<Prisma.Middleware>;
+  middlewares?: Array<LegacyPrismaMiddleware>;
 }
 
 export interface PrismaOptionsFactory {

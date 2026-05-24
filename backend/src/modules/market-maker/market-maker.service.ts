@@ -307,24 +307,28 @@ export class MarketMakerService implements OnModuleInit {
     }
 
     this.realtimeService.broadcastOrderbook(token.id);
-    this.realtimeService.broadcastTicker(token.id, {
-      price: mid,
-      volumes: fresh?.volumes ?? token.volumes,
-    });
 
     const pathActive = this.mmControl.hasActivePathDriver(token.id);
+    const volumes = fresh?.volumes ?? token.volumes;
     if (!pathActive && !this.mmControl.shouldProtectSpot(token.id)) {
       const blend = 0.14;
       const nextSpot = Number((baseMid * (1 - blend) + mid * blend).toFixed(8));
       if (Math.abs(nextSpot - baseMid) / baseMid > 1e-7) {
-        try {
-          await this.tokenCryptoService.updatePrice(token.id, nextSpot);
-        } catch (e) {
-          this.logger.debug(
-            `MM: không cập nhật spot ${token.name}: ${(e as Error).message}`,
-          );
-        }
+        this.tokenCryptoService.updatePriceLive(token.id, nextSpot, {
+          tickerPrice: mid,
+          volumes,
+        });
+      } else {
+        this.realtimeService.emitTickerFast(token.id, {
+          price: mid,
+          volumes,
+        });
       }
+    } else {
+      this.realtimeService.emitTickerFast(token.id, {
+        price: mid,
+        volumes,
+      });
     }
 
     this.logger.log(

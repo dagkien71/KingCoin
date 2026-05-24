@@ -1,5 +1,7 @@
 # Frontend: Realtime (Live UI)
 
+**V2 (smoothing):** [REALTIME_V2_SPEC.md](../REALTIME_V2_SPEC.md) — ingest raw + lerp display (thay throttle 300ms v1).
+
 **Checklist khi làm UI mới:** [UI_DATA_FRESHNESS_SPEC.md](../UI_DATA_FRESHNESS_SPEC.md) — mỗi vùng có cần cập nhật khi API/WS đổi không; nếu có thì phải implement.
 
 **Path:**  
@@ -21,18 +23,21 @@
 
 ---
 
-## 2. Kiến trúc (bắt buộc dùng thống nhất)
+## 2. Kiến trúc V2 (bắt buộc dùng thống nhất)
 
 ```
 MarketLiveProvider (_app global + trade nested tokenId)
   → Socket.IO subscribe channels
-  → pending tickers (ref) → flush mỗi DISPLAY_TICKER_MS (~300ms)
-  → tickers{} display cache + flash up/down + revisions per stream
-       ├── useLiveTicker / useLiveTokenDisplay  → UI giá (đã throttle)
-       └── useLiveFetch(url, stream)  → silent REST refetch (book, trades, logs)
+  → rawTargets (ingest ngay) → PriceSmootherEngine (RAF lerp)
+  → tickers{} smoothed theo profile (ui / chart / nav) + flash + revisions
+       ├── useSmoothedPrice / useLiveTicker  → UI giá (profile ui)
+       ├── useSmoothedPrice(..., "chart")    → forming bar chart
+       └── useLiveFetch(url, stream)         → silent REST refetch (book, trades, logs)
 ```
 
-**Hiển thị giá:** WS vẫn nhận mọi tick; UI chỉ cập nhật tối đa ~3–4 lần/giây (`constants/live-display.ts`). NAV dashboard debounce thêm `NAV_PRICE_DEBOUNCE_MS`. Xem `PriceFlash`, `useLiveTokenDisplay`.
+**Legacy v1:** throttle `DISPLAY_TICKER_MS` (~300ms) — **deprecated**, thay bằng lerp V2.
+
+**Hiển thị giá:** WS nhận mọi tick; UI lerp tới target (`SMOOTH_TAU_*_MS`). NAV dùng profile `nav`. Xem `PriceFlash`, `useLiveTokenDisplay`.
 
 ---
 

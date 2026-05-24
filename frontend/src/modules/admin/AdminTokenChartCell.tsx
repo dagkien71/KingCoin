@@ -3,7 +3,7 @@
 import { TokenIdentity } from "@/components/token/TokenLogo";
 import { AdminTokenChartPlot } from "@/modules/admin/AdminTokenChartPlot";
 import { LiveTokenChangePct } from "@/components/live/LiveTokenStats";
-import { useLiveTicker } from "@/context/market-live-context";
+import { useLiveTicker, useSmoothedPrice } from "@/context/market-live-context";
 import useFetchApi from "@/hooks/useFetchApi";
 import { applyTickerPatch } from "@/lib/apply-ticker-patch";
 import { tokenDetailPath, tradeHref } from "@/lib/token-routes";
@@ -30,10 +30,12 @@ export function AdminTokenChartCell({
   refreshKey,
 }: Props) {
   const patch = useLiveTicker(token.id);
+  const chartPatch = useSmoothedPrice(token.id, "chart");
   const live = useMemo(
     () => applyTickerPatch(token, patch) ?? token,
     [token, patch]
   );
+  const chartSpotPrice = chartPatch?.price ?? live.price;
 
   const logPath = token.id ? `/crypto-logs/${token.id}` : "";
   const { data: logs, loading, refetch } = useFetchApi<ITokenCryptoLog[]>(
@@ -109,7 +111,7 @@ export function AdminTokenChartCell({
           logs={logs}
           loading={loading}
           timeframeId={timeframeId}
-          spotPrice={live.price}
+          spotPrice={chartSpotPrice}
         />
       </div>
     </article>

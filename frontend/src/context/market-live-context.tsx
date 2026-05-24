@@ -1,10 +1,10 @@
 "use client";
 
-import { LIVE_FALLBACK_MS } from "@/constant/config";
-import {
-  DISPLAY_TICKER_MS,
-  PRICE_FLASH_MS,
-} from "@/constants/live-display";
+import { API_URL, LIVE_FALLBACK_MS } from "@/constant/config";
+import { PRICE_FLASH_MS } from "@/constants/live-display";
+import { allSmoothTauMs } from "@/lib/live/smooth-profiles";
+import { PriceSmootherEngine } from "@/lib/live/price-smoother";
+import type { SmoothProfile } from "@/lib/live/smooth-profiles";
 import {
   getMarketSocket,
   subscribeChannel,
@@ -12,6 +12,7 @@ import {
 } from "@/lib/market-realtime-socket";
 import { mergeTickerPatch } from "@/lib/merge-ticker-patch";
 import type { TokenVolumes } from "@/types/token.type";
+import type { ITokenCrypto } from "@/types/token.type";
 import React, {
   createContext,
   useCallback,
@@ -40,11 +41,18 @@ export type TickerPatch = {
   priceChange24h?: number;
   priceChange7d?: number;
   at?: number;
-  /** Hướng thay đổi giá lần flush gần nhất — cho UI flash */
   flash?: TickerFlash;
 };
 
 type RevisionMap = Record<LiveStreamKey, number>;
+
+type SmoothedMaps = Record<SmoothProfile, Record<string, TickerPatch>>;
+
+const emptySmoothed = (): SmoothedMaps => ({
+  ui: {},
+  chart: {},
+  nav: {},
+});
 
 const defaultRevisions = (): RevisionMap => ({
   ticker: 0,
@@ -54,20 +62,13 @@ const defaultRevisions = (): RevisionMap => ({
   logs: 0,
 });
 
-function displayTickerIntervalMs(): number {
-  if (typeof window === "undefined") return DISPLAY_TICKER_MS;
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    return Math.max(DISPLAY_TICKER_MS, 800);
-  }
-  return DISPLAY_TICKER_MS;
-}
-
 type MarketLiveContextValue = {
   tokenId: string | null;
   connected: boolean;
   revisions: RevisionMap;
-  /** Patch đã throttle — dùng cho mọi UI giá/volume */
+  /** Profile ui — backward compat với useLiveTicker */
   tickers: Record<string, TickerPatch>;
+  smoothedByProfile: SmoothedMaps;
 };
 
 const MarketLiveContext = createContext<MarketLiveContextValue | null>(null);
@@ -80,21 +81,24 @@ export function MarketLiveProvider({
   children: React.ReactNode;
 }) {
   const [revisions, setRevisions] = useState<RevisionMap>(defaultRevisions);
-  const [tickers, setTickers] = useState<Record<string, TickerPatch>>({});
+  const [smoothedByProfile, setSmoothedByProfile] =
+    useState<SmoothedMaps>(emptySmoothed);
   const [connected, setConnected] = useState(false);
 
   const tokenIdRef = useRef(tokenId ?? null);
   tokenIdRef.current = tokenId ?? null;
 
-  const pendingRef = useRef<Record<string, TickerPatch>>({});
-  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flashTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>(
     {}
   );
+  const uiFlashRef = useRef<Record<string, TickerFlash | undefined>>({});
+  const engineRef = useRef<PriceSmootherEngine | null>(null);
+  const bumpRef = useRef<(key: LiveStreamKey) => void>(() => {});
 
   const bump = useCallback((key: LiveStreamKey) => {
     setRevisions((prev) => ({ ...prev, [key]: prev[key] + 1 }));
   }, []);
+  bumpRef.current = bump;
 
   const clearFlashLater = useCallback((tokenIds: string[]) => {
     for (const id of tokenIds) {
@@ -102,76 +106,107 @@ export function MarketLiveProvider({
       if (prev) clearTimeout(prev);
       flashTimersRef.current[id] = setTimeout(() => {
         delete flashTimersRef.current[id];
-        setTickers((cur) => {
-          const row = cur[id];
+        delete uiFlashRef.current[id];
+        setSmoothedByProfile((cur) => {
+          const row = cur.ui[id];
           if (!row?.flash) return cur;
           return {
             ...cur,
-            [id]: { ...row, flash: undefined },
+            ui: {
+              ...cur.ui,
+              [id]: { ...row, flash: undefined },
+            },
           };
         });
       }, PRICE_FLASH_MS);
     }
   }, []);
 
-  const flushDisplayTickers = useCallback(() => {
-    flushTimerRef.current = null;
-    const pending = pendingRef.current;
-    const ids = Object.keys(pending);
-    if (ids.length === 0) return;
+  const uiPricesRef = useRef<Record<string, number | undefined>>({});
+  const targetPricesRef = useRef<Record<string, number | undefined>>({});
 
-    pendingRef.current = {};
-
-    const flushedIds: string[] = [];
-
-    setTickers((prev) => {
-      const next = { ...prev };
-      for (const id of ids) {
-        const patch = pending[id];
-        const before = prev[id];
-        const merged = mergeTickerPatch(before, patch);
-
-        let flash: TickerFlash | undefined;
-        if (
-          merged.price != null &&
-          before?.price != null &&
-          merged.price !== before.price
-        ) {
-          flash = merged.price > before.price ? "up" : "down";
-        }
-
-        next[id] = flash ? { ...merged, flash } : { ...merged, flash: undefined };
-        flushedIds.push(id);
-      }
-      return next;
-    });
-
-    if (flushedIds.length > 0) {
-      bump("ticker");
-      clearFlashLater(flushedIds);
-    }
-  }, [bump, clearFlashLater]);
-
-  const scheduleFlush = useCallback(() => {
-    if (flushTimerRef.current != null) return;
-    flushTimerRef.current = setTimeout(
-      flushDisplayTickers,
-      displayTickerIntervalMs()
-    );
-  }, [flushDisplayTickers]);
-
-  const queueTicker = useCallback(
+  const ingestTargetStable = useCallback(
     (payload: TickerPatch) => {
       if (!payload?.tokenId) return;
-      const prev = pendingRef.current[payload.tokenId];
-      pendingRef.current[payload.tokenId] = mergeTickerPatch(prev, {
-        ...payload,
-        at: payload.at ?? Date.now(),
-      });
-      scheduleFlush();
+      const engine = engineRef.current;
+      if (!engine) return;
+
+      const id = payload.tokenId;
+      const prevTarget = targetPricesRef.current[id];
+      const merged = mergeTickerPatch(
+        { tokenId: id },
+        { ...payload, at: payload.at ?? Date.now() }
+      );
+
+      const changedIds = engine.setTarget(id, merged);
+      const newPrice = merged.price;
+
+      if (
+        newPrice != null &&
+        changedIds.includes(id) &&
+        prevTarget != null &&
+        newPrice !== prevTarget
+      ) {
+        uiFlashRef.current[id] = newPrice > prevTarget ? "up" : "down";
+        bumpRef.current("ticker");
+        clearFlashLater([id]);
+      } else if (changedIds.length > 0) {
+        bumpRef.current("ticker");
+      }
+
+      if (newPrice != null) {
+        targetPricesRef.current[id] = newPrice;
+      }
     },
-    [scheduleFlush]
+    [clearFlashLater]
   );
+
+  useEffect(() => {
+    const engine = new PriceSmootherEngine({
+      tauMs: allSmoothTauMs(),
+      onFrame: ({ ui, chart, nav }) => {
+        uiPricesRef.current = Object.fromEntries(
+          Object.entries(ui).map(([k, v]) => [k, v.price])
+        );
+        setSmoothedByProfile({
+          ui: Object.fromEntries(
+            Object.entries(ui).map(([id, patch]) => [
+              id,
+              uiFlashRef.current[id]
+                ? { ...patch, flash: uiFlashRef.current[id] }
+                : { ...patch, flash: undefined },
+            ])
+          ),
+          chart,
+          nav,
+        });
+      },
+    });
+    engineRef.current = engine;
+    return () => {
+      engine.dispose();
+      engineRef.current = null;
+    };
+  }, []);
+
+  const ingestFromTokenList = useCallback((tokens: ITokenCrypto[]) => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    for (const t of tokens) {
+      if (!t?.id) continue;
+      engine.setTarget(t.id, {
+        tokenId: t.id,
+        price: t.price ?? undefined,
+        marketCap: t.marketCap ?? undefined,
+        volumes: t.volumes ?? undefined,
+        priceChange1h: t.priceChange1h ?? undefined,
+        priceChange24h: t.priceChange24h ?? undefined,
+        priceChange7d: t.priceChange7d ?? undefined,
+        at: Date.now(),
+      });
+    }
+    bumpRef.current("ticker");
+  }, []);
 
   useEffect(() => {
     const s = getMarketSocket();
@@ -186,7 +221,7 @@ export function MarketLiveProvider({
 
     const onTicker = (payload: TickerPatch) => {
       if (!matchesToken(payload)) return;
-      queueTicker(payload);
+      ingestTargetStable(payload);
     };
 
     const onOrderbook = (payload: { tokenId?: string }) => {
@@ -202,7 +237,7 @@ export function MarketLiveProvider({
 
     const onMarkets = (payload: TickerPatch) => {
       if (payload?.tokenId && (payload.price != null || payload.volumes)) {
-        queueTicker(payload);
+        ingestTargetStable(payload);
       }
     };
 
@@ -226,8 +261,24 @@ export function MarketLiveProvider({
       subscribeChannel(`trades:${tokenId}`);
     }
 
-    const fallback = setInterval(() => {
+    const fallback = setInterval(async () => {
       if (s.connected) return;
+
+      try {
+        const res = await fetch(`${API_URL}/token-crypto/all`);
+        if (res.ok) {
+          const json = (await res.json()) as
+            | ITokenCrypto[]
+            | { data?: ITokenCrypto[] };
+          const list = Array.isArray(json) ? json : (json.data ?? []);
+          if (list.length > 0) {
+            ingestFromTokenList(list);
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+
       if (tokenId) {
         bump("orderbook");
         bump("trades");
@@ -236,11 +287,11 @@ export function MarketLiveProvider({
 
     return () => {
       clearInterval(fallback);
-      if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
       for (const t of Object.values(flashTimersRef.current)) {
         clearTimeout(t);
       }
       flashTimersRef.current = {};
+      uiFlashRef.current = {};
       s.off("connect", onConnect);
       s.off("disconnect", onDisconnect);
       s.off("ticker", onTicker);
@@ -254,7 +305,9 @@ export function MarketLiveProvider({
         unsubscribeChannel(`trades:${tokenId}`);
       }
     };
-  }, [tokenId, bump, queueTicker]);
+  }, [tokenId, bump, ingestTargetStable, ingestFromTokenList]);
+
+  const tickers = smoothedByProfile.ui;
 
   const value = useMemo(
     () => ({
@@ -262,8 +315,9 @@ export function MarketLiveProvider({
       connected,
       revisions,
       tickers,
+      smoothedByProfile,
     }),
-    [tokenId, connected, revisions, tickers]
+    [tokenId, connected, revisions, tickers, smoothedByProfile]
   );
 
   return (
@@ -281,6 +335,7 @@ export function useMarketLive(): MarketLiveContextValue {
       connected: false,
       revisions: defaultRevisions(),
       tickers: {},
+      smoothedByProfile: emptySmoothed(),
     };
   }
   return ctx;
@@ -290,10 +345,18 @@ export function useMarketLiveRevision(key: LiveStreamKey): number {
   return useMarketLive().revisions[key];
 }
 
-/** Patch giá/volume đã throttle — dùng cho UI */
+/** Patch giá profile ui — alias backward compat */
 export function useLiveTicker(
   tokenId: string | undefined | null
 ): TickerPatch | undefined {
-  const { tickers } = useMarketLive();
-  return tokenId ? tickers[tokenId] : undefined;
+  return useSmoothedPrice(tokenId, "ui");
+}
+
+export function useSmoothedPrice(
+  tokenId: string | undefined | null,
+  profile: SmoothProfile = "ui"
+): TickerPatch | undefined {
+  const { smoothedByProfile } = useMarketLive();
+  if (!tokenId) return undefined;
+  return smoothedByProfile[profile][tokenId];
 }

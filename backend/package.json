@@ -32,6 +32,12 @@
     "credit:kingcoin-balance": "node scripts/credit-kingcoin-balance.js",
     "reset:market": "node scripts/reset-seed-10-tokens.js && node scripts/ensure-market-maker-user.js && node scripts/ensure-flow-trader-user.js && node scripts/ensure-bot-inventory.js && node scripts/ensure-demo-user-kc.js && node scripts/sync-price-changes.js"
   },
+  "overrides": {
+    "@nestjs/common": "10.0.2",
+    "@nestjs/core": "10.0.2",
+    "@nestjs/platform-express": "10.0.2",
+    "@nestjs/testing": "10.0.2"
+  },
   "keywords": [
     "nestjs",
     "prisma",
@@ -52,12 +58,12 @@
     "@nestjs/core": "10.0.2",
     "@nestjs/jwt": "10.1.0",
     "@nestjs/platform-express": "10.0.2",
-    "@nestjs/platform-socket.io": "^10.0.2",
+    "@nestjs/platform-socket.io": "10.0.2",
     "@nestjs/schedule": "^5.0.1",
     "@nestjs/swagger": "7.0.2",
     "@nestjs/terminus": "10.0.1",
     "@nestjs/throttler": "4.1.0",
-    "@nestjs/websockets": "^10.0.2",
+    "@nestjs/websockets": "10.0.2",
     "@nodeteam/nestjs-pipes": "1.2.5",
     "@nodeteam/nestjs-prisma-pagination": "1.0.6",
     "@prisma/client": "^6.2.1",
@@ -75,7 +81,7 @@
     "mongodb": "^6.12.0",
     "reflect-metadata": "0.1.13",
     "rxjs": "7.8.1",
-    "socket.io": "^4.7.5",
+    "socket.io": "4.7.5",
     "sqs-consumer": "7.2.0",
     "sqs-producer": "3.1.2",
     "web-push": "^3.6.7",

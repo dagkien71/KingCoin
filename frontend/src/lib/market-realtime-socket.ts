@@ -9,8 +9,9 @@ export function getMarketSocket(): Socket {
     throw new Error("Socket chỉ dùng phía client");
   }
   if (!socket) {
+    const isProd = process.env.NODE_ENV === "production";
     socket = io(`${API_ORIGIN}${WS_NAMESPACE}`, {
-      transports: ["websocket", "polling"],
+      transports: isProd ? ["websocket"] : ["websocket", "polling"],
       autoConnect: true,
       reconnection: true,
       reconnectionDelayMax: 5000,

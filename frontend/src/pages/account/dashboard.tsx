@@ -2,9 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LiveAssetQuotePrice } from "@/components/live/LiveTokenStats";
 import { QUOTE_SYMBOL } from "@/constants/quote";
 import { useMarketLive } from "@/context/market-live-context";
-import { NAV_PRICE_DEBOUNCE_MS } from "@/constants/live-display";
 import useAuth from "@/hooks/useAuth";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import useFetchApi from "@/hooks/useFetchApi";
 import useLiveFetch from "@/hooks/useLiveFetch";
 import { tradeHref } from "@/lib/token-routes";
@@ -39,8 +37,16 @@ export default function Dashboard() {
     { id: string; completed: boolean }[] | null
   >("/quests");
 
-  const { tickers } = useMarketLive();
-  const tickersForNav = useDebouncedValue(tickers, NAV_PRICE_DEBOUNCE_MS);
+  const { smoothedByProfile } = useMarketLive();
+  const navTickers = smoothedByProfile.nav;
+  const livePriceById = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const [id, patch] of Object.entries(navTickers)) {
+      if (patch.price != null && patch.price > 0) m.set(id, patch.price);
+    }
+    return m;
+  }, [navTickers]);
+
   const tokensById = useMemo(() => {
     const m = new Map<string, ITokenCrypto>();
     for (const c of coins ?? []) {
@@ -48,14 +54,6 @@ export default function Dashboard() {
     }
     return m;
   }, [coins]);
-
-  const livePriceById = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const [id, patch] of Object.entries(tickersForNav)) {
-      if (patch.price != null && patch.price > 0) m.set(id, patch.price);
-    }
-    return m;
-  }, [tickersForNav]);
 
   const portfolio = useMemo(
     () =>

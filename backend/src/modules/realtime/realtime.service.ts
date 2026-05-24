@@ -25,6 +25,14 @@ export class RealtimeService {
     tokenId: string,
     payload: Record<string, unknown>,
   ): void {
+    this.emitTickerFast(tokenId, payload);
+  }
+
+  /** WS only — không ghi DB (Realtime V2 hot path). */
+  emitTickerFast(
+    tokenId: string,
+    payload: Record<string, unknown>,
+  ): void {
     this.gateway.emitToChannel(this.tickerChannel(tokenId), 'ticker', {
       tokenId,
       at: Date.now(),
