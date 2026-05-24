@@ -88,27 +88,27 @@ export const platformMainSteps: TourStep[] = [
     side: "top",
   },
   {
-    id: "nav-wallet",
-    target: '[data-tour="nav-wallet"]',
-    title: "Ví KingCoin",
+    id: "nav-account",
+    target: '[data-tour="nav-account"]',
+    title: "Tài sản & tài khoản",
     description:
-      "Xem số dư KC (quote) và token alt đang nắm. NAV tổng quy về KC theo giá spot hiện tại.",
+      "Tổng quát NAV (KC + alt), tab Lịch sử (biến động ví & spot), và Thông tin hồ sơ.",
     side: "bottom",
     beforeShow: ensureMobileNavVisible,
   },
   {
-    id: "wallet-balances",
-    route: "/wallet",
-    target: '[data-tour="wallet-balances"]',
-    title: "Số dư & lịch sử",
+    id: "account-overview",
+    route: "/account/dashboard",
+    target: '[data-tour="account-overview"]',
+    title: "Tổng quát tài sản",
     description:
-      "KC hiển thị riêng vì là stablecoin nội bộ. Token alt được định giá lại theo giá thị trường khi xem portfolio.",
+      "NAV quy KC theo giá spot. KC là stablecoin quote; alt được định giá lại theo thị trường.",
     side: "top",
   },
   {
     id: "nav-quest",
     target: '[data-tour="nav-quest"]',
-    route: "/wallet",
+    route: "/account/dashboard",
     title: "Nhiệm vụ — kiếm KC",
     description:
       "Hoàn thành quest (đăng ký, trade, mời bạn…) để nhận KC miễn phí — nguồn vốn chính cho người mới.",

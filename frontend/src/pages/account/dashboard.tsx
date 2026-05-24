@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LiveAssetQuotePrice } from "@/components/live/LiveTokenStats";
 import { QUOTE_SYMBOL } from "@/constants/quote";
@@ -8,19 +7,13 @@ import useAuth from "@/hooks/useAuth";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import useFetchApi from "@/hooks/useFetchApi";
 import useLiveFetch from "@/hooks/useLiveFetch";
-import { ledgerEntryLabel } from "@/lib/ledger-labels";
 import { tradeHref } from "@/lib/token-routes";
-import { AccountQuickLinks } from "@/modules/account/components/AccountQuickLinks";
 import { AllocationDonut } from "@/modules/account/components/AllocationDonut";
 import { buildPortfolio, formatPnLLine } from "@/modules/account/portfolio";
-import type { IBalanceSnapshot, ILedgerEntry } from "@/types/trade.type";
+import type { IBalanceSnapshot } from "@/types/trade.type";
 import { ITokenCrypto } from "@/types/token.type";
-import {
-  formatSignedKcAmount,
-  formatTokenPrice,
-} from "@/utils/format-number";
+import { formatTokenPrice } from "@/utils/format-number";
 import Link from "next/link";
-import { useRouter } from "next/router";
 import { useMemo, useState } from "react";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 
@@ -31,7 +24,6 @@ function maskValue(hidden: boolean, value: string): string {
 }
 
 export default function Dashboard() {
-  const router = useRouter();
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [hideSmallAssets, setHideSmallAssets] = useState(true);
@@ -43,18 +35,12 @@ export default function Dashboard() {
     useLiveFetch<IBalanceSnapshot>("/users/me/balances", {
       stream: "trades",
     });
-  const { data: ledgerRaw } = useLiveFetch<{ data: ILedgerEntry[] }>(
-    "/users/me/ledger",
-    { stream: "trades" }
-  );
   const { data: quests } = useFetchApi<
     { id: string; completed: boolean }[] | null
   >("/quests");
 
   const { tickers } = useMarketLive();
   const tickersForNav = useDebouncedValue(tickers, NAV_PRICE_DEBOUNCE_MS);
-  const ledgerEntries = ledgerRaw?.data ?? [];
-
   const tokensById = useMemo(() => {
     const m = new Map<string, ITokenCrypto>();
     for (const c of coins ?? []) {
@@ -107,7 +93,10 @@ export default function Dashboard() {
 
   return (
     <main className="min-h-screen bg-kc-bg text-kc-fg">
-      <div className="container mx-auto max-w-6xl p-4 pb-16">
+      <div
+        className="container mx-auto max-w-6xl p-4 pb-16"
+        data-tour="account-overview"
+      >
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Tổng quát</h1>
@@ -117,9 +106,15 @@ export default function Dashboard() {
                 {user?.username ?? user?.email ?? "bạn"}
               </span>
               {memberSince ? ` · Thành viên từ ${memberSince}` : null}
+              {" · "}
+              <Link
+                href="/account/history"
+                className="text-kc-accent hover:underline"
+              >
+                Xem lịch sử
+              </Link>
             </p>
           </div>
-          <AccountQuickLinks />
         </div>
 
         {pendingQuests > 0 ? (
@@ -196,50 +191,6 @@ export default function Dashboard() {
                       </span>
                     </div>
                   </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    size="sm"
-                    type="button"
-                    disabled
-                    title="Mô phỏng — không hỗ trợ nạp fiat/on-chain"
-                  >
-                    Nạp tiền
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    type="button"
-                    onClick={() => router.push("/convert")}
-                  >
-                    Chuyển đổi
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    type="button"
-                    onClick={() => router.push("/trade")}
-                  >
-                    Giao dịch
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    type="button"
-                    disabled
-                    title="Mô phỏng — không hỗ trợ rút fiat/on-chain"
-                  >
-                    Rút tiền
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    type="button"
-                    onClick={() => router.push("/wallet")}
-                  >
-                    Ví chi tiết
-                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -423,47 +374,6 @@ export default function Dashboard() {
                     },
                   ]}
                 />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex-row items-center justify-between space-y-0">
-                <CardTitle>Giao dịch gần đây</CardTitle>
-                <Link
-                  href="/wallet"
-                  className="text-xs font-medium text-kc-accent hover:underline"
-                >
-                  Xem tất cả
-                </Link>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {ledgerEntries.slice(0, 8).map((e) => (
-                  <div
-                    key={e.id}
-                    className="flex items-start justify-between gap-2 border-b border-kc-border/80 pb-3 text-sm last:border-0 last:pb-0"
-                  >
-                    <div className="min-w-0">
-                      <span className="block text-kc-fg">
-                        {ledgerEntryLabel(e.refType, e.note)}
-                      </span>
-                      <span className="text-xs text-kc-muted">
-                        {new Date(e.createdAt).toLocaleString("vi-VN")}
-                      </span>
-                    </div>
-                    <span
-                      className={`num shrink-0 font-semibold ${
-                        e.amount >= 0 ? "text-kc-up" : "text-kc-down"
-                      }`}
-                    >
-                      {hideBalances
-                        ? "******"
-                        : `${e.amount >= 0 ? "+" : ""}${formatSignedKcAmount(e.amount, 2)} ${e.currency}`}
-                    </span>
-                  </div>
-                ))}
-                {!ledgerEntries.length ? (
-                  <p className="text-sm text-kc-muted">Chưa có biến động ví.</p>
-                ) : null}
               </CardContent>
             </Card>
           </div>

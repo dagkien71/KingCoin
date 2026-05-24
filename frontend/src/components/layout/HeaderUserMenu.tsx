@@ -106,7 +106,7 @@ export default function HeaderUserMenu() {
               className={menuItemClass}
               onClick={() => {
                 setOpen(false);
-                router.push("/account");
+                router.push("/account/dashboard");
               }}
             >
               <HiOutlineUserCircle className="h-5 w-5 text-kc-muted" />

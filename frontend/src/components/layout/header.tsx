@@ -28,7 +28,7 @@ const NAV = [
   { label: "Thị trường", href: "/token/list", tourId: "nav-markets" },
   { label: "Giao dịch", href: defaultTradeHref(), tourId: "nav-trade" },
   { label: "Futures", href: "/futures", tourId: "nav-futures" },
-  { label: "Ví", href: "/wallet", tourId: "nav-wallet" },
+  { label: "Tài sản", href: "/account/dashboard", tourId: "nav-account" },
   { label: "Nhiệm vụ", href: "/quest", tourId: "nav-quest" },
   { label: "Chuyển đổi", href: "/convert", tourId: "nav-convert" },
 ];
@@ -37,7 +37,8 @@ function isNavActive(pathname: string, href: string) {
   if (href === "/token/list") return pathname.startsWith("/token/list");
   if (href.startsWith("/trade")) return pathname.startsWith("/trade");
   if (href === "/futures") return pathname.startsWith("/futures");
-  if (href === "/wallet") return pathname.startsWith("/wallet");
+  if (href === "/account/dashboard")
+    return pathname.startsWith("/account");
   if (href === "/quest") return pathname.startsWith("/quest");
   if (href === "/convert") return pathname.startsWith("/convert");
   return pathname === href;
@@ -260,7 +261,7 @@ export default function Header() {
                     className="w-full"
                     onClick={() => {
                       setOpen(false);
-                      router.push("/account");
+                      router.push("/account/dashboard");
                     }}
                   >
                     Tài khoản
