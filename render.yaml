@@ -14,6 +14,8 @@ services:
         value: production
       - key: DATABASE_URL
         sync: false
+      - key: DATABASE_NAME
+        value: kingcoin
       - key: JWT_SECRET
         sync: false
       - key: SWAGGER_PASSWORD
