@@ -31,6 +31,9 @@ import PriceAlertPanel from "@/components/notifications/PriceAlertPanel";
 import { tokenCryptoApiPath, tradeHref } from "@/lib/token-routes";
 import { cn } from "@/lib/cn";
 import useAuth from "@/hooks/useAuth";
+import { getDynamicPageProps } from "@/lib/next-dynamic-slugs";
+
+export const getServerSideProps = getDynamicPageProps;
 
 const Stat = ({ label, value }: { label: string; value: React.ReactNode }) => (
   <div className="rounded-lg border border-kc-border bg-kc-surface/40 px-4 py-3">
