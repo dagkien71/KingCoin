@@ -10,7 +10,10 @@ export type SquareOgMeta = {
   siteName?: string;
 };
 
-const DEFAULT_OG_IMAGE = "/og-default.svg";
+/** Banner marketing KingCoin — `frontend/public/og-site.jpg` */
+export const DEFAULT_OG_IMAGE = "/og-site.jpg";
+export const DEFAULT_OG_IMAGE_WIDTH = 1024;
+export const DEFAULT_OG_IMAGE_HEIGHT = 571;
 const SITE_NAME = "KingCoin";
 
 function truncate(text: string, max: number): string {

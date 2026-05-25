@@ -67,7 +67,8 @@ Subscribe (user socket + JWT):
 
 ## Chia sẻ & OGP
 
-- **Link canonical (OGP):** `https://{APP}/square/posts/{postId}` — crawler đọc `og:title`, `og:description`, `og:image` (ảnh bài hoặc `/og-default.svg`).
+- **Link canonical (OGP):** `https://{APP}/square/posts/{postId}` — crawler đọc `og:title`, `og:description`, `og:image` (ảnh bài hoặc `/og-site.jpg`).
+- **OG site mặc định:** `/og-site.jpg` (banner KingCoin) — dùng cho trang chủ, `/square`, và fallback bài không có ảnh.
 - **Link hồ sơ:** `/square/u/{handle}?post={postId}` — scroll tới bài trên feed profile.
 - **UI:** nút「Chia sẻ」→ copy link, Facebook, X, LinkedIn, Zalo, Web Share API.
 - Env: `NEXT_PUBLIC_APP_URL` (production, vd `https://king-coin-crypto-cex.vercel.app`).
