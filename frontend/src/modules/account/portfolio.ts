@@ -16,14 +16,35 @@ export type HoldingRow = {
   sharePct: number;
 };
 
+export type OpenPositionEquity = {
+  marginKc: number;
+  unrealizedPnlKc: number;
+};
+
 export type PortfolioSummary = {
   quoteKc: number;
   altValueKc: number;
+  fundingKc: number;
+  futuresEquityKc: number;
+  /** Spot KC + alt — không gồm ví funding/futures. */
+  spotNavKc: number;
   totalKc: number;
   holdings: HoldingRow[];
   kcSharePct: number;
   altSharePct: number;
 };
+
+/** Vốn futures = KC rảnh + ký quỹ khóa + uPnL chưa chốt (khớp backend NAV). */
+export function computeFuturesEquityKc(
+  futuresFreeKc: number,
+  openPositions: OpenPositionEquity[] | undefined
+): number {
+  const locked = (openPositions ?? []).reduce(
+    (s, p) => s + p.marginKc + p.unrealizedPnlKc,
+    0
+  );
+  return futuresFreeKc + locked;
+}
 
 export function priceForToken(
   token: Pick<ITokenCrypto, "id" | "price">,
@@ -38,9 +59,15 @@ export function buildPortfolio(
   balances: IBalanceSnapshot | undefined,
   tokensById: Map<string, ITokenCrypto>,
   livePriceById?: Map<string, number>,
-  minValueKc = 0
+  minValueKc = 0,
+  openFutures?: OpenPositionEquity[]
 ): PortfolioSummary {
   const quoteKc = balances?.quoteKc ?? 0;
+  const fundingKc = balances?.fundingKc ?? 0;
+  const futuresEquityKc = computeFuturesEquityKc(
+    balances?.futuresKc ?? 0,
+    openFutures
+  );
   const holdings: HoldingRow[] = [];
 
   for (const bal of balances?.tokens ?? []) {
@@ -72,7 +99,8 @@ export function buildPortfolio(
   holdings.sort((a, b) => b.valueKc - a.valueKc);
 
   const altValueKc = holdings.reduce((s, h) => s + h.valueKc, 0);
-  const totalKc = quoteKc + altValueKc;
+  const spotNavKc = quoteKc + altValueKc;
+  const totalKc = spotNavKc + fundingKc + futuresEquityKc;
 
   for (const h of holdings) {
     h.sharePct = totalKc > 0 ? (h.valueKc / totalKc) * 100 : 0;
@@ -84,11 +112,25 @@ export function buildPortfolio(
   return {
     quoteKc,
     altValueKc,
+    fundingKc,
+    futuresEquityKc,
+    spotNavKc,
     totalKc,
     holdings,
     kcSharePct,
     altSharePct,
   };
+}
+
+/** Lãi/lỗ NAV live từ tổng hiện tại vs mốc đầu ngày/tuần (backend lưu baseline). */
+export function liveNavPnLLine(
+  totalKc: number,
+  baselineKc?: number | null
+): { text: string; positive: boolean } {
+  const base = baselineKc ?? 0;
+  const amount = totalKc - base;
+  const pct = base > 1e-8 ? (amount / base) * 100 : 0;
+  return formatPnLLine(amount, pct);
 }
 
 export function formatPnLLine(

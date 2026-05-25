@@ -1,8 +1,13 @@
+import { unrealizedPnlKc } from '@modules/futures/futures-math.util';
 import { UserRepository } from '@modules/user/user.repository';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { USER_NOT_FOUND_KC } from '@constants/errors.constants';
 import { PrismaService } from '@providers/prisma';
-import { User } from '@prisma/client';
+import {
+  FuturesPositionStatus,
+  User,
+  WalletPool,
+} from '@prisma/client';
 
 /** Đầu ngày / đầu tuần (UTC, thứ Hai = đầu tuần). */
 function startOfUtcDay(now = new Date()): Date {
@@ -30,9 +35,47 @@ export class PortfolioPnlService {
     private readonly userRepository: UserRepository,
   ) {}
 
-  /** NAV ước tính = quote KC + Σ (amount × spot price KC). */
-  async computeNavKc(userId: string): Promise<number> {
-    const quoteKc = await this.userRepository.getQuoteBalance(userId);
+  /** Vốn futures = KC rảnh ví futures + Σ (ký quỹ + uPnL) từng vị thế mở. */
+  async computeFuturesEquityKc(userId: string): Promise<number> {
+    const free = await this.userRepository.getWalletKc(
+      userId,
+      WalletPool.futures,
+    );
+    const open = await this.prisma.futuresPosition.findMany({
+      where: { userId, status: FuturesPositionStatus.open },
+      select: {
+        side: true,
+        size: true,
+        entryPrice: true,
+        marginKc: true,
+        tokenId: true,
+      },
+    });
+
+    let lockedEquity = 0;
+    for (const p of open) {
+      const token = await this.prisma.tokenCrypto.findUnique({
+        where: { id: p.tokenId },
+        select: { price: true },
+      });
+      const mark =
+        token?.price != null && token.price > 0
+          ? token.price
+          : p.entryPrice;
+      const u = unrealizedPnlKc(
+        p.side,
+        p.size,
+        p.entryPrice,
+        mark,
+      );
+      lockedEquity += p.marginKc + u;
+    }
+
+    return Number((free + lockedEquity).toFixed(8));
+  }
+
+  /** Giá trị alt spot (KC), không gồm quote / ví futures / funding. */
+  async computeSpotAltValueKc(userId: string): Promise<number> {
     const quoteId = await this.userRepository.getQuoteTokenId();
     const balance = await this.prisma.balance.findUnique({
       where: { userId },
@@ -54,7 +97,27 @@ export class PortfolioPnlService {
       }
     }
 
-    return Number((quoteKc + altValue).toFixed(8));
+    return Number(altValue.toFixed(8));
+  }
+
+  /**
+   * NAV = spot KC + alt (giá spot) + funding + vốn futures (ký quỹ + uPnL mở).
+   * @see docs/STABLECOIN_KC_SPEC.md
+   */
+  async computeNavKc(userId: string): Promise<number> {
+    const quoteKc = await this.userRepository.getQuoteBalance(userId);
+    const fundingKc = await this.userRepository.getWalletKc(
+      userId,
+      WalletPool.funding,
+    );
+    const [altValue, futuresEquity] = await Promise.all([
+      this.computeSpotAltValueKc(userId),
+      this.computeFuturesEquityKc(userId),
+    ]);
+
+    return Number(
+      (quoteKc + altValue + fundingKc + futuresEquity).toFixed(8),
+    );
   }
 
   /**

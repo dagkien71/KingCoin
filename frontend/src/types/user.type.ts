@@ -21,6 +21,8 @@ export interface IUser {
   monthlyPnL?: number;
   dailyPnLPercent?: number;
   weeklyPnLPercent?: number;
+  navBaselineDayKc?: number | null;
+  navBaselineWeekKc?: number | null;
   isVerified?: boolean;
   birthDate?: string;
   createdAt?: string;

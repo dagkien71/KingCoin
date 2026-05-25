@@ -7,7 +7,12 @@ import useFetchApi from "@/hooks/useFetchApi";
 import useLiveFetch from "@/hooks/useLiveFetch";
 import { tradeHref } from "@/lib/token-routes";
 import { AllocationDonut } from "@/modules/account/components/AllocationDonut";
-import { buildPortfolio, formatPnLLine } from "@/modules/account/portfolio";
+import {
+  buildPortfolio,
+  liveNavPnLLine,
+} from "@/modules/account/portfolio";
+import { useLiveFuturesPositions } from "@/hooks/useLiveFuturesPositions";
+import type { FuturesPositionView } from "@/types/futures.type";
 import type { IBalanceSnapshot } from "@/types/trade.type";
 import { ITokenCrypto } from "@/types/token.type";
 import { formatTokenPrice } from "@/utils/format-number";
@@ -33,6 +38,11 @@ export default function Dashboard() {
     useLiveFetch<IBalanceSnapshot>("/users/me/balances", {
       stream: "trades",
     });
+  const { data: openFuturesRaw } = useLiveFetch<FuturesPositionView[]>(
+    "/futures/positions",
+    { stream: "trades" }
+  );
+  const openFuturesLive = useLiveFuturesPositions(openFuturesRaw ?? []);
   const { data: quests } = useFetchApi<
     { id: string; completed: boolean }[] | null
   >("/quests");
@@ -55,19 +65,41 @@ export default function Dashboard() {
     return m;
   }, [coins]);
 
+  const futuresEquityInput = useMemo(
+    () =>
+      openFuturesLive.map((p) => ({
+        marginKc: p.marginKc,
+        unrealizedPnlKc: p.unrealizedPnlKc,
+      })),
+    [openFuturesLive]
+  );
+
   const portfolio = useMemo(
     () =>
       buildPortfolio(
         balances ?? undefined,
         tokensById,
         livePriceById,
-        hideSmallAssets ? MIN_VALUE_KC : 0
+        hideSmallAssets ? MIN_VALUE_KC : 0,
+        futuresEquityInput
       ),
-    [balances, tokensById, livePriceById, hideSmallAssets]
+    [
+      balances,
+      tokensById,
+      livePriceById,
+      hideSmallAssets,
+      futuresEquityInput,
+    ]
   );
 
-  const dailyPnL = formatPnLLine(user?.dailyPnL, user?.dailyPnLPercent);
-  const weeklyPnL = formatPnLLine(user?.weeklyPnL, user?.weeklyPnLPercent);
+  const dailyPnL = liveNavPnLLine(
+    portfolio.totalKc,
+    user?.navBaselineDayKc
+  );
+  const weeklyPnL = liveNavPnLLine(
+    portfolio.totalKc,
+    user?.navBaselineWeekKc
+  );
 
   const pendingQuests = (quests ?? []).filter((q) => !q.completed).length;
 
@@ -155,16 +187,34 @@ export default function Dashboard() {
                     </button>
                   </div>
                   <p className="mt-1 text-xs text-kc-muted">
-                    KC:{" "}
+                    Spot:{" "}
                     {maskValue(
                       hideBalances,
-                      formatTokenPrice(2, portfolio.quoteKc)
+                      formatTokenPrice(2, portfolio.spotNavKc)
                     )}{" "}
-                    · Altcoin:{" "}
-                    {maskValue(
-                      hideBalances,
-                      formatTokenPrice(2, portfolio.altValueKc)
-                    )}
+                    KC
+                    {portfolio.futuresEquityKc > 0.005 ? (
+                      <>
+                        {" "}
+                        · Futures:{" "}
+                        {maskValue(
+                          hideBalances,
+                          formatTokenPrice(2, portfolio.futuresEquityKc)
+                        )}{" "}
+                        KC
+                      </>
+                    ) : null}
+                    {portfolio.fundingKc > 0.005 ? (
+                      <>
+                        {" "}
+                        · Funding:{" "}
+                        {maskValue(
+                          hideBalances,
+                          formatTokenPrice(2, portfolio.fundingKc)
+                        )}{" "}
+                        KC
+                      </>
+                    ) : null}
                   </p>
                   <div className="mt-3 space-y-1">
                     <p className="text-xs text-kc-muted">

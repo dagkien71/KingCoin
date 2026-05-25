@@ -90,6 +90,14 @@ export default class UserBaseEntity extends PartialType(UserEntity) {
   @Expose()
   declare readonly weeklyPnLPercent: number;
 
+  @ApiProperty({ type: Number, nullable: true })
+  @Expose()
+  declare readonly navBaselineDayKc: number | null;
+
+  @ApiProperty({ type: Number, nullable: true })
+  @Expose()
+  declare readonly navBaselineWeekKc: number | null;
+
   @ApiProperty({ type: Date })
   @Expose()
   declare readonly createdAt: Date;

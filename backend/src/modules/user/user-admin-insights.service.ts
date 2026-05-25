@@ -149,8 +149,10 @@ export class UserAdminInsightsService {
     userId: string,
     quoteKc: number,
   ): Promise<AdminUserStats> {
-    const navKc = await this.portfolioPnl.computeNavKc(userId);
-    const altValueKc = Number((navKc - quoteKc).toFixed(8));
+    const [navKc, altValueKc] = await Promise.all([
+      this.portfolioPnl.computeNavKc(userId),
+      this.portfolioPnl.computeSpotAltValueKc(userId),
+    ]);
 
     const [openSpotOrders, completedSpotOrders, canceledSpotOrders, fills] =
       await Promise.all([
