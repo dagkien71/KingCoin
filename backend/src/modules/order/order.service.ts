@@ -1,3 +1,4 @@
+import { isLiquidityBotEmail } from '../../common/system-accounts.util';
 import { assertPositiveSpotPrice } from '../../common/spot-price.util';
 import { NotificationService } from '@modules/notification/notification.service';
 import { tradeDeeplink } from '../../common/token-route.util';
@@ -518,6 +519,7 @@ export class OrderService {
       (await this.orderRepository.findById(order.id)) ?? order;
     const token = await this.tokenCryptoService.findOne(finalOrder.tokenId);
     await this.notifyPlacedOrder(userId, finalOrder, token);
+    await this.notifyAdminsOrderPlaced(userId, finalOrder, token);
     return finalOrder;
   }
 
@@ -951,6 +953,52 @@ export class OrderService {
         orderId: order.id,
         tokenId: order.tokenId,
         symbol: sym,
+      },
+    });
+  }
+
+  private async notifyAdminsOrderPlaced(
+    userId: string,
+    order: Order,
+    token: TokenCrypto | null,
+  ): Promise<void> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user || isLiquidityBotEmail(user.email, user.username)) {
+      return;
+    }
+
+    const sym = token?.symbol ?? token?.name ?? 'Token';
+    const side = order.type === 'buy' ? 'Mua' : 'Bán';
+    const price = Number(order.price);
+    const qty = Number(order.quantity);
+    const matched = Number(order.matchedQuantity) || 0;
+
+    let statusNote = 'chờ khớp';
+    if (order.status === OrderStatus.completed) {
+      statusNote = 'đã khớp hết';
+    } else if (matched > 0) {
+      statusNote = `khớp một phần (${matched.toFixed(4)})`;
+    }
+
+    const who = user.username?.trim() || user.email;
+
+    await this.notificationService.notifyAdmins({
+      type: NotificationType.ADMIN_ORDER_PLACED,
+      priority: NotificationPriority.normal,
+      title: 'User đặt lệnh spot',
+      body: `${who}: ${side} ${qty.toFixed(4)} ${sym} @ ${price.toFixed(4)} KC — ${statusNote}`,
+      dedupeKey: `ADMIN_ORDER_PLACED:${order.id}`,
+      payload: {
+        deeplink: `/admin/users/${userId}`,
+        orderId: order.id,
+        tokenId: order.tokenId,
+        symbol: sym,
+        userId,
+        userEmail: user.email,
+        orderType: order.type,
+        price,
+        quantity: qty,
+        status: order.status,
       },
     });
   }

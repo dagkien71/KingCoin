@@ -443,6 +443,8 @@ enum NotificationType {
   LISTING_REQUEST_APPROVED
   LISTING_REQUEST_REJECTED
   PRICE_ALERT
+  /** Chỉ gửi admin — user (không phải bot) đặt lệnh spot */
+  ADMIN_ORDER_PLACED
 }
 
 enum NotificationPriority {

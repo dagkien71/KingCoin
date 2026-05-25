@@ -19,4 +19,4 @@ NODE
 fi
 
 node scripts/render-bootstrap.js
-exec node dist/main.js
+exec node -r module-alias/register dist/main.js

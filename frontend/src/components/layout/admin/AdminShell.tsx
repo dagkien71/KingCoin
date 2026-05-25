@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import useAuth from "@/hooks/useAuth";
 import { cn } from "@/lib/cn";
 import { ADMIN_NAV, isAdminNavActive } from "@/modules/admin/admin-nav";
+import NotificationBell from "@/components/notifications/NotificationBell";
 import { AdminGate } from "@/modules/admin/AdminGate";
 import Link from "next/link";
 import { useRouter } from "next/router";
@@ -70,6 +71,7 @@ export default function AdminShell({ children }: Props) {
             </Button>
             {isLogin ? (
               <>
+                <NotificationBell />
                 <span className="hidden max-w-[9rem] truncate text-xs text-kc-muted md:inline">
                   {user?.username || user?.email}
                 </span>

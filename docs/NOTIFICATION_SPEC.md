@@ -48,6 +48,7 @@ Tham chiếu kỹ thuật: [`MODULES/BACKEND-notification.md`](MODULES/BACKEND-n
 | `LISTING_FEE` | normal | Trừ phí listing |
 | `TOKEN_LISTED` | normal | Token phát hành thành công |
 | `PRICE_ALERT` | high | Giá chạm ngưỡng |
+| `ADMIN_ORDER_PLACED` | normal | **Chỉ admin** — user (không bot) đặt lệnh spot |
 
 ---
 
