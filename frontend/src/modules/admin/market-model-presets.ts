@@ -40,6 +40,24 @@ export const MODEL_PRESET_GROUPS = [
 
 export const PRICE_MODEL_PRESETS: ModelPreset[] = [
   {
+    id: "model-volatile-trend-up",
+    modelId: "gbm",
+    title: "Biến động mạnh — xu hướng tăng",
+    desc: "GBM: lắc mạnh ~±4–5%/bước, drift dương — giá nghiêng lên ~15–25% trong 25 phút",
+    durationMin: 25,
+    params: { drift: 0.14, volatility: 0.048 },
+    tone: "up",
+  },
+  {
+    id: "model-volatile-trend-down",
+    modelId: "gbm",
+    title: "Biến động mạnh — xu hướng giảm",
+    desc: "GBM: lắc mạnh ~±4–5%/bước, drift âm — giá nghiêng xuống ~15–25% trong 25 phút",
+    durationMin: 25,
+    params: { drift: -0.14, volatility: 0.048 },
+    tone: "down",
+  },
+  {
     id: "model-pump-ramp",
     modelId: "linear_ramp",
     title: "Pump ramp (+5%)",
@@ -210,6 +228,10 @@ export function buildModelRunBody(
   }
   if (preset.modelId === "exp_trend") {
     params.priceEnd = Number((p * 1.08).toFixed(8));
+  }
+  if (preset.modelId === "gbm") {
+    params.drift = preset.params?.drift ?? 0.05;
+    params.volatility = preset.params?.volatility ?? 0.018;
   }
 
   return {

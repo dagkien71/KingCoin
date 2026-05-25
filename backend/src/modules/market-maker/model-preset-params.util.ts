@@ -29,6 +29,18 @@ function presetDefaults(
         params.priceEnd = Number((p * 0.95).toFixed(8));
       }
       break;
+    case 'model-volatile-trend-up':
+      if (modelId === 'gbm') {
+        params.drift = 0.14;
+        params.volatility = 0.048;
+      }
+      break;
+    case 'model-volatile-trend-down':
+      if (modelId === 'gbm') {
+        params.drift = -0.14;
+        params.volatility = 0.048;
+      }
+      break;
     case 'model-pump-ramp':
       if (modelId === 'linear_ramp') {
         params.priceEnd = Number((p * 1.05).toFixed(8));
@@ -60,8 +72,8 @@ function presetDefaults(
       break;
     case 'model-gbm-demo':
       if (modelId === 'gbm') {
-        params.drift = 0.0002;
-        params.vol = 0.008;
+        params.drift = 0.03;
+        params.volatility = 0.02;
       }
       break;
     case 'model-triangle-v':

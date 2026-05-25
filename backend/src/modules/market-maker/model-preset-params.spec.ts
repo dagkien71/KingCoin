@@ -29,6 +29,28 @@ describe('modelParamsFromPreset', () => {
     expect(params.priceEnd).toBe(90);
   });
 
+  it('volatile trend up — GBM drift dương + vol cao', () => {
+    const params = modelParamsFromPreset(
+      'model-volatile-trend-up',
+      'gbm',
+      15,
+    );
+    expect(params.priceStart).toBe(15);
+    expect(params.drift).toBe(0.14);
+    expect(params.volatility).toBe(0.048);
+  });
+
+  it('volatile trend down — GBM drift âm', () => {
+    const params = modelParamsFromPreset(
+      'model-volatile-trend-down',
+      'gbm',
+      15,
+    );
+    expect(params.priceStart).toBe(15);
+    expect(params.drift).toBe(-0.14);
+    expect(params.volatility).toBe(0.048);
+  });
+
   it('sideway sin_band neo theo spot từng token', () => {
     const extra = {
       priceStart: 100,

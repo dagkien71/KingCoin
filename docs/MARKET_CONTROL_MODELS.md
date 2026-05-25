@@ -86,6 +86,15 @@ API bulk:
 - **Tham số:** `priceStart`, `priceEnd` (= μ), `reversionSpeed` (= k).
 - **Tham chiếu:** [Ornstein–Uhlenbeck](https://en.wikipedia.org/wiki/Ornstein%E2%80%93Uhlenbeck_process) / Vasicek.
 
+### Preset nhanh: biến động mạnh theo xu hướng
+
+| Preset ID | Mô hình | Mô tả |
+|-----------|---------|--------|
+| `model-volatile-trend-up` | `gbm` | Drift **+0.14**, volatility **~4.8%** — lắc mạnh, nghiêng tăng ~25 phút |
+| `model-volatile-trend-down` | `gbm` | Drift **−0.14**, volatility **~4.8%** — lắc mạnh, nghiêng giảm ~25 phút |
+
+Có trong tab **PP2 — Mô hình giá** và gói **Lịch giá** (combo PP1). Bulk `presetId` neo `priceStart` theo spot từng mã, giữ drift/vol.
+
 ### 4. `gbm` — Geometric Brownian Motion (demo)
 - **Công thức:** \(\log P = \log P_0 + (\mu - \frac{1}{2}\sigma^2)t + \sigma\sqrt{t}\,Z\)
 - **Nhiễu:** xác định từ `run.id` + progress (reproducible khi test).

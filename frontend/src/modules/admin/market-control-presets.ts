@@ -86,10 +86,7 @@ function schedule(
   );
 }
 
-function modelRampPreset(
-  ctx: PresetContext,
-  presetId: "model-pump-ramp" | "model-dump-ramp",
-) {
+function modelPresetRun(ctx: PresetContext, presetId: string) {
   const preset = PRICE_MODEL_PRESETS.find((p) => p.id === presetId);
   if (!preset) {
     throw new Error(`Preset ${presetId} không tồn tại`);
@@ -111,6 +108,13 @@ function modelRampPreset(
     body,
     `/admin/market-control/tokens/${ctx.tokenId}/model-run`
   );
+}
+
+function modelRampPreset(
+  ctx: PresetContext,
+  presetId: "model-pump-ramp" | "model-dump-ramp",
+) {
+  return modelPresetRun(ctx, presetId);
 }
 
 export const PRESET_GROUPS: { id: PresetGroup; label: string; hint: string }[] = [
@@ -156,6 +160,26 @@ export const MARKET_PRESETS: MarketPreset[] = [
     tone: "neutral",
     disabled: (c) => c.hasSchedule || c.hasModelRun,
     run: (c) => schedule(c, 30, 0.95, 1.05, 5),
+  },
+  {
+    id: "sched-volatile-trend-up",
+    group: "schedule",
+    scope: "token",
+    title: "Biến động mạnh — tăng",
+    desc: "GBM xu hướng lên, lắc mạnh ~25 phút (PP2)",
+    tone: "up",
+    disabled: (c) => c.hasSchedule || c.hasModelRun,
+    run: (c) => modelPresetRun(c, "model-volatile-trend-up"),
+  },
+  {
+    id: "sched-volatile-trend-down",
+    group: "schedule",
+    scope: "token",
+    title: "Biến động mạnh — giảm",
+    desc: "GBM xu hướng xuống, lắc mạnh ~25 phút (PP2)",
+    tone: "down",
+    disabled: (c) => c.hasSchedule || c.hasModelRun,
+    run: (c) => modelPresetRun(c, "model-volatile-trend-down"),
   },
   {
     id: "sched-pump-10",
