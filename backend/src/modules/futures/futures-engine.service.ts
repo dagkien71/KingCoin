@@ -364,6 +364,7 @@ export class FuturesEngineService {
       tokenId: quoteId,
       refType: 'futures_margin_lock',
       refId: position.id,
+      walletPool: WalletPool.futures,
       note: `Khóa margin futures ${sym} ${side}`,
     });
 
@@ -523,6 +524,7 @@ export class FuturesEngineService {
       tokenId: quoteId,
       refType: 'futures_margin_lock',
       refId: position.id,
+      walletPool: WalletPool.futures,
       note: `Cộng margin futures ${sym} ${side}`,
     });
 
@@ -654,6 +656,8 @@ export class FuturesEngineService {
       position.entryPrice,
       mark,
     );
+    const token = await this.tokenCryptoService.findOne(position.tokenId);
+    const sym = token?.symbol ?? token?.name ?? 'token';
     const closeNotional = closeSize * mark;
     const grossReturn = Math.max(0, closeReturnKc(marginPortion, uPnl));
     const closeFee = this.tradingFees.futuresCloseFee(closeNotional);
@@ -662,7 +666,7 @@ export class FuturesEngineService {
     await this.userRepository.adjustWalletKc(
       params.userId,
       WalletPool.futures,
-      grossReturn,
+      returnKc,
     );
     if (closeFee > 0) {
       await this.tradingFees.collectKcFee({
@@ -671,8 +675,10 @@ export class FuturesEngineService {
         feeKc: closeFee,
         refType: 'futures_close_fee',
         refId: position.id,
-        note: `Phí đóng futures`,
+        note: `Phí đóng futures ${sym}`,
         wallet: WalletPool.futures,
+        deductWallet: false,
+        skipLedger: true,
       });
     }
 
@@ -717,19 +723,7 @@ export class FuturesEngineService {
       },
     });
 
-    const token = await this.tokenCryptoService.findOne(position.tokenId);
-    const sym = token?.symbol ?? 'token';
-    if (marginPortion > 1e-12) {
-      await this.ledgerService.append({
-        userId: params.userId,
-        amount: marginPortion,
-        currency: 'KC',
-        tokenId: quoteId,
-        refType: 'futures_margin_unlock',
-        refId: position.id,
-        note: `Hoàn margin futures ${sym}`,
-      });
-    }
+    const pnlSign = uPnl >= 0 ? '+' : '';
     await this.ledgerService.append({
       userId: params.userId,
       amount: returnKc,
@@ -737,7 +731,8 @@ export class FuturesEngineService {
       tokenId: quoteId,
       refType: 'futures_close',
       refId: position.id,
-      note: `Đóng futures ${sym}: margin ${marginPortion.toFixed(4)} + PnL ${uPnl.toFixed(4)} KC (trước phí ${grossReturn.toFixed(4)})`,
+      walletPool: WalletPool.futures,
+      note: `Đóng ${sym}: hoàn margin ${marginPortion.toFixed(2)} KC, PnL ${pnlSign}${uPnl.toFixed(2)} KC${closeFee > 0 ? `, phí −${closeFee.toFixed(2)}` : ''} → ví +${returnKc.toFixed(2)} KC`,
     });
 
     await this.portfolioPnl.syncUserNavPnL(params.userId);
@@ -854,6 +849,9 @@ export class FuturesEngineService {
       },
     });
 
+    const token = await this.tokenCryptoService.findOne(position.tokenId);
+    const sym = token?.symbol ?? token?.name ?? 'token';
+    const liqPnlSign = uPnl >= 0 ? '+' : '';
     await this.ledgerService.append({
       userId: position.userId,
       amount: returnKc,
@@ -861,13 +859,11 @@ export class FuturesEngineService {
       tokenId: quoteId,
       refType: 'futures_liquidation',
       refId: position.id,
-      note: 'Thanh lý futures',
+      walletPool: WalletPool.futures,
+      note: `Thanh lý ${sym}: margin ${marginPortion.toFixed(2)}, PnL ${liqPnlSign}${uPnl.toFixed(2)}${fee > 0 ? `, phí −${fee.toFixed(2)}` : ''} → +${returnKc.toFixed(2)} KC`,
     });
 
     await this.portfolioPnl.syncUserNavPnL(position.userId);
-
-    const token = await this.tokenCryptoService.findOne(position.tokenId);
-    const sym = token?.symbol ?? token?.name ?? 'token';
     const liqDeeplink = futuresDeeplink(
       token?.symbol,
       token?.name,

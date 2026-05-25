@@ -1,7 +1,7 @@
 import { UserRepository } from '@modules/user/user.repository';
 import { Injectable } from '@nestjs/common';
 import { PaginatorTypes } from '@nodeteam/nestjs-prisma-pagination';
-import { LedgerEntry, Prisma } from '@prisma/client';
+import { LedgerEntry, Prisma, WalletPool } from '@prisma/client';
 import { paginator } from '@nodeteam/nestjs-prisma-pagination';
 import { PrismaService } from '@providers/prisma';
 
@@ -33,10 +33,12 @@ export class LedgerService {
     refType: string;
     refId?: string;
     note?: string;
+    /** Ví KC để hiển thị cột «Sau GD» — mặc định Spot */
+    walletPool?: WalletPool;
   }): Promise<LedgerEntry> {
     const balanceAfter =
       params.currency === 'KC'
-        ? await this.userRepository.getQuoteBalance(params.userId)
+        ? await this.balanceKcAfter(params.userId, params.walletPool)
         : params.tokenId
           ? await this.userRepository.getTokenBalance(
               params.userId,
@@ -113,5 +115,18 @@ export class LedgerService {
       walletCode,
       tokens,
     };
+  }
+
+  private async balanceKcAfter(
+    userId: string,
+    pool?: WalletPool,
+  ): Promise<number> {
+    if (pool === WalletPool.futures) {
+      return this.userRepository.getWalletKc(userId, WalletPool.futures);
+    }
+    if (pool === WalletPool.funding) {
+      return this.userRepository.getWalletKc(userId, WalletPool.funding);
+    }
+    return this.userRepository.getQuoteBalance(userId);
   }
 }

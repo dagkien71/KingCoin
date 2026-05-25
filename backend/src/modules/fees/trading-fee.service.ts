@@ -73,21 +73,29 @@ export class TradingFeeService {
     refId: string;
     note: string;
     wallet?: WalletPool;
+    /** false = chỉ ghi sổ (phí đã trừ trong một lần cộng ví khác) */
+    deductWallet?: boolean;
+    skipLedger?: boolean;
   }): Promise<void> {
     const { userId, quoteId, feeKc, refType, refId, note } = params;
     const wallet = params.wallet ?? WalletPool.spot;
     if (feeKc <= 1e-12) return;
 
-    await this.userRepository.adjustWalletKc(userId, wallet, -feeKc);
-    await this.ledgerService.append({
-      userId,
-      amount: -feeKc,
-      currency: 'KC',
-      tokenId: quoteId,
-      refType,
-      refId,
-      note,
-    });
+    if (params.deductWallet !== false) {
+      await this.userRepository.adjustWalletKc(userId, wallet, -feeKc);
+    }
+    if (!params.skipLedger) {
+      await this.ledgerService.append({
+        userId,
+        amount: -feeKc,
+        currency: 'KC',
+        tokenId: quoteId,
+        refType,
+        refId,
+        note,
+        walletPool: wallet,
+      });
+    }
   }
 
   /** Cộng KC (funding cho short) */
@@ -113,6 +121,7 @@ export class TradingFeeService {
       refType,
       refId,
       note,
+      walletPool: wallet,
     });
   }
 }
