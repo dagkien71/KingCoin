@@ -3,7 +3,7 @@ import { applyTickerPatch } from "@/lib/apply-ticker-patch";
 import useAuth from "@/hooks/useAuth";
 import useLiveFetch from "@/hooks/useLiveFetch";
 import { Api } from "@/api";
-import useMutation from "@/hooks/useMutation";
+import useMutation, { isMutationFailure } from "@/hooks/useMutation";
 import type { IBalanceSnapshot } from "@/types/trade.type";
 import type { IResponse } from "@/types/response";
 import { QUOTE_SYMBOL, quotePairLabel } from "@/constants/quote";
@@ -176,7 +176,7 @@ const TradeForm = ({
       type: isBuyActive ? "buy" : "sell",
       pair: quotePairLabel(token?.symbol),
     });
-    if (!res) return;
+    if (!res || isMutationFailure(res)) return;
 
     onOrderPlaced?.();
     void refetchBalances();

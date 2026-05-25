@@ -8,6 +8,7 @@ import {
   closeReturnKc,
   marginFromSize,
   marginRatio,
+  resolveMarginPortionKc,
   sizeFromMargin,
   unrealizedPnlKc,
   estimateLiqPrice,
@@ -17,6 +18,7 @@ import {
   mergeEntryPrice,
   effectiveLeverage,
 } from '@modules/futures/futures-math.util';
+import { FUTURES_POSITION_NOT_FOUND } from '@constants/errors.constants';
 import { PortfolioPnlService } from '@modules/user/portfolio-pnl.service';
 import { UserRepository } from '@modules/user/user.repository';
 import { TokenCryptoService } from '@modules/token-crypto/token.service';
@@ -290,11 +292,7 @@ export class FuturesEngineService {
       );
     }
 
-    await this.userRepository.adjustBalanceTokenByUserId(
-      userId,
-      quoteId,
-      -marginKc,
-    );
+    await this.userRepository.adjustQuoteKcByUserId(userId, -marginKc);
     if (openFee > 0) {
       await this.tradingFees.collectKcFee({
         userId,
@@ -441,11 +439,7 @@ export class FuturesEngineService {
       );
     }
 
-    await this.userRepository.adjustBalanceTokenByUserId(
-      userId,
-      quoteId,
-      -addMarginKc,
-    );
+    await this.userRepository.adjustQuoteKcByUserId(userId, -addMarginKc);
     if (openFee > 0) {
       await this.tradingFees.collectKcFee({
         userId,
@@ -557,7 +551,7 @@ export class FuturesEngineService {
       },
     });
     if (!position) {
-      throw new NotFoundException('Không tìm thấy vị thế mở.');
+      throw new NotFoundException(FUTURES_POSITION_NOT_FOUND);
     }
 
     const mark = await this.markPrice.getMarkPrice(position.tokenId);
@@ -607,7 +601,7 @@ export class FuturesEngineService {
       },
     });
     if (!position) {
-      throw new NotFoundException('Không tìm thấy vị thế mở.');
+      throw new NotFoundException(FUTURES_POSITION_NOT_FOUND);
     }
 
     const quoteId = await this.userRepository.getQuoteTokenId();
@@ -621,8 +615,13 @@ export class FuturesEngineService {
       throw new BadRequestException('closeSize không hợp lệ.');
     }
 
-    const fraction = closeSize / position.size;
-    const marginPortion = position.marginKc * fraction;
+    const marginPortion = resolveMarginPortionKc({
+      storedMarginKc: position.marginKc,
+      closeSize,
+      positionSize: position.size,
+      leverage: position.leverage,
+      entryPrice: position.entryPrice,
+    });
     const uPnl = unrealizedPnlKc(
       position.side,
       closeSize,
@@ -634,11 +633,7 @@ export class FuturesEngineService {
     const closeFee = this.tradingFees.futuresCloseFee(closeNotional);
     const returnKc = Math.max(0, grossReturn - closeFee);
 
-    await this.userRepository.adjustBalanceTokenByUserId(
-      params.userId,
-      quoteId,
-      grossReturn,
-    );
+    await this.userRepository.adjustQuoteKcByUserId(params.userId, grossReturn);
     if (closeFee > 0) {
       await this.tradingFees.collectKcFee({
         userId: params.userId,
@@ -693,6 +688,17 @@ export class FuturesEngineService {
 
     const token = await this.tokenCryptoService.findOne(position.tokenId);
     const sym = token?.symbol ?? 'token';
+    if (marginPortion > 1e-12) {
+      await this.ledgerService.append({
+        userId: params.userId,
+        amount: marginPortion,
+        currency: 'KC',
+        tokenId: quoteId,
+        refType: 'futures_margin_unlock',
+        refId: position.id,
+        note: `Hoàn margin futures ${sym}`,
+      });
+    }
     await this.ledgerService.append({
       userId: params.userId,
       amount: returnKc,
@@ -700,7 +706,7 @@ export class FuturesEngineService {
       tokenId: quoteId,
       refType: 'futures_close',
       refId: position.id,
-      note: `Đóng futures ${sym} PnL ${uPnl.toFixed(4)} KC`,
+      note: `Đóng futures ${sym}: margin ${marginPortion.toFixed(4)} + PnL ${uPnl.toFixed(4)} KC (trước phí ${grossReturn.toFixed(4)})`,
     });
 
     await this.portfolioPnl.syncUserNavPnL(params.userId);
@@ -719,7 +725,7 @@ export class FuturesEngineService {
           ? NotificationPriority.high
           : NotificationPriority.normal,
       title: titleByReason[reason],
-      body: `${sym}: PnL ${uPnl >= 0 ? '+' : ''}${uPnl.toFixed(4)} KC`,
+      body: `${sym}: hoàn ${marginPortion.toFixed(2)} KC margin + PnL ${uPnl >= 0 ? '+' : ''}${uPnl.toFixed(2)} KC (về ví ${returnKc.toFixed(2)} KC)`,
       dedupeKey: `FUTURES_CLOSED:${position.id}:${closeSize}:${reason}`,
       payload: {
         deeplink: futuresDeeplink(
@@ -731,12 +737,18 @@ export class FuturesEngineService {
         tokenId: position.tokenId,
         symbol: sym,
         pnlKc: uPnl,
+        marginReturnedKc: marginPortion,
+        grossReturnKc: grossReturn,
+        closeFeeKc: closeFee,
         returnKc,
       },
     });
     this.notifications.clearMarginWarning(position.id);
     return {
       realizedPnlKc: uPnl,
+      marginReturnedKc: marginPortion,
+      grossReturnKc: grossReturn,
+      closeFeeKc: closeFee,
       returnKc,
       markPrice: mark,
       balances,
@@ -763,15 +775,21 @@ export class FuturesEngineService {
       mark,
     );
     const closeSize = position.size;
+    const marginPortion = resolveMarginPortionKc({
+      storedMarginKc: position.marginKc,
+      closeSize,
+      positionSize: position.size,
+      leverage: position.leverage,
+      entryPrice: position.entryPrice,
+    });
     const notional = closeSize * mark;
     const fee = notional * cfg.liquidationFeeRate;
-    const returnKc = Math.max(0, closeReturnKc(position.marginKc, uPnl) - fee);
-
-    await this.userRepository.adjustBalanceTokenByUserId(
-      position.userId,
-      quoteId,
-      returnKc,
+    const returnKc = Math.max(
+      0,
+      closeReturnKc(marginPortion, uPnl) - fee,
     );
+
+    await this.userRepository.adjustQuoteKcByUserId(position.userId, returnKc);
 
     await this.prisma.futuresPosition.update({
       where: { id: position.id },

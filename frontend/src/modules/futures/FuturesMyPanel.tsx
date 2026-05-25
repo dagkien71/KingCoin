@@ -88,10 +88,10 @@ export function FuturesMyPanel({ tokenId, refreshKey = 0, onRefetch }: Props) {
       stream: "trades",
     });
 
-  const { data: balances } = useLiveFetch<IBalanceSnapshot>(
-    "/users/me/balances",
-    { stream: "trades" }
-  );
+  const { data: balances, refetch: refetchBalances } =
+    useLiveFetch<IBalanceSnapshot>("/users/me/balances", {
+      stream: "trades",
+    });
 
   const { mutate: closePos, loading: closing } = useMutation(
     "POST",
@@ -130,11 +130,25 @@ export function FuturesMyPanel({ tokenId, refreshKey = 0, onRefetch }: Props) {
 
   const handleClose = async (id: string) => {
     try {
-      await closePos({ size: null }, `/futures/positions/${id}/close`);
-      toast.success("Đã đóng vị thế");
+      const res = await closePos(
+        { size: null },
+        `/futures/positions/${id}/close`
+      );
+      const payload =
+        res && typeof res === "object" && "data" in res
+          ? (res as { data?: { returnKc?: number } }).data
+          : (res as { returnKc?: number } | undefined);
+      const credited =
+        payload?.returnKc != null ? Number(payload.returnKc) : null;
+      toast.success(
+        credited != null && Number.isFinite(credited)
+          ? `Đã đóng vị thế — nhận ${formatTokenPrice(2, credited)} ${QUOTE_SYMBOL} về ví`
+          : "Đã đóng vị thế"
+      );
       void refetchOpen();
       void refetchHist();
       void refetchOrders();
+      void refetchBalances();
       onRefetch?.();
     } catch {
       /* handled */

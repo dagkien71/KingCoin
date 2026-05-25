@@ -1,5 +1,11 @@
 import { PrismaService } from '@providers/prisma';
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  INSUFFICIENT_KC,
+  INSUFFICIENT_TOKEN,
+  USER_NOT_FOUND_KC,
+} from '@constants/errors.constants';
+import { badRequest } from '@common/errors/app-error.util';
 import { paginator } from '@nodeteam/nestjs-prisma-pagination';
 import { PaginatorTypes } from '@nodeteam/nestjs-prisma-pagination';
 import { Prisma, User } from '@prisma/client';
@@ -61,11 +67,10 @@ export class UserRepository {
         }
       | null
       | undefined;
-    let displayBalance = bal?.stableCoin ?? 0;
-    if (quote && bal?.tokens?.length) {
-      const hit = bal.tokens.find((t) => t.tokenId === quote.id);
-      if (hit) displayBalance = hit.amount;
-    }
+    const displayBalance = this.sumQuoteKcFromBalance(
+      bal,
+      quote?.id ?? null,
+    );
     const { balance: _balanceNested, ...rest } = row;
     return { ...rest, balance: displayBalance } as unknown as User;
   }
@@ -103,7 +108,7 @@ export class UserRepository {
     });
 
     if (!user) {
-      throw new Error(`User with id ${id} not found`);
+      throw new NotFoundException(USER_NOT_FOUND_KC);
     }
 
     return this.prisma.user.update({
@@ -118,7 +123,7 @@ export class UserRepository {
     });
 
     if (!user) {
-      throw new Error(`User with id ${id} not found`);
+      throw new NotFoundException(USER_NOT_FOUND_KC);
     }
 
     await this.prisma.user.delete({
@@ -166,9 +171,7 @@ export class UserRepository {
       });
     } else {
       if (delta < 0) {
-        throw new Error(
-          `Không đủ ${tokenId} (quote) — user ${userId}`,
-        );
+        throw badRequest(INSUFFICIENT_KC);
       }
       await this.prisma.balanceToken.create({
         data: { balanceId: balance.id, tokenId, amount: delta },
@@ -187,18 +190,74 @@ export class UserRepository {
     return quote?.id ?? null;
   }
 
+  /** KC khả dụng = stableCoin + BalanceToken quote (tránh “mất” KC legacy). */
+  private sumQuoteKcFromBalance(
+    balance:
+      | {
+          stableCoin?: number;
+          tokens?: { tokenId: string; amount: number }[];
+        }
+      | null
+      | undefined,
+    quoteId: string | null,
+  ): number {
+    if (!balance) return 0;
+    const stable = balance.stableCoin ?? 0;
+    if (!quoteId || !balance.tokens?.length) return stable;
+    const hit = balance.tokens.find((t) => t.tokenId === quoteId);
+    return stable + (hit?.amount ?? 0);
+  }
+
   async getQuoteBalance(userId: string): Promise<number> {
     const quoteId = await this.getQuoteTokenId();
     const balance = await this.prisma.balance.findUnique({
       where: { userId },
       include: { tokens: true },
     });
-    if (!balance) return 0;
-    if (quoteId && balance.tokens?.length) {
-      const hit = balance.tokens.find((t) => t.tokenId === quoteId);
-      if (hit) return hit.amount;
+    return this.sumQuoteKcFromBalance(balance, quoteId);
+  }
+
+  /**
+   * Trừ/cộng KC quote thống nhất: trừ ưu tiên BalanceToken rồi stableCoin; cộng vào BalanceToken.
+   */
+  async adjustQuoteKcByUserId(userId: string, delta: number): Promise<void> {
+    const quoteId = await this.getQuoteTokenId();
+    if (!quoteId) {
+      await this.adjustStableCoinByUserId(userId, delta);
+      return;
     }
-    return balance.stableCoin ?? 0;
+
+    if (delta >= 0) {
+      await this.adjustBalanceTokenByUserId(userId, quoteId, delta);
+      return;
+    }
+
+    const need = -delta;
+    const balance = await this.prisma.balance.findUnique({
+      where: { userId },
+      include: { tokens: true },
+    });
+    if (!balance) {
+      throw badRequest(INSUFFICIENT_KC);
+    }
+
+    const tokenRow = balance.tokens?.find((t) => t.tokenId === quoteId);
+    const fromToken = tokenRow?.amount ?? 0;
+    const fromStable = balance.stableCoin ?? 0;
+
+    if (fromToken + fromStable < need - 1e-9) {
+      throw badRequest(INSUFFICIENT_KC);
+    }
+
+    const takeToken = Math.min(fromToken, need);
+    const takeStable = need - takeToken;
+
+    if (takeToken > 1e-12) {
+      await this.adjustBalanceTokenByUserId(userId, quoteId, -takeToken);
+    }
+    if (takeStable > 1e-12) {
+      await this.adjustStableCoinByUserId(userId, -takeStable);
+    }
   }
 
   async getTokenBalance(userId: string, tokenId: string): Promise<number> {
@@ -237,7 +296,7 @@ export class UserRepository {
     if (row) {
       const next = row.amount + delta;
       if (next < -1e-9) {
-        throw new Error(`Không đủ token — user ${userId}`);
+        throw badRequest(INSUFFICIENT_TOKEN);
       }
       await this.prisma.balanceToken.update({
         where: { id: row.id },
@@ -245,7 +304,7 @@ export class UserRepository {
       });
     } else {
       if (delta < 0) {
-        throw new Error(`Không đủ token — user ${userId}`);
+        throw badRequest(INSUFFICIENT_TOKEN);
       }
       await this.prisma.balanceToken.create({
         data: { balanceId: balance.id, tokenId, amount: delta },

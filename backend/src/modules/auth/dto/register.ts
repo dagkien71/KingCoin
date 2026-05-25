@@ -6,41 +6,46 @@ import {
   Length,
   Matches,
   IsOptional,
+  MaxLength,
 } from 'class-validator';
 
 export class SignUpDto {
   @ApiProperty({ type: String, example: 'user@example.com' })
-  @IsEmail()
-  @IsNotEmpty()
+  @IsEmail({}, { message: 'email không hợp lệ.' })
+  @IsNotEmpty({ message: 'email không được để trống.' })
   readonly email!: string;
 
   @ApiProperty({
     type: String,
-    description:
-      'User password with at least one letter and one digit/special character',
-    example: 'String!12345',
+    description: 'Mật khẩu: ≥6 ký tự, có chữ + số/ký tự đặc biệt, không khoảng trắng',
+    example: 'Matkhau1!',
   })
-  @IsString()
-  @Length(6, 80)
+  @IsString({ message: 'password phải là chuỗi.' })
+  @IsNotEmpty({ message: 'password không được để trống.' })
+  @Length(6, 80, { message: 'password phải từ 6–80 ký tự.' })
   @Matches(/[\d\W]/, {
-    message: 'Password must contain at least one digit or special character',
+    message: 'password phải có ít nhất một số hoặc ký tự đặc biệt.',
   })
-  @Matches(/[a-zA-Z]/, { message: 'Password must contain at least one letter' })
-  @Matches(/^\S+$/, { message: 'Password must not contain spaces' })
+  @Matches(/[a-zA-Z]/, { message: 'password phải có ít nhất một chữ cái.' })
+  @Matches(/^\S+$/, { message: 'password không được chứa khoảng trắng.' })
   readonly password!: string;
 
   @ApiPropertyOptional({ type: String, example: 'john_doe' })
-  @IsString()
   @IsOptional()
+  @IsString({ message: 'username phải là chuỗi.' })
+  @Length(3, 32, { message: 'username phải từ 3–32 ký tự.' })
   readonly username?: string;
 
   @ApiPropertyOptional({
     type: String,
-    description: 'User phone number with country code',
-    example: '+84123456789',
+    description: '10–11 chữ số (tuỳ chọn)',
+    example: '0912345678',
   })
-  @IsString()
   @IsOptional()
+  @IsString({ message: 'phone phải là chuỗi.' })
+  @Matches(/^[0-9]{10,11}$/, {
+    message: 'phone phải gồm 10–11 chữ số.',
+  })
   readonly phone?: string;
 
   @ApiPropertyOptional({
@@ -48,7 +53,8 @@ export class SignUpDto {
     description: 'Mã giới thiệu (từ link ?ref=)',
     example: 'KC1A2B3C',
   })
-  @IsString()
   @IsOptional()
+  @IsString({ message: 'referralCode phải là chuỗi.' })
+  @MaxLength(32, { message: 'referralCode tối đa 32 ký tự.' })
   readonly referralCode?: string;
 }

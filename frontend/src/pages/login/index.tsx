@@ -1,4 +1,5 @@
-import useMutation from "@/hooks/useMutation";
+import { apiFieldErrorsToForm } from "@/lib/auth/apply-api-field-errors";
+import useMutation, { isMutationFailure } from "@/hooks/useMutation";
 import { useAppDispatch } from "@/store/hook";
 import { setAuthState } from "@/store/slice/authSlice";
 import { setSessionState } from "@/store/slice/sessionTokenSlice";
@@ -40,11 +41,20 @@ const Login = () => {
     }
     setErrors({});
 
-    const body = (await mutate({
-      email,
+    const result = await mutate({
+      email: email.trim(),
       password,
-    })) as { data?: unknown } | undefined;
+    });
 
+    if (isMutationFailure(result)) {
+      const apiErrors = apiFieldErrorsToForm<{ email?: string; password?: string }>(
+        result
+      );
+      if (apiErrors) setErrors(apiErrors);
+      return;
+    }
+
+    const body = result as { data?: unknown } | undefined;
     if (!body?.data) {
       return;
     }
@@ -115,7 +125,7 @@ const Login = () => {
                 name="password"
                 value={form.password}
                 onChange={handleChange}
-                placeholder="••••••••"
+                placeholder="≥6 ký tự, chữ + số/ký tự đặc biệt"
                 autoComplete="current-password"
               />
               {errors.password && (

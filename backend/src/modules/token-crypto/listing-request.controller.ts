@@ -22,7 +22,7 @@ import {
   UseAbility,
   UserProxy,
 } from '@modules/casl';
-import { CreateTokenCryptoDto } from '@modules/token-crypto/dto/create-token-crypto-dto';
+import { SubmitListingRequestDto } from '@modules/token-crypto/dto/submit-listing-request.dto';
 import ListingRequestEntity from '@modules/token-crypto/entities/listing-request.entity';
 import { ListingRequestService } from './listing-request.service';
 import { User } from '@prisma/client';
@@ -38,12 +38,12 @@ export class ListingRequestController {
 
   @Post()
   @ApiOkBaseResponse({ dto: ListingRequestEntity })
-  @ApiBody({ type: CreateTokenCryptoDto })
+  @ApiBody({ type: SubmitListingRequestDto })
   @Serialize(ListingRequestEntity)
   @UseGuards(AccessGuard)
-  @UseAbility(Actions.create, CreateTokenCryptoDto)
+  @UseAbility(Actions.create, SubmitListingRequestDto)
   async submit(
-    @Body() body: CreateTokenCryptoDto,
+    @Body() body: SubmitListingRequestDto,
     @CaslUser() userProxy?: UserProxy<User>,
   ) {
     const user = await userProxy?.get();

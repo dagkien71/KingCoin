@@ -1,15 +1,24 @@
-import { getApiErrorMessage } from "@/lib/api-error";
+import {
+  getApiErrorMessage,
+  getApiFieldErrors,
+  type MutationFailure,
+} from "@/lib/api-error";
 import { IResponse } from "@/types/response";
 import { useCallback, useState } from "react";
 import { toast } from "react-toastify";
 import useConfigApi from "./useConfigApi";
 
+export type { MutationFailure } from "@/lib/api-error";
+export { isMutationFailure } from "@/lib/api-error";
+
 interface UseMutationResult<T> {
   data: T | null;
   loading: boolean;
   error: string | null;
-  /** Trả về envelope API hoặc `undefined` khi lỗi (đã toast). Không throw. */
-  mutate: (body?: unknown, url?: string) => Promise<T | undefined>;
+  fieldErrors: Record<string, string[]> | null;
+  /** Thành công: envelope/data. Lỗi: `MutationFailure` (đã toast). */
+  mutate: (body?: unknown, url?: string) => Promise<T | MutationFailure | undefined>;
+  clearErrors: () => void;
 }
 
 const useMutation = <T>(
@@ -20,11 +29,21 @@ const useMutation = <T>(
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<
+    string,
+    string[]
+  > | null>(null);
+
+  const clearErrors = useCallback(() => {
+    setError(null);
+    setFieldErrors(null);
+  }, []);
 
   const mutate = useCallback(
     async (body?: unknown, urlParams?: string) => {
       setLoading(true);
       setError(null);
+      setFieldErrors(null);
       try {
         const response = await Api.request<IResponse<T>>({
           method,
@@ -43,9 +62,16 @@ const useMutation = <T>(
         return envelope as T;
       } catch (err: unknown) {
         const msg = getApiErrorMessage(err);
+        const fields = getApiFieldErrors(err);
         toast.error(msg);
         setError(msg);
-        return undefined;
+        setFieldErrors(fields);
+        const failure: MutationFailure = {
+          _mutationFailed: true,
+          message: msg,
+          fieldErrors: fields,
+        };
+        return failure;
       } finally {
         setLoading(false);
       }
@@ -53,7 +79,7 @@ const useMutation = <T>(
     [method, url, Api]
   );
 
-  return { data, loading, error, mutate };
+  return { data, loading, error, fieldErrors, mutate, clearErrors };
 };
 
 export default useMutation;

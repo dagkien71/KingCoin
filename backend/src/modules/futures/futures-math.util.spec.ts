@@ -5,6 +5,7 @@ import {
   marginFromSize,
   marginRatio,
   mergeEntryPrice,
+  resolveMarginPortionKc,
   sizeFromMargin,
   unrealizedPnlKc,
   validateTpSlPrices,
@@ -43,6 +44,21 @@ describe('futures-math.util', () => {
   it('closeReturnKc never negative', () => {
     expect(closeReturnKc(50, -80)).toBe(0);
     expect(closeReturnKc(50, 30)).toBe(80);
+  });
+
+  it('closeReturnKc returns margin + profit on full win', () => {
+    expect(closeReturnKc(500, 500)).toBe(1000);
+  });
+
+  it('resolveMarginPortionKc falls back when stored margin is zero', () => {
+    const portion = resolveMarginPortionKc({
+      storedMarginKc: 0,
+      closeSize: 100,
+      positionSize: 100,
+      leverage: 10,
+      entryPrice: 10,
+    });
+    expect(portion).toBeCloseTo(100);
   });
 
   it('validateTpSlPrices for long', () => {

@@ -1,114 +1,76 @@
 import {
   ArgumentsHost,
   Catch,
-  HttpException,
-  HttpServer,
+  ExceptionFilter,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
-import { BaseExceptionFilter } from '@nestjs/core';
 import { Prisma } from '@prisma/client';
-import { PRISMA_API_ERROR } from '@constants/errors.constants';
-
-export type ErrorCodesStatusMapping = {
-  [key: string]: number;
-};
+import { DATABASE_ERROR } from '@constants/errors.constants';
+import {
+  prismaErrorMessage,
+  prismaErrorStatus,
+} from '@common/errors/prisma-error.messages';
+import { parseCodedMessage } from '@common/errors/app-error.util';
 
 /**
- * {@link PrismaClientExceptionFilter}
- * catches {@link Prisma.PrismaClientKnownRequestError}
- * and {@link Prisma.NotFoundError} exceptions.
+ * Map mọi {@link Prisma.PrismaClientKnownRequestError} sang envelope API — không fallthrough Nest default.
  */
-@Catch(Prisma?.PrismaClientKnownRequestError)
-export class PrismaClientExceptionFilter extends BaseExceptionFilter {
-  /**
-   * default error codes mapping
-   *
-   * Error codes definition for Prisma Client (Query Engine)
-   * @see https://www.prisma.io/docs/reference/api-reference/error-reference#prisma-client-query-engine
-   */
-  private errorCodesStatusMapping: ErrorCodesStatusMapping = {
-    P2000: HttpStatus.BAD_REQUEST,
-    P2002: HttpStatus.CONFLICT,
-    P2003: HttpStatus.CONFLICT,
-    P2025: HttpStatus.NOT_FOUND,
-  };
+@Catch(Prisma.PrismaClientKnownRequestError)
+export class PrismaClientExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(PrismaClientExceptionFilter.name);
 
-  /**
-   * @param applicationRef
-   * @param errorCodesStatusMapping
-   */
-  constructor(
-    applicationRef?: HttpServer,
-    errorCodesStatusMapping?: ErrorCodesStatusMapping,
-  ) {
-    super(applicationRef);
+  catch(exception: Prisma.PrismaClientKnownRequestError, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const res = ctx.getResponse();
 
-    // use custom error codes mapping (overwrite)
-    //
-    // @example:
-    //
-    //   const { httpAdapter } = app.get(HttpAdapterHost);
-    //   app.useGlobalFilters(new PrismaClientExceptionFilter(httpAdapter, {
-    //     P2022: HttpStatus.BAD_REQUEST,
-    //   }));
-    //
-    if (errorCodesStatusMapping) {
-      this.errorCodesStatusMapping = Object.assign(
-        this.errorCodesStatusMapping,
-        errorCodesStatusMapping,
-      );
-    }
-  }
+    const status = prismaErrorStatus(exception.code);
+    const message = prismaErrorMessage(exception.code, exception.meta);
+    const { code: defaultCode } = parseCodedMessage(DATABASE_ERROR);
 
-  /**
-   * @param exception
-   * @param host
-   * @returns
-   */
-  catch(
-    exception: Prisma.PrismaClientKnownRequestError | any,
-    host: ArgumentsHost,
-  ) {
-    if (exception instanceof Prisma.PrismaClientKnownRequestError) {
-      return this.catchClientKnownRequestError(exception, host);
-    }
-  }
-
-  private catchClientKnownRequestError(
-    exception: Prisma.PrismaClientKnownRequestError,
-    host: ArgumentsHost,
-  ) {
-    const statusCode = this.errorCodesStatusMapping[exception.code];
-    const message = this.exceptionShortMessage(exception.message);
-
-    if (!Object.keys(this.errorCodesStatusMapping).includes(exception.code)) {
-      return super.catch(exception, host);
-    }
-
-    const [code] = PRISMA_API_ERROR.split(':');
-
-    super.catch(
-      new HttpException(
-        {
-          success: false,
-          error: {
-            details: exception.code,
-            message,
-            code: parseInt(code, 10),
-          },
-        },
-        statusCode,
-      ),
-      host,
+    this.logger.warn(
+      `Prisma ${exception.code}: ${exception.message}`,
+      exception.stack,
     );
+
+    const body = {
+      success: false,
+      error: {
+        code: defaultCode ?? 500101,
+        message,
+        details: {
+          prismaCode: exception.code,
+          ...(exception.meta?.target != null
+            ? { target: exception.meta.target }
+            : {}),
+        },
+      },
+    };
+
+    return res.status(status).json(body);
   }
+}
 
-  private exceptionShortMessage(message: string): string {
-    const shortMessage = message.substring(message.indexOf('→'));
+/** Prisma validation / unknown — envelope thống nhất, không lộ stack. */
+@Catch(Prisma.PrismaClientValidationError)
+export class PrismaValidationExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(PrismaValidationExceptionFilter.name);
 
-    return shortMessage
-      .substring(shortMessage.indexOf('\n'))
-      .replace(/\n/g, '')
-      .trim();
+  catch(exception: Prisma.PrismaClientValidationError, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const res = ctx.getResponse();
+    const { code } = parseCodedMessage(DATABASE_ERROR);
+
+    this.logger.warn(exception.message, exception.stack);
+
+    return res.status(HttpStatus.BAD_REQUEST).json({
+      success: false,
+      error: {
+        code: code ?? 500101,
+        message:
+          'Dữ liệu gửi lên không hợp lệ với schema cơ sở dữ liệu.',
+        details: { type: 'PrismaClientValidationError' },
+      },
+    });
   }
 }

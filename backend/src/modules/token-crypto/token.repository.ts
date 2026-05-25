@@ -1,5 +1,6 @@
 import { PrismaService } from '@providers/prisma';
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { TOKEN_NOT_FOUND } from '@constants/errors.constants';
 import { paginator } from '@nodeteam/nestjs-prisma-pagination';
 import { PaginatorTypes } from '@nodeteam/nestjs-prisma-pagination';
 import { Prisma, TokenCrypto } from '@prisma/client';
@@ -80,7 +81,7 @@ export class TokenCryptoRepository {
     });
 
     if (!tokenCrypto) {
-      throw new Error(`TokenCrypto with id ${id} not found`);
+      throw new NotFoundException(TOKEN_NOT_FOUND);
     }
 
     // Update the tokenCrypto
@@ -96,7 +97,7 @@ export class TokenCryptoRepository {
     });
 
     if (!tokenCrypto) {
-      throw new Error(`TokenCrypto with id ${id} not found`);
+      throw new NotFoundException(TOKEN_NOT_FOUND);
     }
 
     await this.prisma.tokenCrypto.delete({

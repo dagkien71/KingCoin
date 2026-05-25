@@ -24,8 +24,8 @@ export class CreateOrderDto {
     description: 'The ID of the coin associated with the order',
     example: '5bdb8976-ec8a-4aee-8a8d-20245ceb6354',
   })
-  @IsString()
-  @IsNotEmpty()
+  @IsString({ message: 'tokenId phải là chuỗi.' })
+  @IsNotEmpty({ message: 'tokenId không được để trống.' })
   tokenId: string;
 
   @ApiProperty({
@@ -33,8 +33,8 @@ export class CreateOrderDto {
     description: 'The type of order (buy or sell)',
     example: OrderType.BUY,
   })
-  @IsEnum(OrderType)
-  @IsNotEmpty()
+  @IsEnum(OrderType, { message: 'type phải là buy hoặc sell.' })
+  @IsNotEmpty({ message: 'type không được để trống.' })
   type: OrderType;
 
   @ApiProperty({
@@ -42,9 +42,9 @@ export class CreateOrderDto {
     description: 'The price per unit of the coin',
     example: 100.5,
   })
-  @IsNumber()
-  @IsPositive()
-  @IsNotEmpty()
+  @IsNumber({}, { message: 'price phải là số.' })
+  @IsPositive({ message: 'price phải lớn hơn 0.' })
+  @IsNotEmpty({ message: 'price không được để trống.' })
   price: number;
 
   @ApiProperty({
@@ -52,8 +52,8 @@ export class CreateOrderDto {
     description: 'The quantity of the coin to buy/sell',
     example: 10,
   })
-  @IsNumber()
-  @IsPositive()
-  @IsNotEmpty()
+  @IsNumber({}, { message: 'quantity phải là số.' })
+  @IsPositive({ message: 'quantity phải lớn hơn 0.' })
+  @IsNotEmpty({ message: 'quantity không được để trống.' })
   quantity: number;
 }

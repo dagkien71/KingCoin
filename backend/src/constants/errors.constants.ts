@@ -71,6 +71,16 @@ export const INVALID_DOMAIN = '400018: Invalid domain';
 export const SELECT_INCLUDE_PIPE_FORMAT = '400019: Invalid query format';
 export const FILE_TOO_LARGE = '400022: Uploaded file is too large';
 export const PRISMA_API_ERROR = '400023: Prismic API error';
+export const DATABASE_ERROR = '500101: Lỗi cơ sở dữ liệu';
+
+/** KingCoin domain */
+export const TOKEN_NOT_FOUND = '404101: Token không tồn tại';
+export const ORDER_NOT_FOUND = '404102: Không tìm thấy lệnh';
+export const FUTURES_POSITION_NOT_FOUND = '404103: Không tìm thấy vị thế futures';
+export const USER_NOT_FOUND_KC = '404104: Không tìm thấy người dùng';
+export const INSUFFICIENT_KC = '400101: Không đủ KC';
+export const INSUFFICIENT_TOKEN = '400102: Không đủ số dư token';
+export const DUPLICATE_RECORD = '409101: Dữ liệu đã tồn tại';
 export const INVALID_VERIFICATION_CODE = '400024: Invalid verification code';
 export const AUTH_CREDENTIALS_INVALID =
   '400025: Authentication credentials were missing or incorrect';

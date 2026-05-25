@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { apiFieldErrorsToForm } from "@/lib/auth/apply-api-field-errors";
 import { validateForm } from "@/lib/auth/register-validation";
 import { IRegisterForm } from "@/lib/auth/register-type";
-import useMutation from "@/hooks/useMutation";
+import useMutation, { isMutationFailure } from "@/hooks/useMutation";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,19 +39,28 @@ export default function Signup() {
     e.preventDefault();
 
     const validationErrors = validateForm(formData);
-    setErrors(validationErrors || {});
-
-    if (Object.keys(validationErrors || {}).length !== 0) {
+    const hasClientErrors = Object.values(validationErrors).some(Boolean);
+    if (hasClientErrors) {
+      setErrors(validationErrors);
       return;
     }
+    setErrors({});
+
+    const phoneDigits = formData.phone?.replace(/\D/g, "").trim();
 
     const result = await mutate({
-      email: formData.email,
-      phone: formData.phone || undefined,
-      username: formData.username || undefined,
+      email: formData.email?.trim(),
+      phone: phoneDigits || undefined,
+      username: formData.username?.trim() || undefined,
       password: formData.password as string,
       referralCode: referralCode.trim() || undefined,
     });
+
+    if (isMutationFailure(result)) {
+      const apiErrors = apiFieldErrorsToForm<IRegisterForm>(result);
+      if (apiErrors) setErrors((prev) => ({ ...prev, ...apiErrors }));
+      return;
+    }
 
     if (result) {
       toast.success("Đăng ký thành công!");
@@ -104,7 +114,12 @@ export default function Signup() {
             {field("email", "Email", "email", "you@example.com")}
             {field("phone", "Số điện thoại (tuỳ chọn)", "tel", "+84…")}
             {field("username", "Tên hiển thị (tuỳ chọn)", "text", "trader_pro")}
-            {field("password", "Mật khẩu", "password", "Tối thiểu 6 ký tự")}
+            {field(
+              "password",
+              "Mật khẩu",
+              "password",
+              "≥6 ký tự, có chữ + số/ký tự đặc biệt, không khoảng trắng"
+            )}
             {field(
               "confirmPassword",
               "Xác nhận mật khẩu",

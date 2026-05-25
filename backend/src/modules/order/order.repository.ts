@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { ORDER_NOT_FOUND } from '@constants/errors.constants';
 import { paginator, PaginatorTypes } from '@nodeteam/nestjs-prisma-pagination';
 import { Order, OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '@providers/prisma';
@@ -93,7 +94,7 @@ export class OrderRepository {
     });
 
     if (!order) {
-      throw new Error(`Order with id ${id} not found`);
+      throw new NotFoundException(ORDER_NOT_FOUND);
     }
 
     // Update the order
@@ -117,13 +118,13 @@ export class OrderRepository {
     });
 
     if (!order) {
-      throw new Error(`Order with id ${id} not found`);
+      throw new NotFoundException(ORDER_NOT_FOUND);
     }
 
     // Nếu lệnh đã khớp toàn bộ thì không thể hủy
     if (order.quantity === order.matchedQuantity) {
-      throw new Error(
-        `Order with id ${id} has already been fully matched and cannot be canceled`,
+      throw new BadRequestException(
+        'Lệnh đã khớp toàn bộ, không thể hủy.',
       );
     }
 
@@ -147,7 +148,7 @@ export class OrderRepository {
       return;
     }
 
-    throw new Error(`Order with id ${id} cannot be canceled`);
+    throw new BadRequestException('Không thể hủy lệnh ở trạng thái hiện tại.');
   }
 
   /**

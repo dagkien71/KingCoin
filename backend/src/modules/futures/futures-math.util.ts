@@ -89,6 +89,25 @@ export function closeReturnKc(
   return Math.max(0, marginPortion + uPnlPortion);
 }
 
+/** Phần margin hoàn khi đóng — ưu tiên `marginKc` lưu DB, fallback từ size/leverage. */
+export function resolveMarginPortionKc(params: {
+  storedMarginKc: number;
+  closeSize: number;
+  positionSize: number;
+  leverage: number;
+  entryPrice: number;
+}): number {
+  const { storedMarginKc, closeSize, positionSize, leverage, entryPrice } =
+    params;
+  if (positionSize <= 0 || closeSize <= 0) return 0;
+  const fraction = closeSize / positionSize;
+  let portion = storedMarginKc * fraction;
+  if (portion < 1e-6) {
+    portion = marginFromSize(closeSize, leverage, entryPrice);
+  }
+  return Math.max(0, portion);
+}
+
 export type TpSlInput = {
   takeProfitPrice?: number | null;
   stopLossPrice?: number | null;

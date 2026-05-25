@@ -28,7 +28,7 @@ export default function App({ Component, pageProps }: AppProps) {
         <title>KingCoin</title>
         <meta
           name="description"
-          content="KingCoin — giao dịch spot, futures và phát hành token trên KC."
+          content="KingCoin — sàn giao dịch mô phỏng: tạo token, Spot & Futures như sàn thật. Kiếm KC miễn phí từ nhiệm vụ, không dùng tiền thật."
         />
       </Head>
       <div

@@ -1,5 +1,6 @@
 import { UserRepository } from '@modules/user/user.repository';
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { USER_NOT_FOUND_KC } from '@constants/errors.constants';
 import { PrismaService } from '@providers/prisma';
 import { User } from '@prisma/client';
 
@@ -63,7 +64,7 @@ export class PortfolioPnlService {
   async syncUserNavPnL(userId: string): Promise<User> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
-      throw new Error(`User ${userId} not found`);
+      throw new NotFoundException(USER_NOT_FOUND_KC);
     }
 
     const nav = await this.computeNavKc(userId);

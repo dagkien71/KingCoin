@@ -4,9 +4,13 @@ import { QUOTE_SYMBOL } from "@/constants/quote";
 import UploadFile from "@/components/upload";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import useMutation from "@/hooks/useMutation";
 import { cn } from "@/lib/cn";
-import { validateFormSubmit } from "@/lib/token/create-validation";
+import { apiFieldErrorsToForm } from "@/lib/auth/apply-api-field-errors";
+import {
+  LISTING_FIELD_KEY_MAP,
+  validateFormSubmit,
+} from "@/lib/token/create-validation";
+import useMutation, { isMutationFailure } from "@/hooks/useMutation";
 import { IssuerFormSection } from "@/modules/issuer/IssuerFormSection";
 import { TokenMintPreview } from "@/modules/issuer/TokenMintPreview";
 import { TOKEN_LISTING_FEE_KC } from "@/modules/issuer/constants";
@@ -108,7 +112,7 @@ export function CreateTokenForm() {
       });
     };
 
-  const handleFormSubmit = (e: FormEvent) => {
+  const handleFormSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const validationErrors = validateFormSubmit(form);
     if (Object.keys(validationErrors).length > 0) {
@@ -116,19 +120,33 @@ export function CreateTokenForm() {
       return;
     }
     setErrors(null);
-    void mutate({
-      ...form,
+
+    const payload = {
+      name: form.name.trim(),
+      symbol: form.symbol.trim().toUpperCase(),
+      logo: form.logo?.trim() || undefined,
       totalSupply: Number(form.totalSupply),
       initialPrice: Number(form.initialPrice),
       decimals: Number(form.decimals),
-    }).then((res) => {
-      if (!res) return;
-      const payload =
-        res && typeof res === "object" && "data" in res
-          ? (res as { data?: IListingRequest }).data
-          : (res as IListingRequest);
-      if (payload?.id) setShowPopup(true);
-    });
+      description: (form.description ?? "").trim(),
+      communityLinks: form.communityLinks,
+    };
+
+    const res = await mutate(payload);
+    if (isMutationFailure(res)) {
+      const apiErrors = apiFieldErrorsToForm<Record<string, string>>(
+        res,
+        LISTING_FIELD_KEY_MAP
+      );
+      if (apiErrors) setErrors(apiErrors as Record<string, string>);
+      return;
+    }
+    if (!res) return;
+    const data =
+      res && typeof res === "object" && "data" in res
+        ? (res as { data?: IListingRequest }).data
+        : (res as IListingRequest);
+    if (data?.id) setShowPopup(true);
   };
 
   const err = (key: string) => errors?.[key];
@@ -184,7 +202,12 @@ export function CreateTokenForm() {
                     id="symbol"
                     placeholder="SLR"
                     value={form.symbol}
-                    onChange={handleFieldChange("symbol")}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        symbol: e.target.value.toUpperCase(),
+                      })
+                    }
                     className={cn(
                       issuerInputClass,
                       "font-mono uppercase tracking-wider",
@@ -205,6 +228,7 @@ export function CreateTokenForm() {
                     rows={4}
                     placeholder="Vision, utility, đối tượng cộng đồng…"
                     value={form.description}
+                    maxLength={500}
                     onChange={(e) => {
                       setDescriptionLength(e.target.value.length);
                       setForm({ ...form, description: e.target.value });
@@ -291,6 +315,9 @@ export function CreateTokenForm() {
                   <p className="text-center text-sm text-kc-muted sm:text-left">
                     PNG, JPG hoặc WebP — khuyến nghị 256×256 trở lên.
                   </p>
+                  {err("logo") ? (
+                    <p className="text-[11px] text-kc-down">{err("logo")}</p>
+                  ) : null}
                   <div className="flex flex-wrap justify-center gap-2 sm:justify-start">
                     <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500">
                       <HiOutlinePhotograph className="h-4 w-4" />

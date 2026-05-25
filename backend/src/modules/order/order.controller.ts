@@ -174,21 +174,19 @@ export class OrderController {
   @UseGuards(AccessGuard)
   @UseAbility(Actions.create, CreateOrderDto)
   async create(
-    @Body() createOrderDto: Prisma.OrderCreateInput,
+    @Body() createOrderDto: CreateOrderDto,
     @CaslUser() userProxy?: UserProxy<User>,
   ): Promise<Order> {
     const user = await userProxy.get();
     if (!user?.id) return;
     const quote = process.env.QUOTE_DISPLAY_SYMBOL?.trim() || 'KC';
-    const sym =
-      (createOrderDto as { symbol?: string }).symbol?.toUpperCase() ?? 'TOKEN';
     const payload: Prisma.OrderCreateInput = {
       tokenId: createOrderDto.tokenId,
       price: createOrderDto.price,
       quantity: createOrderDto.quantity,
       user: { connect: { id: user.id } },
       type: createOrderDto.type as 'buy' | 'sell',
-      pair: `${sym}/${quote}`,
+      pair: `TOKEN/${quote}`,
     };
     return this.orderService.create(payload);
   }

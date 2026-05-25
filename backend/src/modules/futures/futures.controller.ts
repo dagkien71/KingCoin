@@ -19,10 +19,13 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { FuturesSide, User } from '@prisma/client';
+import { ApiBearerAuth, ApiBody, ApiTags } from '@nestjs/swagger';
+import { User } from '@prisma/client';
 import { FuturesConfigService } from './futures-config.service';
 import { FuturesEngineService } from './futures-engine.service';
+import { OpenFuturesDto } from './dto/open-futures.dto';
+import { CloseFuturesDto } from './dto/close-futures.dto';
+import { UpdateFuturesTpSlDto } from './dto/update-futures-tp-sl.dto';
 
 @ApiTags('Futures')
 @ApiBaseResponses()
@@ -104,17 +107,9 @@ export class FuturesController {
   @ApiBearerAuth()
   @UseGuards(AccessGuard)
   @UseAbility(Actions.create, UserEntity)
+  @ApiBody({ type: OpenFuturesDto })
   async openOrder(
-    @Body()
-    body: {
-      tokenId: string;
-      side: FuturesSide;
-      leverage: number;
-      marginKc?: number;
-      size?: number;
-      takeProfitPrice?: number | null;
-      stopLossPrice?: number | null;
-    },
+    @Body() body: OpenFuturesDto,
     @CaslUser() userProxy: UserProxy<User>,
   ) {
     const user = await userProxy.get();
@@ -123,15 +118,11 @@ export class FuturesController {
       userId: user.id,
       tokenId: body.tokenId,
       side: body.side,
-      leverage: Number(body.leverage),
-      marginKc: body.marginKc != null ? Number(body.marginKc) : undefined,
-      size: body.size != null ? Number(body.size) : undefined,
-      takeProfitPrice:
-        body.takeProfitPrice != null
-          ? Number(body.takeProfitPrice)
-          : undefined,
-      stopLossPrice:
-        body.stopLossPrice != null ? Number(body.stopLossPrice) : undefined,
+      leverage: body.leverage,
+      marginKc: body.marginKc,
+      size: body.size,
+      takeProfitPrice: body.takeProfitPrice,
+      stopLossPrice: body.stopLossPrice,
     });
   }
 
@@ -139,32 +130,17 @@ export class FuturesController {
   @ApiBearerAuth()
   @UseGuards(AccessGuard)
   @UseAbility(Actions.update, UserEntity)
+  @ApiBody({ type: UpdateFuturesTpSlDto })
   async updateTpSl(
     @Param('id') id: string,
-    @Body()
-    body: {
-      takeProfitPrice?: number | null;
-      stopLossPrice?: number | null;
-    },
+    @Body() body: UpdateFuturesTpSlDto,
     @CaslUser() userProxy: UserProxy<User>,
   ) {
     const user = await userProxy.get();
     if (!user?.id) return null;
-    const takeProfitPrice =
-      body.takeProfitPrice === undefined
-        ? undefined
-        : body.takeProfitPrice === null
-          ? null
-          : Number(body.takeProfitPrice);
-    const stopLossPrice =
-      body.stopLossPrice === undefined
-        ? undefined
-        : body.stopLossPrice === null
-          ? null
-          : Number(body.stopLossPrice);
     return this.engine.updatePositionTpSl(user.id, id, {
-      takeProfitPrice,
-      stopLossPrice,
+      takeProfitPrice: body.takeProfitPrice,
+      stopLossPrice: body.stopLossPrice,
     });
   }
 
@@ -172,9 +148,10 @@ export class FuturesController {
   @ApiBearerAuth()
   @UseGuards(AccessGuard)
   @UseAbility(Actions.create, UserEntity)
+  @ApiBody({ type: CloseFuturesDto })
   async close(
     @Param('id') id: string,
-    @Body() body: { size?: number | null },
+    @Body() body: CloseFuturesDto,
     @CaslUser() userProxy: UserProxy<User>,
   ) {
     const user = await userProxy.get();

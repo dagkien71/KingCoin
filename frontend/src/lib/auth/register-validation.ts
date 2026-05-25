@@ -1,44 +1,49 @@
 import { IRegisterForm } from "./register-type";
+import { validatePasswordStrength } from "./password-rules";
 
 export const validateEmail = (email: string) => {
   const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-  return emailRegex.test(email);
-};
-
-export const validatePassword = (password: string) => {
-  return password.length >= 6;
+  return emailRegex.test(email.trim());
 };
 
 export const validatePhone = (phone: string) => {
-  const phoneRegex = /^[0-9]{10,11}$/;
-  return phoneRegex.test(phone);
+  const digits = phone.replace(/\D/g, "");
+  return /^[0-9]{10,11}$/.test(digits);
 };
 
 export const validateUsername = (username: string) => {
-  return username.trim().length >= 3;
+  const t = username.trim();
+  return t.length >= 3 && t.length <= 32;
 };
 
 export const validateForm = (formData: IRegisterForm) => {
   const errors: IRegisterForm = {};
 
-  if (!formData.email || !validateEmail(formData.email)) {
-    errors.email = "Email không hợp lệ!";
+  if (!formData.email?.trim()) {
+    errors.email = "Email không được để trống.";
+  } else if (!validateEmail(formData.email)) {
+    errors.email = "Email không hợp lệ.";
   }
 
-  if (!formData.phone || !validatePhone(formData.phone)) {
-    errors.phone = "Số điện thoại không hợp lệ (10-11 chữ số)!";
+  const phone = formData.phone?.trim();
+  if (phone && !validatePhone(phone)) {
+    errors.phone = "Số điện thoại không hợp lệ (10–11 chữ số).";
   }
 
-  if (!formData.username || !validateUsername(formData.username)) {
-    errors.username = "Tên người dùng phải có ít nhất 3 ký tự!";
+  const username = formData.username?.trim();
+  if (username && !validateUsername(username)) {
+    errors.username = "Tên hiển thị phải từ 3–32 ký tự.";
   }
 
-  if (!formData.password || !validatePassword(formData.password)) {
-    errors.password = "Mật khẩu phải có ít nhất 6 ký tự!";
+  const pwdErr = validatePasswordStrength(formData.password ?? "");
+  if (pwdErr) {
+    errors.password = pwdErr;
   }
 
-  if (formData.password !== formData.confirmPassword) {
-    errors.confirmPassword = "Mật khẩu xác nhận không khớp!";
+  if (!formData.confirmPassword?.trim()) {
+    errors.confirmPassword = "Vui lòng xác nhận mật khẩu.";
+  } else if (formData.password !== formData.confirmPassword) {
+    errors.confirmPassword = "Mật khẩu xác nhận không khớp.";
   }
 
   return errors;

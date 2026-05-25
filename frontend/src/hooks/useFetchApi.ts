@@ -1,3 +1,4 @@
+import { getApiErrorMessage } from "@/lib/api-error";
 import { IResponse } from "@/types/response";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import useConfigApi from "./useConfigApi";
@@ -73,8 +74,7 @@ const useFetchApi = <T>(
       if (inner === undefined || inner === null) return;
       setData(inner as T);
     } catch (err: unknown) {
-      const ax = err as { response?: { data?: { error?: unknown } } };
-      console.log(ax?.response?.data?.error);
+      setError(getApiErrorMessage(err));
     } finally {
       if (!opts?.silent) {
         setLoading(false);

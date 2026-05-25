@@ -75,11 +75,7 @@ export class TradingFeeService {
     const { userId, quoteId, feeKc, refType, refId, note } = params;
     if (feeKc <= 1e-12) return;
 
-    await this.userRepository.adjustBalanceTokenByUserId(
-      userId,
-      quoteId,
-      -feeKc,
-    );
+    await this.userRepository.adjustQuoteKcByUserId(userId, -feeKc);
     await this.ledgerService.append({
       userId,
       amount: -feeKc,
@@ -103,11 +99,7 @@ export class TradingFeeService {
     const { userId, quoteId, amountKc, refType, refId, note } = params;
     if (amountKc <= 1e-12) return;
 
-    await this.userRepository.adjustBalanceTokenByUserId(
-      userId,
-      quoteId,
-      amountKc,
-    );
+    await this.userRepository.adjustQuoteKcByUserId(userId, amountKc);
     await this.ledgerService.append({
       userId,
       amount: amountKc,

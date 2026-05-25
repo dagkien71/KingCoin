@@ -1,4 +1,5 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
+import { configureApp } from '@common/configure-app';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Server } from 'http';
 import { AppModule } from '@modules/app/app.module';
@@ -30,6 +31,7 @@ class BaseContext {
     }).compile();
 
     this._app = this._module.createNestApplication();
+    configureApp(this._app);
 
     this._connection = new PrismaClient();
 

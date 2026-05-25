@@ -23,6 +23,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { TOKEN_NOT_FOUND } from '@constants/errors.constants';
 import { PaginatorTypes } from '@nodeteam/nestjs-prisma-pagination';
 import {
   NotificationPriority,
@@ -438,7 +439,7 @@ export class TokenCryptoService {
     const token = await this.tokenRepository.findById(tokenId);
 
     if (!token) {
-      throw new Error('Token not found');
+      throw new NotFoundException(TOKEN_NOT_FOUND);
     }
 
     // Tính toán giá cao nhất và thấp nhất trong ngày và mọi thời đại

@@ -1,6 +1,6 @@
 import { TokenCryptoLogService } from '@modules/token-crypto/token-log.service';
 import { TokenCryptoService } from '@modules/token-crypto/token.service';
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { TokenCrypto } from '@prisma/client';
 import { MarketFlowService } from './market-flow.service';
 import { MarketMakerService } from './market-maker.service';
@@ -87,7 +87,7 @@ export class OrderbookPathService {
     const factor = direction === 'up' ? 1 + pct : 1 - pct;
     const next = Number((prev * factor).toFixed(8));
     if (next <= 0) {
-      throw new Error('Giá sau điều chỉnh không hợp lệ');
+      throw new BadRequestException('Giá sau điều chỉnh không hợp lệ.');
     }
 
     if (

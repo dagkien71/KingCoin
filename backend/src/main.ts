@@ -1,26 +1,11 @@
 import basicAuth from 'express-basic-auth';
-import { HttpAdapterHost, NestFactory } from '@nestjs/core';
+import { NestFactory } from '@nestjs/core';
 import { IoAdapter } from '@nestjs/platform-socket.io';
-import {
-  INestApplication,
-  Logger,
-  RequestMethod,
-  ValidationPipe,
-  VersioningType,
-} from '@nestjs/common';
+import { INestApplication, Logger } from '@nestjs/common';
+import { configureApp } from '@common/configure-app';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from '@modules/app/app.module';
-import { VersioningOptions } from '@nestjs/common/interfaces/version-options.interface';
-import { AllExceptionsFilter } from '@filters/all-exception.filter';
-import { PrismaClientExceptionFilter } from '@providers/prisma/prisma-client-exception.filter';
-import { ValidationExceptionFilter } from '@filters/validation-exception.filter';
-import validationExceptionFactory from '@filters/validation-exception-factory';
-import { BadRequestExceptionFilter } from '@filters/bad-request-exception.filter';
-import { ThrottlerExceptionsFilter } from '@filters/throttler-exception.filter';
-import { TransformInterceptor } from '@interceptors/transform.interceptor';
-import { AccessExceptionFilter } from '@filters/access-exception.filter';
-import { NotFoundExceptionFilter } from '@filters/not-found-exception.filter';
 
 async function bootstrap(): Promise<{ port: number }> {
   /**
@@ -45,49 +30,7 @@ async function bootstrap(): Promise<{ port: number }> {
     app.useLogger(options);
   }
 
-  {
-    /**
-     * ValidationPipe options
-     * https://docs.nestjs.com/pipes#validation-pipe
-     */
-    const options = {
-      transform: true,
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      skipMissingProperties: false,
-    };
-
-    app.useGlobalPipes(
-      new ValidationPipe({
-        ...options,
-        exceptionFactory: validationExceptionFactory,
-      }),
-    );
-  }
-
-  {
-    /**
-     * set global prefix for all routes except GET /
-     */
-    const options = {
-      exclude: [{ path: '/', method: RequestMethod.GET }],
-    };
-
-    app.setGlobalPrefix('api', options);
-  }
-
-  {
-    /**
-     * Enable versioning for all routes
-     * https://docs.nestjs.com/openapi/multiple-openapi-documents#versioning
-     */
-    const options: VersioningOptions = {
-      type: VersioningType.URI,
-      defaultVersion: '1',
-    };
-
-    app.enableVersioning(options);
-  }
+  configureApp(app);
 
   {
     /**
@@ -119,26 +62,6 @@ async function bootstrap(): Promise<{ port: number }> {
         persistAuthorization: true,
       },
     });
-  }
-
-  app.useGlobalInterceptors(new TransformInterceptor());
-
-  {
-    /**
-     * Enable global filters
-     * https://docs.nestjs.com/exception-filters
-     */
-    const { httpAdapter } = app.get(HttpAdapterHost);
-
-    app.useGlobalFilters(
-      new AllExceptionsFilter(),
-      new AccessExceptionFilter(httpAdapter),
-      new NotFoundExceptionFilter(),
-      new BadRequestExceptionFilter(),
-      new PrismaClientExceptionFilter(httpAdapter),
-      new ValidationExceptionFilter(),
-      new ThrottlerExceptionsFilter(),
-    );
   }
 
   await app.listen(appConfig.port);

@@ -5,7 +5,13 @@ import {
 import { TokenCryptoLogService } from '@modules/token-crypto/token-log.service';
 import { TokenCryptoService } from '@modules/token-crypto/token.service';
 import { RealtimeService } from '@modules/realtime/realtime.service';
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { PrismaService } from '@providers/prisma';
 import { TokenCrypto } from '@prisma/client';
 import { randomUUID } from 'crypto';
@@ -404,16 +410,20 @@ export class MmControlService implements OnModuleInit, OnModuleDestroy {
   ): PriceSchedule {
     const { startAt, endAt, priceMin, priceMax } = input;
     if (!Number.isFinite(startAt) || !Number.isFinite(endAt)) {
-      throw new Error('Thời gian không hợp lệ');
+      throw new BadRequestException('Thời gian không hợp lệ.');
     }
     if (endAt <= startAt) {
-      throw new Error('Thời gian kết thúc phải sau thời gian bắt đầu');
+      throw new BadRequestException(
+        'Thời gian kết thúc phải sau thời gian bắt đầu.',
+      );
     }
     if (endAt - startAt < 30_000) {
-      throw new Error('Khoảng thời gian tối thiểu 30 giây');
+      throw new BadRequestException('Khoảng thời gian tối thiểu 30 giây.');
     }
     if (priceMin <= 0 || priceMax <= 0 || priceMin >= priceMax) {
-      throw new Error('priceMin phải nhỏ hơn priceMax và dương');
+      throw new BadRequestException(
+        'priceMin phải nhỏ hơn priceMax và dương.',
+      );
     }
 
     const now = Date.now();
@@ -462,17 +472,19 @@ export class MmControlService implements OnModuleInit, OnModuleDestroy {
   ): PriceModelRun {
     const { startAt, endAt, modelId } = input;
     if (!Number.isFinite(startAt) || !Number.isFinite(endAt)) {
-      throw new Error('Thời gian không hợp lệ');
+      throw new BadRequestException('Thời gian không hợp lệ.');
     }
     if (endAt <= startAt) {
-      throw new Error('Thời gian kết thúc phải sau thời gian bắt đầu');
+      throw new BadRequestException(
+        'Thời gian kết thúc phải sau thời gian bắt đầu.',
+      );
     }
     if (endAt - startAt < 30_000) {
-      throw new Error('Khoảng thời gian tối thiểu 30 giây');
+      throw new BadRequestException('Khoảng thời gian tối thiểu 30 giây.');
     }
     const catalog = PRICE_MODEL_CATALOG.find((m) => m.id === modelId);
     if (!catalog) {
-      throw new Error(`Mô hình không hỗ trợ: ${modelId}`);
+      throw new BadRequestException(`Mô hình không hỗ trợ: ${modelId}.`);
     }
 
     const durationMin = (endAt - startAt) / 60_000;
@@ -889,7 +901,7 @@ export class MmControlService implements OnModuleInit, OnModuleDestroy {
     const factor = direction === 'up' ? 1 + pct : 1 - pct;
     const next = Number((prev * factor).toFixed(8));
     if (next <= 0) {
-      throw new Error('Giá sau điều chỉnh không hợp lệ');
+      throw new BadRequestException('Giá sau điều chỉnh không hợp lệ.');
     }
 
     const updated = await this.setSpotPrice(

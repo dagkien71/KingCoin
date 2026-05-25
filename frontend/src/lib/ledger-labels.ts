@@ -10,6 +10,7 @@ const LABELS: Record<string, string> = {
   order_cancel: "Hủy lệnh — hoàn",
   order_amend: "Điều chỉnh lệnh",
   futures_margin_lock: "Futures — khóa margin",
+  futures_margin_unlock: "Futures — hoàn margin",
   futures_open_fee: "Futures — phí mở lệnh",
   futures_close: "Futures — đóng vị thế",
   futures_close_fee: "Futures — phí đóng lệnh",

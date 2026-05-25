@@ -1,5 +1,5 @@
 import useAuth from "@/hooks/useAuth";
-import useMutation from "@/hooks/useMutation";
+import useMutation, { isMutationFailure } from "@/hooks/useMutation";
 import { ETypeOrder, IOrder, OrderStatus } from "@/types/order.type";
 import { withQuoteUnit } from "@/constants/quote";
 import { formatNumber, formatTokenPrice } from "@/utils/format-number";
@@ -68,7 +68,7 @@ const MyOrder = ({
 
   const handleCancel = async (idOrder: string) => {
     const ok = await mutate({}, `/orders/${idOrder}`);
-    if (!ok) return;
+    if (!ok || isMutationFailure(ok)) return;
     refetch?.();
     toast.success("Huỷ lệnh thành công!");
   };
