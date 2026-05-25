@@ -4,7 +4,8 @@
   "description": "KingCoin monorepo — frontend + backend",
   "scripts": {
     "dev:up": "bash scripts/dev-up.sh",
-    "start:all": "concurrently -k -n backend,frontend -c blue,green \"npm run start:dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "start:backend": "bash scripts/start-backend-dev.sh",
+    "start:all": "concurrently -k -n backend,frontend -c blue,green \"npm run start:backend\" \"npm run dev --prefix frontend\"",
     "dev:all": "npm run dev:up && npm run start:all",
     "start": "npm run start:all",
     "dev": "npm run dev:all",

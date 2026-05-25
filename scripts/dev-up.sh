@@ -101,6 +101,9 @@ node scripts/ensure-demo-user-kc.js
 echo "==> Dọn lệnh pending cũ (trước escrow)..."
 node scripts/cancel-stale-pending-orders.js
 
+echo "==> Build backend (cho npm run start:all)..."
+npm run build --silent 2>/dev/null || npm run build
+
 echo ""
 echo "OK — Mongo + schema + seed."
 echo "Market maker (dev): mặc định BẬT khi chạy API — tắt bằng MARKET_MAKER_ENABLED=false trong backend/.env."
