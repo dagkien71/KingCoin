@@ -9,8 +9,10 @@ Monorepo: `frontend/` (Next.js), `backend/` (NestJS + Prisma + MongoDB). Tài li
 
 ## Cổng & URL
 
-- **Web:** http://localhost:3000 (`frontend`)
-- **API:** http://localhost:3001/api/v1 (`backend`, `APP_PORT=3001` trong `backend/.env`)
+- **Web (local):** http://localhost:3000 (`frontend`)
+- **Web (prod):** https://king-coin-crypto-cex.vercel.app
+- **API (local):** http://localhost:3001/api/v1 (`backend`, `APP_PORT=3001` trong `backend/.env`)
+- **API (prod):** https://kingcoin-mlnz.onrender.com/api/v1
 - **Swagger:** http://localhost:3001/docs
 - **Mongo dev (Docker):** `127.0.0.1:27018`, replica set `rs0` — compose: `backend/docker-compose.dev.yml`
 

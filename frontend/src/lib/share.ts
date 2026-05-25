@@ -1,14 +1,8 @@
+import { APP_URL } from "@/constant/config";
 import { tokenDetailPath, tradeHrefFromSlug } from "@/lib/token-routes";
 
-const DEFAULT_PUBLIC_URL =
-  typeof window !== "undefined"
-    ? window.location.origin
-    : "http://localhost:3000";
-
 export function publicBaseUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? DEFAULT_PUBLIC_URL
-  );
+  return APP_URL;
 }
 
 export function appendUtm(url: string, campaign: string): string {

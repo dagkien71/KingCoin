@@ -98,41 +98,38 @@ export default function NotificationsPage() {
               Không có thông báo
             </li>
           ) : (
-            (() => {
-              let unreadIdx = 0;
-              return items.map((item) => {
-                const deeplink =
-                  typeof item.payload?.deeplink === "string"
-                    ? item.payload.deeplink
-                    : undefined;
-                const num = !item.readAt ? ++unreadIdx : undefined;
-                return (
-                  <li
-                    key={item.id}
-                    className={cn(
-                      "px-4 py-3",
-                      !item.readAt && "bg-violet-500/5"
-                    )}
-                  >
-                    <div className="flex justify-between gap-2">
-                      <div className="flex min-w-0 flex-1 gap-3">
-                        {!item.readAt && num != null ? (
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-500 text-xs font-bold text-white">
-                            {num > 99 ? "99+" : num}
-                          </span>
-                        ) : (
-                          <span className="w-6 shrink-0" aria-hidden />
-                        )}
-                        <div className="min-w-0">
-                          <p className="font-medium text-kc-fg">{item.title}</p>
-                          <p className="text-sm text-kc-muted mt-0.5">
-                            {item.body}
-                          </p>
-                          <p className="text-xs text-kc-muted/70 mt-1">
-                            {new Date(item.createdAt).toLocaleString("vi-VN")}
-                          </p>
-                        </div>
+            items.map((item) => {
+              const deeplink =
+                typeof item.payload?.deeplink === "string"
+                  ? item.payload.deeplink
+                  : undefined;
+              const unread = item.readAt == null;
+              return (
+                <li
+                  key={item.id}
+                  className={cn(
+                    "px-4 py-3",
+                    unread && "bg-violet-500/5"
+                  )}
+                >
+                  <div className="flex justify-between gap-2">
+                    <div className="flex min-w-0 flex-1 gap-3">
+                      {unread ? (
+                        <span
+                          className="mt-2 h-2 w-2 shrink-0 rounded-full bg-violet-500"
+                          aria-hidden
+                        />
+                      ) : null}
+                      <div className="min-w-0">
+                        <p className="font-medium text-kc-fg">{item.title}</p>
+                        <p className="text-sm text-kc-muted mt-0.5">
+                          {item.body}
+                        </p>
+                        <p className="text-xs text-kc-muted/70 mt-1">
+                          {new Date(item.createdAt).toLocaleString("vi-VN")}
+                        </p>
                       </div>
+                    </div>
                       {deeplink ? (
                         <Link
                           href={deeplink}
@@ -147,8 +144,7 @@ export default function NotificationsPage() {
                     </div>
                   </li>
                 );
-              });
-            })()
+            })
           )}
         </ul>
       </div>

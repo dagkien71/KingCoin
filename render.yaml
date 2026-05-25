@@ -21,7 +21,7 @@ services:
       - key: SWAGGER_PASSWORD
         sync: false
       - key: APP_PUBLIC_URL
-        value: https://frontend-two-steel-25.vercel.app
+        value: https://king-coin-crypto-cex.vercel.app
       - key: BASE_URL
         value: https://kingcoin-mlnz.onrender.com
       - key: MARKET_MAKER_ENABLED

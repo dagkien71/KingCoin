@@ -50,7 +50,7 @@ Stack gợi ý **0 đồng** cho demo / MVP, phù hợp monorepo Next.js + NestJ
    | `DATABASE_URL` | URI Atlas ở trên |
    | `NODE_ENV` | `production` |
    | `JWT_SECRET` | chuỗi random dài (≥32 ký tự) |
-   | `APP_PUBLIC_URL` | `https://your-app.vercel.app` |
+   | `APP_PUBLIC_URL` | `https://king-coin-crypto-cex.vercel.app` |
    | `BASE_URL` | `https://kingcoin-api.onrender.com` |
    | `SWAGGER_PASSWORD` | mật khẩu vào `/docs` |
 
@@ -84,14 +84,15 @@ Stack gợi ý **0 đồng** cho demo / MVP, phù hợp monorepo Next.js + NestJ
 
    | Biến | Giá trị |
    |------|---------|
-   | `NEXT_PUBLIC_API_URL` | `https://YOUR-API.onrender.com/api/v1` |
-   | `NEXT_PUBLIC_API_ORIGIN` | `https://YOUR-API.onrender.com` |
+   | `NEXT_PUBLIC_API_URL` | `https://kingcoin-mlnz.onrender.com/api/v1` |
+   | `NEXT_PUBLIC_API_ORIGIN` | `https://kingcoin-mlnz.onrender.com` |
+   | `NEXT_PUBLIC_APP_URL` | `https://king-coin-crypto-cex.vercel.app` |
 
-   `NEXT_PUBLIC_API_ORIGIN` cần cho **WebSocket** (`/realtime`).
+   `NEXT_PUBLIC_API_ORIGIN` cần cho **WebSocket** (`/realtime`). `NEXT_PUBLIC_APP_URL` dùng cho link mời/chia sẻ.
 
-5. Deploy → mở URL Vercel.
+5. Deploy → mở https://king-coin-crypto-cex.vercel.app
 
-6. Cập nhật lại backend `APP_PUBLIC_URL` = URL Vercel (referral, link email).
+6. Cập nhật backend `APP_PUBLIC_URL` = `https://king-coin-crypto-cex.vercel.app` (referral, link email).
 
 ---
 

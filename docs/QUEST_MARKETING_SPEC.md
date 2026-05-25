@@ -119,7 +119,7 @@ Quest giá trị cao (≥500 KC) có thể bổ sung admin proof (phase sau).
 | `INITIAL_KC_BALANCE` | 2000 | KC khi đăng ký |
 | `QUEST_DELAYED_CLAIM_SECONDS` | 45 | Chờ sau engage |
 | `REFERRAL_MAX_PER_MONTH` | 20 | Cap attribution/tháng |
-| `APP_PUBLIC_URL` | http://localhost:3000 | Link share |
+| `APP_PUBLIC_URL` | http://localhost:3000 (dev) / https://king-coin-crypto-cex.vercel.app (prod) | Link share |
 | `QUEST_SOCIAL_FACEBOOK_URL` | — | Fanpage/post |
 | `QUEST_SOCIAL_ZALO_URL` | — | Zalo OA |
 

@@ -1,7 +1,8 @@
 {
   "env": {
     "NEXT_PUBLIC_API_URL": "https://kingcoin-mlnz.onrender.com/api/v1",
-    "NEXT_PUBLIC_API_ORIGIN": "https://kingcoin-mlnz.onrender.com"
+    "NEXT_PUBLIC_API_ORIGIN": "https://kingcoin-mlnz.onrender.com",
+    "NEXT_PUBLIC_APP_URL": "https://king-coin-crypto-cex.vercel.app"
   },
   "rewrites": [
     { "source": "/favicon.ico", "destination": "/favicon.svg" }

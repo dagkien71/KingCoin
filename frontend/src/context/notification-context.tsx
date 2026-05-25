@@ -64,7 +64,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         fetchUnreadCount(),
       ]);
       setItems(list.items);
-      setUnreadCount(count);
+      const fromItems = list.items.filter((n) => n.readAt == null).length;
+      const apiCount = Number(count);
+      setUnreadCount(
+        Number.isFinite(apiCount) ? Math.max(apiCount, fromItems) : fromItems
+      );
     } catch {
       /* ignore */
     } finally {

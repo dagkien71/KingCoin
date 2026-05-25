@@ -52,7 +52,8 @@ export async function fetchUnreadCount() {
   const res = await Api.get<IResponse<{ count: number }>>(
     "/notifications/unread-count"
   );
-  return res.data.data.count;
+  const count = res.data?.data?.count;
+  return typeof count === "number" && Number.isFinite(count) ? count : 0;
 }
 
 export async function markNotificationRead(id: string) {

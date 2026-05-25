@@ -21,7 +21,7 @@ export function ReferralBanner() {
 
   if (!data) return null;
 
-  const link = data.link || buildReferralRegisterUrl(data.code);
+  const link = buildReferralRegisterUrl(data.code);
 
   const copy = async (text: string, msg: string) => {
     setBusy(true);

@@ -15,14 +15,15 @@ function formatTime(iso: string) {
   return d.toLocaleDateString("vi-VN");
 }
 
+function isUnread(item: NotificationItem) {
+  return item.readAt == null;
+}
+
 function ItemRow({
   item,
-  unreadIndex,
   onRead,
 }: {
   item: NotificationItem;
-  /** Số thứ tự trong các tin chưa đọc (1, 2, 3…) */
-  unreadIndex?: number;
   onRead: (id: string) => void;
 }) {
   const deeplink =
@@ -37,20 +38,16 @@ function ItemRow({
       }}
       className={cn(
         "block px-3 py-2.5 text-sm transition-colors hover:bg-white/[0.06]",
-        !item.readAt && "bg-violet-500/10"
+        isUnread(item) && "bg-violet-500/10"
       )}
     >
       <div className="flex items-start gap-2">
-        {!item.readAt && unreadIndex != null ? (
+        {isUnread(item) ? (
           <span
-            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-500 text-[10px] font-bold text-white"
+            className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-violet-500"
             aria-hidden
-          >
-            {unreadIndex > 99 ? "99+" : unreadIndex}
-          </span>
-        ) : (
-          <span className="h-5 w-5 shrink-0" aria-hidden />
-        )}
+          />
+        ) : null}
         <p className="min-w-0 flex-1 font-medium text-kc-fg line-clamp-1">
           {item.title}
         </p>
@@ -84,25 +81,28 @@ export default function NotificationBell() {
   const { items, unreadCount, markRead, markAllRead, enableWebPush, refresh } =
     ctx;
 
+  const unreadFromItems = items.filter(isUnread).length;
+  const badgeCount = Math.max(unreadCount, unreadFromItems);
+
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative overflow-visible" ref={ref}>
       <button
         type="button"
         onClick={() => {
           setOpen((v) => !v);
           if (!open) void refresh();
         }}
-        className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-kc-border text-kc-fg hover:bg-white/[0.04]"
+        className="relative flex h-9 w-9 items-center justify-center overflow-visible rounded-lg border border-kc-border text-kc-fg hover:bg-white/[0.04]"
         aria-label={
-          unreadCount > 0
-            ? `Thông báo, ${unreadCount} chưa đọc`
+          badgeCount > 0
+            ? `Thông báo, ${badgeCount} chưa đọc`
             : "Thông báo"
         }
       >
         <HiOutlineBell className="h-5 w-5" />
-        {unreadCount > 0 ? (
-          <span className="absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full border-2 border-kc-bg bg-violet-500 px-1 text-[11px] font-bold leading-none text-white">
-            {unreadCount > 99 ? "99+" : unreadCount}
+        {badgeCount > 0 ? (
+          <span className="pointer-events-none absolute -right-1.5 -top-1.5 z-10 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-violet-500 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-kc-bg">
+            {badgeCount > 99 ? "99+" : badgeCount}
           </span>
         ) : null}
       </button>
@@ -110,15 +110,8 @@ export default function NotificationBell() {
       {open ? (
         <div className="absolute right-0 top-full z-[60] mt-2 w-[min(100vw-2rem,22rem)] overflow-hidden rounded-xl border border-kc-border bg-kc-bg shadow-xl">
           <div className="flex items-center justify-between border-b border-kc-border px-3 py-2">
-            <span className="text-sm font-semibold text-kc-fg">
-              Thông báo
-              {unreadCount > 0 ? (
-                <span className="ml-2 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-violet-500 px-1.5 text-[11px] font-bold text-white">
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </span>
-              ) : null}
-            </span>
-            {unreadCount > 0 ? (
+            <span className="text-sm font-semibold text-kc-fg">Thông báo</span>
+            {badgeCount > 0 ? (
               <button
                 type="button"
                 className="text-xs text-violet-400 hover:underline"
@@ -134,20 +127,9 @@ export default function NotificationBell() {
                 Chưa có thông báo
               </p>
             ) : (
-              (() => {
-                let unreadIdx = 0;
-                return items.slice(0, 10).map((item) => {
-                  const num = !item.readAt ? ++unreadIdx : undefined;
-                  return (
-                    <ItemRow
-                      key={item.id}
-                      item={item}
-                      unreadIndex={num}
-                      onRead={markRead}
-                    />
-                  );
-                });
-              })()
+              items.slice(0, 10).map((item) => (
+                <ItemRow key={item.id} item={item} onRead={markRead} />
+              ))
             )}
           </div>
           <div className="flex flex-col gap-1 border-t border-kc-border p-2">
