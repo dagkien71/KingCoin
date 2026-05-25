@@ -44,6 +44,8 @@ export interface ITokenCrypto {
   priceChange7d?: number;
   tokenKind?: TokenKind | string;
   stablecoinSpec?: IStablecoinSpec;
+  /** defi | gamefi | meme | … */
+  category?: string | null;
 }
 
 export interface ICreateTokenCrypto {
@@ -51,8 +53,11 @@ export interface ICreateTokenCrypto {
   symbol: string;
   logo: string;
   decimals: number;
-  initialPrice: number;
   totalSupply: number;
+  category: string;
+  liquidityTokenAmount: number;
+  liquidityKcAmount: number;
+  teamTokenAmount: number;
   whitepaperUrl?: string;
   description?: string;
   communityLinks?: ICommunityLinks;

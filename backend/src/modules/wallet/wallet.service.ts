@@ -3,6 +3,10 @@ import { normalizeWalletCode } from '@common/wallet-code.util';
 import { LedgerService } from '@modules/ledger/ledger.service';
 import { NotificationService } from '@modules/notification/notification.service';
 import { walletPoolLabel } from '@modules/wallet/wallet-pool.util';
+import {
+  atomicInternalWalletTransfer,
+  atomicUserWalletTransfer,
+} from '@modules/wallet/wallet-transfer.atomic';
 import { UserRepository } from '@modules/user/user.repository';
 import {
   BadRequestException,
@@ -12,6 +16,7 @@ import {
 import {
   NotificationPriority,
   NotificationType,
+  Prisma,
   WalletPool,
   WalletTransfer,
 } from '@prisma/client';
@@ -59,10 +64,46 @@ export class WalletService {
     };
   }
 
+  private idempotencyKeyTrimmed(key?: string): string | undefined {
+    const trimmed = key?.trim();
+    return trimmed || undefined;
+  }
+
+  private async findByIdempotencyKey(
+    userId: string,
+    key?: string,
+  ): Promise<WalletTransfer | null> {
+    const trimmed = this.idempotencyKeyTrimmed(key);
+    if (!trimmed) return null;
+    return this.prisma.walletTransfer.findFirst({
+      where: { fromUserId: userId, idempotencyKey: trimmed },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  private findByIdempotencyKeyInTx(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    key?: string,
+  ): Promise<WalletTransfer | null> {
+    const trimmed = this.idempotencyKeyTrimmed(key);
+    if (!trimmed) return Promise.resolve(null);
+    return tx.walletTransfer.findFirst({
+      where: { fromUserId: userId, idempotencyKey: trimmed },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async transferToUser(
     fromUserId: string,
     dto: TransferToUserDto,
   ): Promise<WalletTransfer> {
+    const existing = await this.findByIdempotencyKey(
+      fromUserId,
+      dto.idempotencyKey,
+    );
+    if (existing) return existing;
+
     const toWallet = dto.toWallet ?? dto.fromWallet;
     const fromCode = await this.userRepository.ensureWalletCode(fromUserId);
     const toCodeNorm = normalizeWalletCode(dto.toWalletCode);
@@ -85,36 +126,60 @@ export class WalletService {
     }
 
     const amount = Number(dto.amount);
-    await this.userRepository.adjustWalletKc(fromUserId, dto.fromWallet, -amount);
-    await this.userRepository.adjustWalletKc(recipient.id, toWallet, amount);
-
     const quoteId = await this.userRepository.getQuoteTokenId();
-    const transfer = await this.prisma.walletTransfer.create({
-      data: {
+    const idempotencyKey = this.idempotencyKeyTrimmed(dto.idempotencyKey);
+
+    let created = true;
+    const transfer = await this.prisma.$transaction(async (tx) => {
+      const duplicate = await this.findByIdempotencyKeyInTx(
+        tx,
+        fromUserId,
+        idempotencyKey,
+      );
+      if (duplicate) {
+        created = false;
+        return duplicate;
+      }
+
+      await atomicUserWalletTransfer(
+        tx,
+        quoteId,
+        fromUserId,
+        recipient.id,
+        dto.fromWallet,
+        toWallet,
+        amount,
+      );
+
+      return tx.walletTransfer.create({
+        data: {
+          fromUserId,
+          toUserId: recipient.id,
+          amount,
+          fromWallet: dto.fromWallet,
+          toWallet,
+          fromCode,
+          toCode: recipient.walletCode ?? toCodeNorm,
+          note: dto.note?.trim() || null,
+          idempotencyKey,
+        },
+      });
+    });
+
+    if (created) {
+      await this.appendLedgerPair({
         fromUserId,
         toUserId: recipient.id,
         amount,
         fromWallet: dto.fromWallet,
         toWallet,
-        fromCode,
-        toCode: recipient.walletCode ?? toCodeNorm,
-        note: dto.note?.trim() || null,
-      },
-    });
+        transferId: transfer.id,
+        note: dto.note,
+      });
+    }
 
-    await this.appendLedgerPair({
-      fromUserId,
-      toUserId: recipient.id,
-      amount,
-      fromWallet: dto.fromWallet,
-      toWallet,
-      transferId: transfer.id,
-      note: dto.note,
-    });
-
-    const fromLabel = walletPoolLabel(dto.fromWallet);
     const toLabel = walletPoolLabel(toWallet);
-    await this.notifications.notify({
+    if (created) await this.notifications.notify({
       userId: recipient.id,
       type: NotificationType.WALLET_TRANSFER_RECEIVED,
       priority: NotificationPriority.high,
@@ -140,34 +205,65 @@ export class WalletService {
     if (dto.fromWallet === dto.toWallet) {
       throw new BadRequestException('Ví nguồn và ví đích phải khác nhau.');
     }
+
+    const existing = await this.findByIdempotencyKey(
+      userId,
+      dto.idempotencyKey,
+    );
+    if (existing) return existing;
+
     const amount = Number(dto.amount);
     const code = await this.userRepository.ensureWalletCode(userId);
+    const quoteId = await this.userRepository.getQuoteTokenId();
+    const idempotencyKey = this.idempotencyKeyTrimmed(dto.idempotencyKey);
 
-    await this.userRepository.adjustWalletKc(userId, dto.fromWallet, -amount);
-    await this.userRepository.adjustWalletKc(userId, dto.toWallet, amount);
+    let created = true;
+    const transfer = await this.prisma.$transaction(async (tx) => {
+      const duplicate = await this.findByIdempotencyKeyInTx(
+        tx,
+        userId,
+        idempotencyKey,
+      );
+      if (duplicate) {
+        created = false;
+        return duplicate;
+      }
 
-    const transfer = await this.prisma.walletTransfer.create({
-      data: {
+      await atomicInternalWalletTransfer(
+        tx,
+        userId,
+        quoteId,
+        dto.fromWallet,
+        dto.toWallet,
+        amount,
+      );
+
+      return tx.walletTransfer.create({
+        data: {
+          fromUserId: userId,
+          toUserId: userId,
+          amount,
+          fromWallet: dto.fromWallet,
+          toWallet: dto.toWallet,
+          fromCode: code,
+          toCode: code,
+          note: 'Chuyển nội bộ',
+          idempotencyKey,
+        },
+      });
+    });
+
+    if (created) {
+      await this.appendLedgerPair({
         fromUserId: userId,
         toUserId: userId,
         amount,
         fromWallet: dto.fromWallet,
         toWallet: dto.toWallet,
-        fromCode: code,
-        toCode: code,
-        note: 'Chuyển nội bộ',
-      },
-    });
-
-    await this.appendLedgerPair({
-      fromUserId: userId,
-      toUserId: userId,
-      amount,
-      fromWallet: dto.fromWallet,
-      toWallet: dto.toWallet,
-      transferId: transfer.id,
-      note: 'Nội bộ',
-    });
+        transferId: transfer.id,
+        note: 'Nội bộ',
+      });
+    }
 
     return transfer;
   }
@@ -207,6 +303,7 @@ export class WalletService {
       refType: 'wallet_transfer_out',
       refId: opts.transferId,
       note: `Chuyển ra ${toLabel} (${fromLabel})${extra}`,
+      walletPool: opts.fromWallet,
     });
 
     if (opts.fromUserId !== opts.toUserId) {
@@ -218,6 +315,7 @@ export class WalletService {
         refType: 'wallet_transfer_in',
         refId: opts.transferId,
         note: `Nhận vào ${toLabel}${extra}`,
+        walletPool: opts.toWallet,
       });
     } else {
       await this.ledger.append({
@@ -228,6 +326,7 @@ export class WalletService {
         refType: 'wallet_transfer_in',
         refId: opts.transferId,
         note: `Chuyển nội bộ → ${toLabel}${extra}`,
+        walletPool: opts.toWallet,
       });
     }
   }

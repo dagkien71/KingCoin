@@ -293,6 +293,15 @@ const PIPELINE_PLACEHOLDERS: UpcomingListing[] = [
   },
 ];
 
+export function filterByAssetCategory(
+  tokens: ITokenCrypto[],
+  assetCategory: string
+): ITokenCrypto[] {
+  if (!assetCategory || assetCategory === "all") return tokens;
+  const id = assetCategory.toLowerCase();
+  return tokens.filter((t) => (t.category ?? "other").toLowerCase() === id);
+}
+
 export function filterByCategory(
   tokens: ITokenCrypto[],
   category: MarketCategoryId,

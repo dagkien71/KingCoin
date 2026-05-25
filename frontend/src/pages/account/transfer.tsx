@@ -5,7 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import useFetchApi from "@/hooks/useFetchApi";
 import useLiveFetch from "@/hooks/useLiveFetch";
-import useMutation, { isMutationFailure } from "@/hooks/useMutation";
+import useMutation, {
+  isMutationFailure,
+  newIdempotencyKey,
+} from "@/hooks/useMutation";
 import { cn } from "@/lib/cn";
 import type { IBalanceSnapshot, WalletPoolId } from "@/types/trade.type";
 import { useCallback, useMemo, useState } from "react";
@@ -117,6 +120,7 @@ export default function AccountTransferPage() {
 
   const submitExternal = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (transferOut.loading) return;
     const amt = Number(amount);
     if (!Number.isFinite(amt) || amt < 0.01) {
       toast.error("Số tiền tối thiểu 0.01 KC.");
@@ -127,6 +131,7 @@ export default function AccountTransferPage() {
       amount: amt,
       fromWallet,
       toWallet,
+      idempotencyKey: newIdempotencyKey(),
     });
     if (isMutationFailure(result)) return;
     toast.success("Chuyển KC thành công!");
@@ -136,6 +141,7 @@ export default function AccountTransferPage() {
 
   const submitInternal = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (transferInternal.loading) return;
     const amt = Number(amount);
     if (!Number.isFinite(amt) || amt < 0.01) {
       toast.error("Số tiền tối thiểu 0.01 KC.");
@@ -149,6 +155,7 @@ export default function AccountTransferPage() {
       fromWallet: internalFrom,
       toWallet: internalTo,
       amount: amt,
+      idempotencyKey: newIdempotencyKey(),
     });
     if (isMutationFailure(result)) return;
     toast.success("Chuyển nội bộ thành công!");
@@ -272,8 +279,14 @@ export default function AccountTransferPage() {
                   placeholder="0.00"
                 />
               </div>
-              <Button type="submit" variant="primary" className="w-full" size="lg">
-                Chuyển KC
+              <Button
+                type="submit"
+                variant="primary"
+                className="w-full"
+                size="lg"
+                disabled={transferOut.loading}
+              >
+                {transferOut.loading ? "Đang chuyển…" : "Chuyển KC"}
               </Button>
             </form>
           ) : (
@@ -305,8 +318,14 @@ export default function AccountTransferPage() {
               <p className="text-xs text-kc-muted">
                 Trước khi mở lệnh Futures, chuyển KC từ ví chính sang ví Futures.
               </p>
-              <Button type="submit" variant="primary" className="w-full" size="lg">
-                Chuyển nội bộ
+              <Button
+                type="submit"
+                variant="primary"
+                className="w-full"
+                size="lg"
+                disabled={transferInternal.loading}
+              >
+                {transferInternal.loading ? "Đang chuyển…" : "Chuyển nội bộ"}
               </Button>
             </form>
           )}

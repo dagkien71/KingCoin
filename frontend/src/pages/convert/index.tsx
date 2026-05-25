@@ -81,6 +81,7 @@ const Converter = () => {
   };
 
   const handleSwap = async () => {
+    if (loading) return;
     if (!isLogin) {
       router.push("/login");
       return;

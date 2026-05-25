@@ -67,6 +67,16 @@ export class OrderService {
     private readonly mmInstantFill: MmInstantFillService,
   ) {}
 
+  /** Cộng/trừ KC ví Spot (stableCoin + BalanceToken quote). */
+  private async adjustSpotQuoteKc(userId: string, delta: number): Promise<void> {
+    const quoteId = await this.userRepository.getQuoteTokenId();
+    if (!quoteId) {
+      await this.userRepository.adjustStableCoinByUserId(userId, delta);
+      return;
+    }
+    await this.userRepository.adjustQuoteKcByUserId(userId, delta);
+  }
+
   /** Trừ KC/base khi treo lệnh — chuẩn escrow sàn spot */
   private async reserveOrderFunds(
     userId: string,
@@ -80,28 +90,12 @@ export class OrderService {
 
     if (type === 'buy') {
       const cost = price * quantity;
-      if (!quoteId) {
-        await this.userRepository.adjustStableCoinByUserId(userId, -cost);
-        await this.ledgerService.append({
-          userId,
-          amount: -cost,
-          currency: 'KC',
-          refType: 'order_reserve',
-          refId: orderId,
-          note: 'Treo lệnh mua (KC)',
-        });
-        return;
-      }
-      await this.userRepository.adjustBalanceTokenByUserId(
-        userId,
-        quoteId,
-        -cost,
-      );
+      await this.adjustSpotQuoteKc(userId, -cost);
       await this.ledgerService.append({
         userId,
         amount: -cost,
         currency: 'KC',
-        tokenId: quoteId,
+        tokenId: quoteId ?? undefined,
         refType: 'order_reserve',
         refId: orderId,
         note: 'Treo lệnh mua',
@@ -164,15 +158,7 @@ export class OrderService {
     if (delta > 0) {
       if (order.type === 'buy') {
         const cost = delta;
-        if (!quoteId) {
-          await this.userRepository.adjustStableCoinByUserId(userId, -cost);
-        } else {
-          await this.userRepository.adjustBalanceTokenByUserId(
-            userId,
-            quoteId,
-            -cost,
-          );
-        }
+        await this.adjustSpotQuoteKc(userId, -cost);
         await this.ledgerService.append({
           userId,
           amount: -cost,
@@ -220,15 +206,7 @@ export class OrderService {
 
     const refund = -delta;
     if (order.type === 'buy') {
-      if (!quoteId) {
-        await this.userRepository.adjustStableCoinByUserId(userId, refund);
-      } else {
-        await this.userRepository.adjustBalanceTokenByUserId(
-          userId,
-          quoteId,
-          refund,
-        );
-      }
+      await this.adjustSpotQuoteKc(userId, refund);
       await this.ledgerService.append({
         userId,
         amount: refund,
@@ -283,31 +261,12 @@ export class OrderService {
 
     if (order.type === 'buy') {
       const refund = price * remaining;
-      if (!quoteId) {
-        await this.userRepository.adjustStableCoinByUserId(
-          order.userId,
-          refund,
-        );
-        await this.ledgerService.append({
-          userId: order.userId,
-          amount: refund,
-          currency: 'KC',
-          refType: 'order_cancel',
-          refId: order.id,
-          note: 'Hủy lệnh mua — hoàn KC',
-        });
-        return;
-      }
-      await this.userRepository.adjustBalanceTokenByUserId(
-        order.userId,
-        quoteId,
-        refund,
-      );
+      await this.adjustSpotQuoteKc(order.userId, refund);
       await this.ledgerService.append({
         userId: order.userId,
         amount: refund,
         currency: 'KC',
-        tokenId: quoteId,
+        tokenId: quoteId ?? undefined,
         refType: 'order_cancel',
         refId: order.id,
         note: 'Hủy lệnh mua — hoàn KC',

@@ -122,6 +122,16 @@ export default class TokenCryptoBaseEntity extends PartialType(
   @ApiProperty({
     type: String,
     nullable: true,
+    description: 'Asset category: defi, gamefi, meme, …',
+  })
+  @Expose()
+  @IsString()
+  @IsOptional()
+  declare readonly category: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
     description: 'The URL of the token whitepaper',
   })
   @Expose()

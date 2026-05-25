@@ -6,6 +6,7 @@ import useFetchApi from "@/hooks/useFetchApi";
 import useMutation from "@/hooks/useMutation";
 import { AdminDataTable } from "@/modules/admin/AdminDataTable";
 import { TokenLogo } from "@/components/token/TokenLogo";
+import { assetCategoryLabel } from "@/lib/token-categories";
 import type { IListingRequest } from "@/types/listing-request.type";
 import {
   LISTING_REQUEST_STATUS_LABEL,
@@ -184,14 +185,30 @@ export function AdminListingRequests() {
             ),
           },
           {
+            key: "category",
+            header: "Hạng mục",
+            render: (r) => (
+              <span className="text-xs text-kc-fg">
+                {assetCategoryLabel(r.category)}
+              </span>
+            ),
+          },
+          {
             key: "supply",
-            header: "Cung / giá",
+            header: "Pool / giá",
             render: (r) => (
               <div className="text-xs text-kc-muted">
-                <p className="num text-kc-fg">{r.totalSupply.toLocaleString()}</p>
-                <p>
-                  {r.initialPrice != null ? `${r.initialPrice} KC` : "—"}
+                <p className="num text-kc-fg">
+                  {r.liquidityTokenAmount.toLocaleString()} tok +{" "}
+                  {r.liquidityKcAmount.toLocaleString()} KC
                 </p>
+                <p>
+                  Giá:{" "}
+                  {r.initialPrice != null
+                    ? `${r.initialPrice.toLocaleString("vi-VN")} KC`
+                    : "—"}
+                </p>
+                <p className="num">Team: {r.teamTokenAmount.toLocaleString()}</p>
               </div>
             ),
           },

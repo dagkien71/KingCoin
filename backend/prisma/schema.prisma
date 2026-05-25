@@ -84,19 +84,22 @@ enum WalletPool {
 }
 
 model WalletTransfer {
-  id         String     @id @default(auto()) @map("_id") @db.ObjectId
-  fromUserId String     @db.ObjectId
-  toUserId   String     @db.ObjectId
-  amount     Float
-  fromWallet WalletPool
-  toWallet   WalletPool
-  fromCode   String?
-  toCode     String?
-  note       String?
-  createdAt  DateTime   @default(now())
+  id             String     @id @default(auto()) @map("_id") @db.ObjectId
+  fromUserId     String     @db.ObjectId
+  toUserId       String     @db.ObjectId
+  amount         Float
+  fromWallet     WalletPool
+  toWallet       WalletPool
+  fromCode       String?
+  toCode         String?
+  note           String?
+  /** Client gửi để chống double-submit — cùng user + key chỉ xử lý một lần */
+  idempotencyKey String?
+  createdAt      DateTime   @default(now())
 
   @@index([fromUserId, createdAt(sort: Desc)])
   @@index([toUserId, createdAt(sort: Desc)])
+  @@index([fromUserId, idempotencyKey])
 }
 
 model BalanceToken {
@@ -168,6 +171,8 @@ model TokenCrypto {
   tokenKind        String?
   /** Đặc tả stablecoin (peg, dự trữ, độ lệch cho phép…) — xem docs/STABLECOIN_KC_SPEC.md */
   stablecoinSpec   Json?
+  /** Nhóm tài sản: defi, gamefi, meme, … — xem docs/LISTING_TOKENOMICS_SPEC.md */
+  category         String?
 }
 
 /** Token sắp niêm yết — countdown, đặc tả, chưa giao dịch Spot */
@@ -220,7 +225,16 @@ model ListingRequest {
   logo              String?
   decimals          Int       @default(6)
   totalSupply       Float
+  /** Giá mở cửa = liquidityKcAmount / liquidityTokenAmount (KC/token) */
   initialPrice      Float?
+  /** Nhóm: defi | gamefi | meme | … */
+  category          String    @default("creator")
+  /** KC creator ký quỹ thanh khoản (trừ lúc submit, hoàn khi reject) */
+  liquidityKcAmount Float     @default(0)
+  /** Token đưa vào thanh khoản MM (mint cho bot lúc go-live) */
+  liquidityTokenAmount Float  @default(0)
+  /** Token phân bổ cho creator (mint vào ví lúc go-live) */
+  teamTokenAmount   Float     @default(0)
   description       String?
   communityLinks    Json?
   /** pending | approved | rejected | live */

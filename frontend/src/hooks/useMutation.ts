@@ -4,7 +4,7 @@ import {
   type MutationFailure,
 } from "@/lib/api-error";
 import { IResponse } from "@/types/response";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import useConfigApi from "./useConfigApi";
 
@@ -16,7 +16,7 @@ interface UseMutationResult<T> {
   loading: boolean;
   error: string | null;
   fieldErrors: Record<string, string[]> | null;
-  /** Thành công: envelope/data. Lỗi: `MutationFailure` (đã toast). */
+  /** Thành công: envelope/data. Lỗi: `MutationFailure` (đã toast). Bỏ qua nếu đang gọi. */
   mutate: (body?: unknown, url?: string) => Promise<T | MutationFailure | undefined>;
   clearErrors: () => void;
 }
@@ -33,6 +33,7 @@ const useMutation = <T>(
     string,
     string[]
   > | null>(null);
+  const inFlightRef = useRef(false);
 
   const clearErrors = useCallback(() => {
     setError(null);
@@ -41,6 +42,15 @@ const useMutation = <T>(
 
   const mutate = useCallback(
     async (body?: unknown, urlParams?: string) => {
+      if (inFlightRef.current) {
+        return {
+          _mutationFailed: true,
+          message: "Đang xử lý yêu cầu trước đó…",
+          fieldErrors: null,
+        } satisfies MutationFailure;
+      }
+
+      inFlightRef.current = true;
       setLoading(true);
       setError(null);
       setFieldErrors(null);
@@ -73,6 +83,7 @@ const useMutation = <T>(
         };
         return failure;
       } finally {
+        inFlightRef.current = false;
         setLoading(false);
       }
     },
@@ -83,3 +94,11 @@ const useMutation = <T>(
 };
 
 export default useMutation;
+
+/** Khóa idempotency cho chuyển ví / thanh toán — gửi lại cùng key → backend trả bản ghi cũ */
+export function newIdempotencyKey(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `idem-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}

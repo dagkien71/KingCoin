@@ -41,6 +41,62 @@ export class BotInventoryService {
   /**
    * Cấp `amount` token base cho một bot (tạo BalanceToken nếu chưa có).
    */
+  /** Cộng KC quote cho bot MM (thanh khoản listing). */
+  async creditKcToBot(email: string, amount: number): Promise<boolean> {
+    const kc = Number(amount);
+    if (!Number.isFinite(kc) || kc <= 0) return false;
+
+    const quote = await this.prisma.tokenCrypto.findFirst({
+      where: { name: this.quoteName() },
+      select: { id: true },
+    });
+    if (!quote?.id) {
+      this.logger.warn('Bot inventory: chưa có token quote KC');
+      return false;
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
+    if (!user) return false;
+
+    const balanceId = await this.ensureBotBalance(user.id);
+    if (!balanceId) return false;
+
+    const row = await this.prisma.balanceToken.findFirst({
+      where: { balanceId, tokenId: quote.id },
+    });
+    const current = row?.amount ?? 0;
+    const next = current + kc;
+    if (row) {
+      await this.prisma.balanceToken.update({
+        where: { id: row.id },
+        data: { amount: next },
+      });
+    } else {
+      await this.prisma.balanceToken.create({
+        data: { balanceId, tokenId: quote.id, amount: next },
+      });
+    }
+    this.logger.log(`Bot inventory: ${email} +${kc} KC (listing liquidity)`);
+    return true;
+  }
+
+  /**
+   * Seed thanh khoản niêm yết: token base + KC vào MM chính (không dùng 5M mặc định).
+   */
+  async creditListingLiquidityToMm(
+    tokenId: string,
+    tokenAmount: number,
+    kcAmount: number,
+  ): Promise<void> {
+    const email =
+      process.env.MARKET_MAKER_EMAIL ?? 'marketmaker@kingcoin.local';
+    await this.creditTokenToBot(email, tokenId, tokenAmount);
+    await this.creditKcToBot(email, kcAmount);
+  }
+
   async creditTokenToBot(
     email: string,
     tokenId: string,

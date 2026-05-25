@@ -3,6 +3,7 @@
 import { QUOTE_SYMBOL } from "@/constants/quote";
 import { tokenLogoFallbackSrc } from "@/components/token/TokenLogo";
 import { cn } from "@/lib/cn";
+import { listingEconomicsSummary } from "@/lib/token/create-validation";
 import type { ICreateTokenCrypto } from "@/types/token.type";
 import { motion } from "framer-motion";
 import {
@@ -26,10 +27,10 @@ function formatNum(n: number): string {
 export function TokenMintPreview({ form, className }: Props) {
   const symbol = form.symbol?.trim().toUpperCase() || "???";
   const name = form.name?.trim() || "Tên token của bạn";
-  const price = Number(form.initialPrice);
-  const supply = Number(form.totalSupply);
-  const marketCap =
-    Number.isFinite(price) && Number.isFinite(supply) ? price * supply : 0;
+  const econ = listingEconomicsSummary(form);
+  const price = econ.price;
+  const marketCap = econ.mcap;
+  const fdv = econ.fdv;
   const logoSrc =
     form.logo?.trim() ||
     tokenLogoFallbackSrc(form.symbol, form.name, undefined);
@@ -90,6 +91,7 @@ export function TokenMintPreview({ form, className }: Props) {
             >
               {symbol}
             </motion.p>
+            <p className="mt-1 text-xs text-emerald-400/90">{econ.categoryLabel}</p>
             {form.description?.trim() ? (
               <p className="mt-3 line-clamp-3 text-xs leading-relaxed text-kc-muted">
                 {form.description.trim()}
@@ -112,22 +114,22 @@ export function TokenMintPreview({ form, className }: Props) {
             </div>
             <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5">
               <p className="text-[10px] uppercase tracking-wider text-kc-muted">
-                Tổng cung
+                Vốn hoá (pool)
               </p>
               <p className="num mt-0.5 text-sm font-semibold text-kc-fg">
-                {formatNum(supply)}
+                {formatNum(marketCap)} {QUOTE_SYMBOL}
               </p>
             </div>
             <div className="col-span-2 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.06] px-3 py-2.5">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-emerald-400/80">
                   <HiOutlineChartBar className="h-3.5 w-3.5" />
-                  Vốn hoá khởi tạo
+                  FDV (tổng cung × giá)
                 </div>
                 <HiOutlineBadgeCheck className="h-4 w-4 text-emerald-500/50" />
               </div>
               <p className="num mt-1 text-base font-semibold text-kc-fg">
-                {formatNum(marketCap)} {QUOTE_SYMBOL}
+                {formatNum(fdv)} {QUOTE_SYMBOL}
               </p>
             </div>
           </div>

@@ -54,8 +54,10 @@ export class ListingRequestController {
       logo: body.logo,
       decimals: Number(body.decimals),
       totalSupply: Number(body.totalSupply),
-      initialPrice:
-        body.initialPrice != null ? Number(body.initialPrice) : undefined,
+      category: body.category,
+      liquidityKcAmount: Number(body.liquidityKcAmount),
+      liquidityTokenAmount: Number(body.liquidityTokenAmount),
+      teamTokenAmount: Number(body.teamTokenAmount),
       description: body.description,
       communityLinks: body.communityLinks as unknown as
         | Prisma.InputJsonValue

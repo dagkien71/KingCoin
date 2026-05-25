@@ -8,8 +8,10 @@ import { cn } from "@/lib/cn";
 import { apiFieldErrorsToForm } from "@/lib/auth/apply-api-field-errors";
 import {
   LISTING_FIELD_KEY_MAP,
+  listingEconomicsSummary,
   validateFormSubmit,
 } from "@/lib/token/create-validation";
+import { TOKEN_ASSET_CATEGORIES } from "@/lib/token-categories";
 import useMutation, { isMutationFailure } from "@/hooks/useMutation";
 import { IssuerFormSection } from "@/modules/issuer/IssuerFormSection";
 import { TokenMintPreview } from "@/modules/issuer/TokenMintPreview";
@@ -76,8 +78,11 @@ export function CreateTokenForm() {
     logo: "",
     symbol: "",
     decimals: 6,
-    totalSupply: 1000,
-    initialPrice: 1,
+    totalSupply: 1_000_000,
+    category: "creator",
+    teamTokenAmount: 200_000,
+    liquidityTokenAmount: 700_000,
+    liquidityKcAmount: 3_500_000,
     description: "",
     communityLinks: {
       website: "",
@@ -86,6 +91,8 @@ export function CreateTokenForm() {
       twitter: "",
     },
   });
+
+  const economics = listingEconomicsSummary(form);
   const { mutate, loading } = useMutation<IListingRequest>(
     "POST",
     "/listing-requests"
@@ -98,7 +105,11 @@ export function CreateTokenForm() {
       setForm({
         ...form,
         [field]:
-          field === "decimals" || field === "totalSupply" || field === "initialPrice"
+          field === "decimals" ||
+          field === "totalSupply" ||
+          field === "teamTokenAmount" ||
+          field === "liquidityTokenAmount" ||
+          field === "liquidityKcAmount"
             ? Number(v)
             : v,
       });
@@ -120,13 +131,17 @@ export function CreateTokenForm() {
       return;
     }
     setErrors(null);
+    if (loading) return;
 
     const payload = {
       name: form.name.trim(),
       symbol: form.symbol.trim().toUpperCase(),
       logo: form.logo?.trim() || undefined,
       totalSupply: Number(form.totalSupply),
-      initialPrice: Number(form.initialPrice),
+      category: form.category,
+      teamTokenAmount: Number(form.teamTokenAmount),
+      liquidityTokenAmount: Number(form.liquidityTokenAmount),
+      liquidityKcAmount: Number(form.liquidityKcAmount),
       decimals: Number(form.decimals),
       description: (form.description ?? "").trim(),
       communityLinks: form.communityLinks,
@@ -165,12 +180,16 @@ export function CreateTokenForm() {
           Đúc token của bạn
         </h1>
         <p className="mt-3 max-w-xl text-sm leading-relaxed text-kc-muted">
-          Thiết kế danh tính, kinh tế token và thương hiệu — xem trước thẻ niêm yết
-          bên trái. Phí phát hành{" "}
+          Thiết kế danh tính, phân bổ token và thanh khoản KC — giá mở cửa tính từ
+          pool. Phí niêm yết{" "}
           <span className="font-medium text-emerald-300">
             {TOKEN_LISTING_FEE_KC} {QUOTE_SYMBOL}
-          </span>
-          .
+          </span>{" "}
+          + KC ký quỹ pool (hiện{" "}
+          <span className="num text-emerald-300">
+            {Number(form.liquidityKcAmount).toLocaleString("vi-VN")}
+          </span>{" "}
+          {QUOTE_SYMBOL}).
         </p>
       </motion.header>
 
@@ -217,6 +236,28 @@ export function CreateTokenForm() {
                 </Field>
               </div>
               <div className="mt-4">
+                <Field label="Hạng mục *" htmlFor="category" error={err("category")}>
+                  <select
+                    id="category"
+                    aria-label="Hạng mục token"
+                    value={form.category}
+                    onChange={(e) =>
+                      setForm({ ...form, category: e.target.value })
+                    }
+                    className={cn(
+                      "flex h-10 w-full rounded-lg border px-3 text-sm text-kc-fg",
+                      issuerInputClass
+                    )}
+                  >
+                    {TOKEN_ASSET_CATEGORIES.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+              <div className="mt-4">
                 <Field
                   label="Mô tả *"
                   htmlFor="description"
@@ -246,11 +287,20 @@ export function CreateTokenForm() {
 
             <IssuerFormSection
               step={2}
-              title="Kinh tế token"
-              subtitle="Quyết định cung, độ chính xác và giá khởi điểm trên sàn."
+              title="Kinh tế & thanh khoản"
+              subtitle="Giá = KC trong pool ÷ token trong pool. Team + pool không vượt tổng cung."
               icon={<HiOutlineSparkles className="h-5 w-5" />}
             >
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Tổng cung *" htmlFor="totalSupply" error={err("totalSupply")}>
+                  <Input
+                    id="totalSupply"
+                    type="number"
+                    value={form.totalSupply}
+                    onChange={handleFieldChange("totalSupply")}
+                    className={cn(issuerInputClass, "num")}
+                  />
+                </Field>
                 <Field
                   label="Số thập phân"
                   htmlFor="decimals"
@@ -265,26 +315,47 @@ export function CreateTokenForm() {
                     className={cn(issuerInputClass, "num")}
                   />
                 </Field>
-                <Field label="Tổng cung" htmlFor="totalSupply" error={errors?.totalSupply}>
+                <Field
+                  label="Token team giữ *"
+                  htmlFor="teamTokenAmount"
+                  error={err("teamTokenAmount")}
+                  hint="Mint vào ví bạn khi lên sàn"
+                >
                   <Input
-                    id="totalSupply"
+                    id="teamTokenAmount"
                     type="number"
-                    value={form.totalSupply}
-                    onChange={handleFieldChange("totalSupply")}
+                    value={form.teamTokenAmount}
+                    onChange={handleFieldChange("teamTokenAmount")}
                     className={cn(issuerInputClass, "num")}
                   />
                 </Field>
                 <Field
-                  label={`Giá KC *`}
-                  htmlFor="initialPrice"
-                  error={errors?.initialPrice}
+                  label="Token vào pool *"
+                  htmlFor="liquidityTokenAmount"
+                  error={err("liquidityTokenAmount")}
+                  hint="MM treo lệnh bán/mua"
+                >
+                  <Input
+                    id="liquidityTokenAmount"
+                    type="number"
+                    value={form.liquidityTokenAmount}
+                    onChange={handleFieldChange("liquidityTokenAmount")}
+                    className={cn(issuerInputClass, "num")}
+                  />
+                </Field>
+                <div className="sm:col-span-2">
+                <Field
+                  label={`KC vào pool *`}
+                  htmlFor="liquidityKcAmount"
+                  error={err("liquidityKcAmount")}
+                  hint="Trừ ngay khi gửi yêu cầu"
                 >
                   <div className="relative">
                     <Input
-                      id="initialPrice"
+                      id="liquidityKcAmount"
                       type="number"
-                      value={form.initialPrice}
-                      onChange={handleFieldChange("initialPrice")}
+                      value={form.liquidityKcAmount}
+                      onChange={handleFieldChange("liquidityKcAmount")}
                       className={cn(issuerInputClass, "num pr-12")}
                     />
                     <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-kc-muted">
@@ -292,6 +363,36 @@ export function CreateTokenForm() {
                     </span>
                   </div>
                 </Field>
+                </div>
+              </div>
+              <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.06] p-4 text-sm">
+                <p className="text-kc-muted">
+                  Giá mở cửa:{" "}
+                  <span className="num font-semibold text-kc-fg">
+                    {economics.price > 0
+                      ? `${economics.price.toLocaleString("vi-VN", { maximumFractionDigits: 6 })} ${QUOTE_SYMBOL}`
+                      : "—"}
+                  </span>
+                  / token
+                </p>
+                <p className="mt-1 text-kc-muted">
+                  Vốn hoá lưu hành (pool):{" "}
+                  <span className="num font-medium text-emerald-300">
+                    {economics.mcap.toLocaleString("vi-VN")} {QUOTE_SYMBOL}
+                  </span>
+                  {" · "}
+                  FDV:{" "}
+                  <span className="num font-medium text-kc-fg">
+                    {economics.fdv.toLocaleString("vi-VN")} {QUOTE_SYMBOL}
+                  </span>
+                </p>
+                {economics.treasury > 0 ? (
+                  <p className="mt-1 text-xs text-kc-muted">
+                    Chưa lưu hành:{" "}
+                    <span className="num">{economics.treasury.toLocaleString("vi-VN")}</span>{" "}
+                    token
+                  </p>
+                ) : null}
               </div>
             </IssuerFormSection>
 

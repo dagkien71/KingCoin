@@ -52,13 +52,13 @@
 
 ## 5. Luồng tạo token (listing)
 
-1. Validate owner có đủ KC ≥ `TOKEN_LISTING_FEE_KC` (default 1000).
-2. Trừ KC quote + `LedgerEntry` `refType=listing_fee`.
-3. Tạo `TokenCrypto`: `price = initialPrice`, `marketCap = totalSupply * initialPrice`.
-4. `botInventoryService.creditNewTokenToBots` — MM/flow bot nhận base token để treo sell.
-5. `updateRanks()` theo marketCap giảm dần.
+Xem [LISTING_TOKENOMICS_SPEC.md](../LISTING_TOKENOMICS_SPEC.md).
 
-**Chuẩn ngoài:** sau listing cần **liquidity** — KingCoin dùng **market-maker bot** (module riêng).
+1. User gửi `POST /listing-requests`: `category`, `teamTokenAmount`, `liquidityTokenAmount`, `liquidityKcAmount`.
+2. `initialPrice = liquidityKc / liquidityToken`; trừ phí listing + KC pool.
+3. Admin duyệt → `UpcomingListing` → cron go-live.
+4. Tạo `TokenCrypto`: `circulatingSupply = liquidityToken`, `category`; MM nhận đúng pool KC/token; creator nhận `teamTokenAmount`.
+5. Không cấp 5M token MM mặc định khi list qua luồng này (`skipDefaultBotInventory`).
 
 ---
 

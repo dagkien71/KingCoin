@@ -20,7 +20,7 @@ const Login = () => {
   const [errors, setErrors] = useState<{ email?: string; password?: string }>(
     {}
   );
-  const { mutate } = useMutation<IResponse>("POST", "/auth/login");
+  const { mutate, loading } = useMutation<IResponse>("POST", "/auth/login");
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -32,6 +32,7 @@ const Login = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     const { email, password } = form;
 
     const validationErrors = validateForm(email, password);
@@ -147,8 +148,14 @@ const Login = () => {
                 </Link>
               </p>
             </div>
-            <Button type="submit" variant="primary" className="w-full" size="lg">
-              Đăng nhập
+            <Button
+              type="submit"
+              variant="primary"
+              className="w-full"
+              size="lg"
+              disabled={loading}
+            >
+              {loading ? "Đang đăng nhập…" : "Đăng nhập"}
             </Button>
           </form>
           <p className="mt-6 text-center text-sm text-kc-muted">

@@ -35,6 +35,22 @@ export default class ListingRequestEntity {
   @Expose()
   declare readonly initialPrice: number | null;
 
+  @ApiProperty()
+  @Expose()
+  declare readonly category: string;
+
+  @ApiProperty()
+  @Expose()
+  declare readonly liquidityKcAmount: number;
+
+  @ApiProperty()
+  @Expose()
+  declare readonly liquidityTokenAmount: number;
+
+  @ApiProperty()
+  @Expose()
+  declare readonly teamTokenAmount: number;
+
   @ApiProperty({ nullable: true })
   @Expose()
   declare readonly description: string | null;

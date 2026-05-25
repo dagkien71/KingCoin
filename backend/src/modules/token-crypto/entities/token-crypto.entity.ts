@@ -34,6 +34,8 @@ export default class TokenEntity implements TokenCrypto {
 
   readonly description!: string;
 
+  readonly category!: string | null;
+
   readonly communityLinks!: JsonValue;
 
   readonly initialPrice!: number;

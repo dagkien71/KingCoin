@@ -13,6 +13,10 @@ export interface IListingRequest {
   decimals: number;
   totalSupply: number;
   initialPrice?: number | null;
+  category: string;
+  liquidityKcAmount: number;
+  liquidityTokenAmount: number;
+  teamTokenAmount: number;
   description?: string | null;
   status: ListingRequestStatus | string;
   listingFeeKc: number;

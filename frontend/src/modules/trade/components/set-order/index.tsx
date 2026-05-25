@@ -62,7 +62,7 @@ const TradeForm = ({
   const [useMargin, setUseMargin] = useState(false);
   const [toolsModalOpen, setToolsModalOpen] = useState(false);
   const [marginModalOpen, setMarginModalOpen] = useState(false);
-  const { mutate } = useMutation("POST", "/orders");
+  const { mutate, loading: orderSubmitting } = useMutation("POST", "/orders");
   const { data: feeRates } = useTradingFees();
   const takerRate = feeRates?.spot.takerRate ?? 0.001;
   const makerRate = feeRates?.spot.makerRate ?? 0.0005;
@@ -164,6 +164,7 @@ const TradeForm = ({
   };
 
   const handleOrder = async (values: TradeFormValues) => {
+    if (orderSubmitting) return;
     const priceOut = roundInputPrice(
       orderType === "market"
         ? await resolveMarketPrice()
@@ -410,14 +411,17 @@ const TradeForm = ({
                 {isLogin ? (
                   <button
                     type="submit"
+                    disabled={orderSubmitting}
                     className={clsx(
-                      "w-full rounded-lg py-2.5 text-sm font-semibold transition",
+                      "w-full rounded-lg py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
                       isBuyActive
                         ? "bg-kc-up text-white hover:bg-kc-up/90"
                         : "bg-kc-down text-white hover:bg-kc-down/90"
                     )}
                   >
-                    Đặt lệnh {isBuyActive ? "Mua" : "Bán"}
+                    {orderSubmitting
+                      ? "Đang đặt lệnh…"
+                      : `Đặt lệnh ${isBuyActive ? "Mua" : "Bán"}`}
                   </button>
                 ) : (
                   <button

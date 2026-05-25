@@ -16,6 +16,7 @@ import {
   getHotTokens,
   getTopGainers,
   getTopLosers,
+  filterByAssetCategory,
   type MarketCategoryId,
 } from "@/modules/markets/market-hub-utils";
 import type { ITokenCrypto } from "@/types/token.type";
@@ -31,10 +32,12 @@ import {
   HiOutlineRefresh,
   HiOutlineSparkles,
 } from "react-icons/hi";
+import { TOKEN_ASSET_CATEGORIES } from "@/lib/token-categories";
 import { toast } from "react-toastify";
 
 export default function MarketsHub() {
   const [category, setCategory] = useState<MarketCategoryId>("all");
+  const [assetCategory, setAssetCategory] = useState("all");
   const [searchLocal, setSearchLocal] = useState("");
   const [sortColumn, setSortColumn] = useState("marketCap");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -71,7 +74,10 @@ export default function MarketsHub() {
   const upcomingListings = upcomingRaw ?? [];
 
   const filteredTokens = useMemo(() => {
-    let list = filterByCategory(allTokens, category, watchList);
+    let list = filterByAssetCategory(
+      filterByCategory(allTokens, category, watchList),
+      assetCategory
+    );
     const q = searchLocal.trim().toLowerCase();
     if (q) {
       list = list.filter(
@@ -80,7 +86,7 @@ export default function MarketsHub() {
       );
     }
     return list;
-  }, [allTokens, category, watchList, searchLocal]);
+  }, [allTokens, category, assetCategory, watchList, searchLocal]);
 
   const handleSort = (column: string) => {
     if (column === "rating" || column === "actions") return;
@@ -235,6 +241,21 @@ export default function MarketsHub() {
               tokens={allTokens}
               watchList={watchList}
             />
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="text-xs text-kc-muted">Hạng mục:</span>
+              <select
+                value={assetCategory}
+                onChange={(e) => setAssetCategory(e.target.value)}
+                className="h-8 rounded-lg border border-kc-border bg-kc-surface px-2 text-xs text-kc-fg"
+              >
+                <option value="all">Tất cả</option>
+                {TOKEN_ASSET_CATEGORIES.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             {!isLogin && category === "watchlist" ? (
               <p className="mt-2 text-xs text-kc-muted">
                 <Link href="/login" className="text-kc-accent hover:underline">

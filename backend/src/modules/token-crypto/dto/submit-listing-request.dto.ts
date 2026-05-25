@@ -1,6 +1,8 @@
+import { TOKEN_ASSET_CATEGORIES } from '@common/token-listing.constants';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -56,6 +58,13 @@ export class SubmitListingRequestDto {
   @Matches(/[a-zA-Z]/, { message: 'symbol phải có ít nhất một chữ cái.' })
   symbol!: string;
 
+  @ApiProperty({ example: 'defi', enum: TOKEN_ASSET_CATEGORIES })
+  @IsString()
+  @IsIn([...TOKEN_ASSET_CATEGORIES], {
+    message: 'category không hợp lệ.',
+  })
+  category!: string;
+
   @ApiPropertyOptional({ description: 'URL logo (tuỳ chọn)' })
   @IsOptional()
   @ValidateIf((_, v) => v != null && String(v).trim() !== '')
@@ -70,17 +79,38 @@ export class SubmitListingRequestDto {
   @Max(18, { message: 'decimals tối đa 18.' })
   decimals!: number;
 
-  @ApiProperty({ example: 1 })
-  @Type(() => Number)
-  @IsNumber({}, { message: 'initialPrice phải là số.' })
-  @IsPositive({ message: 'initialPrice phải lớn hơn 0.' })
-  initialPrice!: number;
-
   @ApiProperty({ example: 1_000_000 })
   @Type(() => Number)
   @IsNumber({}, { message: 'totalSupply phải là số.' })
   @IsPositive({ message: 'totalSupply phải lớn hơn 0.' })
   totalSupply!: number;
+
+  @ApiProperty({
+    example: 700_000,
+    description: 'Token đưa vào thanh khoản (MM)',
+  })
+  @Type(() => Number)
+  @IsNumber({}, { message: 'liquidityTokenAmount phải là số.' })
+  @IsPositive({ message: 'liquidityTokenAmount phải lớn hơn 0.' })
+  liquidityTokenAmount!: number;
+
+  @ApiProperty({
+    example: 3_500_000,
+    description: 'KC ký quỹ thanh khoản — giá = KC/token trong pool',
+  })
+  @Type(() => Number)
+  @IsNumber({}, { message: 'liquidityKcAmount phải là số.' })
+  @IsPositive({ message: 'liquidityKcAmount phải lớn hơn 0.' })
+  liquidityKcAmount!: number;
+
+  @ApiProperty({
+    example: 200_000,
+    description: 'Token creator giữ sau khi list',
+  })
+  @Type(() => Number)
+  @IsNumber({}, { message: 'teamTokenAmount phải là số.' })
+  @Min(0, { message: 'teamTokenAmount tối thiểu 0.' })
+  teamTokenAmount!: number;
 
   @ApiProperty({ example: 'Mô tả dự án…' })
   @IsString({ message: 'description phải là chuỗi.' })

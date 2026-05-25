@@ -1,3 +1,9 @@
+import {
+  assetCategoryLabel,
+  deriveFdvKc,
+  deriveListingPrice,
+  TOKEN_ASSET_CATEGORIES,
+} from "@/lib/token-categories";
 import { ICreateTokenCrypto } from "@/types/token.type";
 
 const NAME_MAX = 18;
@@ -36,19 +42,51 @@ export const validateFormSubmit = (form: ICreateTokenCrypto) => {
     errors.symbol = `Ký hiệu tối đa ${SYMBOL_MAX} ký tự.`;
   }
 
+  const category = form?.category?.trim() ?? "";
+  if (!category) {
+    errors.category = "Chọn hạng mục token.";
+  } else if (!TOKEN_ASSET_CATEGORIES.some((c) => c.id === category)) {
+    errors.category = "Hạng mục không hợp lệ.";
+  }
+
   const decimals = Number(form?.decimals);
   if (!Number.isFinite(decimals) || decimals < 0 || decimals > 18) {
     errors.decimals = "Số thập phân phải từ 0 đến 18.";
   }
 
-  const initialPrice = Number(form?.initialPrice);
-  if (!Number.isFinite(initialPrice) || initialPrice <= 0) {
-    errors.initialPrice = "Giá khởi điểm phải lớn hơn 0.";
-  }
-
   const totalSupply = Number(form?.totalSupply);
   if (!Number.isFinite(totalSupply) || totalSupply <= 0) {
     errors.totalSupply = "Tổng cung phải lớn hơn 0.";
+  }
+
+  const teamTokenAmount = Number(form?.teamTokenAmount);
+  if (!Number.isFinite(teamTokenAmount) || teamTokenAmount < 0) {
+    errors.teamTokenAmount = "Token team không hợp lệ.";
+  }
+
+  const liquidityTokenAmount = Number(form?.liquidityTokenAmount);
+  if (!Number.isFinite(liquidityTokenAmount) || liquidityTokenAmount <= 0) {
+    errors.liquidityTokenAmount = "Token vào pool phải lớn hơn 0.";
+  }
+
+  const liquidityKcAmount = Number(form?.liquidityKcAmount);
+  if (!Number.isFinite(liquidityKcAmount) || liquidityKcAmount <= 0) {
+    errors.liquidityKcAmount = "KC vào pool phải lớn hơn 0.";
+  }
+
+  if (
+    Number.isFinite(totalSupply) &&
+    Number.isFinite(teamTokenAmount) &&
+    Number.isFinite(liquidityTokenAmount) &&
+    teamTokenAmount + liquidityTokenAmount > totalSupply + 1e-9
+  ) {
+    errors.liquidityTokenAmount =
+      "Team + thanh khoản không được vượt tổng cung.";
+  }
+
+  const price = deriveListingPrice(liquidityKcAmount, liquidityTokenAmount);
+  if (price <= 0 && !errors.liquidityKcAmount && !errors.liquidityTokenAmount) {
+    errors.liquidityKcAmount = "Tỷ lệ KC/token không hợp lệ.";
   }
 
   const description = form?.description?.trim() ?? "";
@@ -88,7 +126,30 @@ export const LISTING_FIELD_KEY_MAP: Record<string, string> = {
   symbol: "symbol",
   logo: "logo",
   decimals: "decimals",
-  initialPrice: "initialPrice",
+  category: "category",
   totalSupply: "totalSupply",
+  teamTokenAmount: "teamTokenAmount",
+  liquidityTokenAmount: "liquidityTokenAmount",
+  liquidityKcAmount: "liquidityKcAmount",
   description: "description",
 };
+
+export function listingEconomicsSummary(form: ICreateTokenCrypto) {
+  const totalSupply = Number(form.totalSupply) || 0;
+  const team = Number(form.teamTokenAmount) || 0;
+  const liqTok = Number(form.liquidityTokenAmount) || 0;
+  const liqKc = Number(form.liquidityKcAmount) || 0;
+  const price = deriveListingPrice(liqKc, liqTok);
+  const circulating = liqTok;
+  const mcap = deriveFdvKc(price, circulating);
+  const fdv = deriveFdvKc(price, totalSupply);
+  const treasury = Math.max(0, totalSupply - team - liqTok);
+  return {
+    price,
+    circulating,
+    mcap,
+    fdv,
+    treasury,
+    categoryLabel: assetCategoryLabel(form.category),
+  };
+}

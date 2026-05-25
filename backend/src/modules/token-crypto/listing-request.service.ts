@@ -1,3 +1,9 @@
+import {
+  deriveListingInitialPrice,
+  isTokenAssetCategory,
+  TOKEN_ASSET_CATEGORY_LABELS,
+  validateListingAllocation,
+} from '@common/token-listing.constants';
 import { NotificationService } from '@modules/notification/notification.service';
 import { UserRepository } from '@modules/user/user.repository';
 import { LedgerService } from '@modules/ledger/ledger.service';
@@ -25,10 +31,12 @@ type SubmitPayload = {
   logo?: string | null;
   decimals?: number;
   totalSupply: number;
-  initialPrice?: number;
+  category: string;
+  liquidityKcAmount: number;
+  liquidityTokenAmount: number;
+  teamTokenAmount: number;
   description?: string;
   communityLinks?: Prisma.InputJsonValue;
-  circulatingSupply?: number;
 };
 
 @Injectable()
@@ -74,28 +82,34 @@ export class ListingRequestService {
       );
     }
 
-    if (payload.initialPrice != null) {
-      assertPositiveSpotPrice(Number(payload.initialPrice), 'Giá khởi điểm');
+    const category = payload.category.trim().toLowerCase();
+    if (!isTokenAssetCategory(category)) {
+      throw new BadRequestException('Hạng mục (category) không hợp lệ.');
     }
 
+    const alloc = validateListingAllocation({
+      totalSupply: payload.totalSupply,
+      teamTokenAmount: payload.teamTokenAmount,
+      liquidityTokenAmount: payload.liquidityTokenAmount,
+    });
+    if (!alloc.ok) {
+      throw new BadRequestException(alloc.message ?? 'Phân bổ token không hợp lệ.');
+    }
+
+    const initialPrice = deriveListingInitialPrice(
+      payload.liquidityKcAmount,
+      payload.liquidityTokenAmount,
+    );
+    assertPositiveSpotPrice(initialPrice, 'Giá khởi điểm (từ pool)');
+
     const listingFee = this.listingFee();
-    if (listingFee > 0) {
-      const kc = await this.userRepo.getQuoteBalance(userId);
-      if (kc < listingFee - 1e-9) {
-        throw new BadRequestException(
-          `Không đủ KC. Cần ${listingFee} KC, hiện có ${kc.toFixed(4)} KC.`,
-        );
-      }
-      const quoteId = await this.userRepo.getQuoteTokenId();
-      if (quoteId) {
-        await this.userRepo.adjustBalanceTokenByUserId(
-          userId,
-          quoteId,
-          -listingFee,
-        );
-      } else {
-        await this.userRepo.adjustStableCoinByUserId(userId, -listingFee);
-      }
+    const liquidityKc = Number(payload.liquidityKcAmount);
+    const kcRequired = listingFee + liquidityKc;
+    const kc = await this.userRepo.getQuoteBalance(userId);
+    if (kc < kcRequired - 1e-9) {
+      throw new BadRequestException(
+        `Không đủ KC. Cần ${kcRequired.toFixed(2)} KC (phí ${listingFee} + thanh khoản ${liquidityKc.toFixed(2)}), hiện có ${kc.toFixed(4)} KC.`,
+      );
     }
 
     const request = await this.repo.create({
@@ -105,24 +119,48 @@ export class ListingRequestService {
       logo: payload.logo ?? null,
       decimals: payload.decimals ?? 6,
       totalSupply: payload.totalSupply,
-      initialPrice: payload.initialPrice ?? null,
+      initialPrice,
+      category,
+      liquidityKcAmount: liquidityKc,
+      liquidityTokenAmount: payload.liquidityTokenAmount,
+      teamTokenAmount: payload.teamTokenAmount,
       description: payload.description ?? null,
       communityLinks: payload.communityLinks ?? undefined,
       status: 'pending',
       listingFeeKc: listingFee,
     });
 
-    if (listingFee > 0) {
-      const quoteId = await this.userRepo.getQuoteTokenId();
+    const quoteId = await this.userRepo.getQuoteTokenId();
+    const deductKc = async (amount: number, note: string, refType: string) => {
+      if (amount <= 0) return;
+      if (quoteId) {
+        await this.userRepo.adjustBalanceTokenByUserId(userId, quoteId, -amount);
+      } else {
+        await this.userRepo.adjustStableCoinByUserId(userId, -amount);
+      }
       await this.ledgerService.append({
         userId,
-        amount: -listingFee,
+        amount: -amount,
         currency: 'KC',
         tokenId: quoteId ?? undefined,
-        refType: 'listing_fee',
+        refType,
         refId: request.id,
-        note: `Phí yêu cầu niêm yết ${symbol}`,
+        note,
       });
+    };
+
+    await deductKc(
+      listingFee,
+      `Phí yêu cầu niêm yết ${symbol}`,
+      'listing_fee',
+    );
+    await deductKc(
+      liquidityKc,
+      `KC thanh khoản niêm yết ${symbol}`,
+      'listing_liquidity_kc',
+    );
+
+    if (listingFee > 0) {
       await this.notifications.notify({
         userId,
         type: NotificationType.LISTING_FEE,
@@ -185,16 +223,42 @@ export class ListingRequestService {
       );
     }
 
+    const catLabel =
+      TOKEN_ASSET_CATEGORY_LABELS[
+        request.category as keyof typeof TOKEN_ASSET_CATEGORY_LABELS
+      ] ?? request.category;
+    const treasury = Math.max(
+      0,
+      request.totalSupply -
+        request.teamTokenAmount -
+        request.liquidityTokenAmount,
+    );
     const specs = [
+      { label: 'Hạng mục', value: catLabel },
       { label: 'Tổng cung', value: `${this.formatSupply(request.totalSupply)} ${request.symbol}` },
+      {
+        label: 'Thanh khoản',
+        value: `${this.formatSupply(request.liquidityTokenAmount)} ${request.symbol} + ${request.liquidityKcAmount.toLocaleString('vi-VN')} KC`,
+      },
+      {
+        label: 'Team giữ',
+        value: `${this.formatSupply(request.teamTokenAmount)} ${request.symbol}`,
+      },
+      ...(treasury > 0
+        ? [
+            {
+              label: 'Kho bạc / chưa lưu hành',
+              value: `${this.formatSupply(treasury)} ${request.symbol}`,
+            },
+          ]
+        : []),
       {
         label: 'Giá mở cửa',
         value:
           request.initialPrice != null
-            ? `${request.initialPrice} KC`
+            ? `${request.initialPrice} KC / token`
             : 'TBA',
       },
-      { label: 'Creator', value: 'KingCoin Studio' },
       { label: 'Cặp', value: `${request.symbol}/KC` },
     ];
 
@@ -208,7 +272,7 @@ export class ListingRequestService {
       listingAt,
       initialPrice: request.initialPrice,
       totalSupply: request.totalSupply,
-      category: 'Creator',
+      category: catLabel,
       features: ['Spot'],
       specs,
       sortOrder: 0,
@@ -261,26 +325,30 @@ export class ListingRequestService {
       throw new BadRequestException('Yêu cầu không ở trạng thái chờ duyệt.');
     }
 
-    const fee = request.listingFeeKc;
-    if (fee > 0) {
+    const refundTotal =
+      request.listingFeeKc + (request.liquidityKcAmount ?? 0);
+    if (refundTotal > 0) {
       const quoteId = await this.userRepo.getQuoteTokenId();
       if (quoteId) {
         await this.userRepo.adjustBalanceTokenByUserId(
           request.userId,
           quoteId,
-          fee,
+          refundTotal,
         );
       } else {
-        await this.userRepo.adjustStableCoinByUserId(request.userId, fee);
+        await this.userRepo.adjustStableCoinByUserId(
+          request.userId,
+          refundTotal,
+        );
       }
       await this.ledgerService.append({
         userId: request.userId,
-        amount: fee,
+        amount: refundTotal,
         currency: 'KC',
         tokenId: quoteId ?? undefined,
         refType: 'listing_fee_refund',
         refId: request.id,
-        note: `Hoàn phí niêm yết ${request.symbol}`,
+        note: `Hoàn phí + KC thanh khoản niêm yết ${request.symbol}`,
       });
     }
 
@@ -333,6 +401,7 @@ export class ListingRequestService {
       return;
     }
 
+    const circulating = request.liquidityTokenAmount;
     const token = await this.tokenService.create(
       {
         name: request.name,
@@ -340,13 +409,25 @@ export class ListingRequestService {
         logo: request.logo,
         decimals: request.decimals,
         totalSupply: request.totalSupply,
-        circulatingSupply: request.totalSupply,
+        circulatingSupply: circulating,
         initialPrice: request.initialPrice ?? undefined,
         description: request.description ?? undefined,
         communityLinks: request.communityLinks ?? undefined,
+        category: request.category,
         owner: { connect: { id: request.userId } },
       },
-      { skipListingFee: true },
+      {
+        skipListingFee: true,
+        skipDefaultBotInventory: true,
+        listingLiquidity: {
+          tokenAmount: request.liquidityTokenAmount,
+          kcAmount: request.liquidityKcAmount,
+        },
+        teamAllocation: {
+          userId: request.userId,
+          amount: request.teamTokenAmount,
+        },
+      },
     );
 
     await this.repo.update(requestId, {

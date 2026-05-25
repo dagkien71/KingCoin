@@ -21,7 +21,7 @@ export default function Signup() {
   const router = useRouter();
   const [errors, setErrors] = useState<IRegisterForm>({});
   const [referralCode, setReferralCode] = useState("");
-  const { mutate } = useMutation("POST", "/auth/register");
+  const { mutate, loading } = useMutation("POST", "/auth/register");
 
   useEffect(() => {
     const ref = router.query.ref;
@@ -37,6 +37,7 @@ export default function Signup() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (loading) return;
 
     const validationErrors = validateForm(formData);
     const hasClientErrors = Object.values(validationErrors).some(Boolean);
@@ -147,8 +148,14 @@ export default function Signup() {
                 placeholder="KC…"
               />
             </div>
-            <Button type="submit" variant="primary" className="w-full" size="lg">
-              Đăng ký
+            <Button
+              type="submit"
+              variant="primary"
+              className="w-full"
+              size="lg"
+              disabled={loading}
+            >
+              {loading ? "Đang đăng ký…" : "Đăng ký"}
             </Button>
           </form>
           <p className="mt-6 text-center text-sm text-kc-muted">

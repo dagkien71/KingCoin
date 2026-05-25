@@ -33,6 +33,11 @@ export class TransferToUserDto {
   @IsString()
   @MaxLength(120, { message: 'note tối đa 120 ký tự.' })
   readonly note?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64, { message: 'idempotencyKey tối đa 64 ký tự.' })
+  readonly idempotencyKey?: string;
 }
 
 export class InternalWalletTransferDto {
@@ -47,4 +52,9 @@ export class InternalWalletTransferDto {
   @Min(0.01, { message: 'Số tiền chuyển tối thiểu 0.01 KC.' })
   @Max(1_000_000_000, { message: 'Số tiền chuyển quá lớn.' })
   readonly amount!: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64, { message: 'idempotencyKey tối đa 64 ký tự.' })
+  readonly idempotencyKey?: string;
 }

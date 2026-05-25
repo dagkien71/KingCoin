@@ -288,7 +288,13 @@ export class TokenCryptoService {
    */
   async create(
     createTokenCryptoDto: Prisma.TokenCryptoCreateInput,
-    options?: { skipListingFee?: boolean },
+    options?: {
+      skipListingFee?: boolean;
+      /** Không cấp 5M token mặc định — dùng listingLiquidity */
+      skipDefaultBotInventory?: boolean;
+      listingLiquidity?: { tokenAmount: number; kcAmount: number };
+      teamAllocation?: { userId: string; amount: number };
+    },
   ): Promise<TokenCrypto> {
     const ownerId =
       (createTokenCryptoDto as { ownerId?: string }).ownerId ??
@@ -349,7 +355,23 @@ export class TokenCryptoService {
     }
 
     try {
-      await this.botInventoryService.creditNewTokenToBots(newToken.id);
+      if (options?.listingLiquidity) {
+        await this.botInventoryService.creditListingLiquidityToMm(
+          newToken.id,
+          options.listingLiquidity.tokenAmount,
+          options.listingLiquidity.kcAmount,
+        );
+      } else if (!options?.skipDefaultBotInventory) {
+        await this.botInventoryService.creditNewTokenToBots(newToken.id);
+      }
+      const team = options?.teamAllocation;
+      if (team && team.amount > 0 && team.userId) {
+        await this.userRepository.adjustBalanceTokenByUserId(
+          team.userId,
+          newToken.id,
+          team.amount,
+        );
+      }
     } catch (err) {
       console.error('Bot inventory after token create:', err);
     }
