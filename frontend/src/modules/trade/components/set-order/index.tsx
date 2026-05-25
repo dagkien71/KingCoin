@@ -6,7 +6,7 @@ import { Api } from "@/api";
 import useMutation, { isMutationFailure } from "@/hooks/useMutation";
 import type { IBalanceSnapshot } from "@/types/trade.type";
 import type { IResponse } from "@/types/response";
-import { QUOTE_SYMBOL, quotePairLabel } from "@/constants/quote";
+import { QUOTE_SYMBOL } from "@/constants/quote";
 import {
   feeFromNotional,
   formatFeePct,
@@ -175,7 +175,6 @@ const TradeForm = ({
       quantity: Number(values.quantity),
       tokenId: token?.id,
       type: isBuyActive ? "buy" : "sell",
-      pair: quotePairLabel(token?.symbol),
     });
     if (!res || isMutationFailure(res)) return;
 
