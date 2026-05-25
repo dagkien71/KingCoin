@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  NotFoundException,
   Param,
   Post,
   Query,
@@ -103,7 +104,11 @@ export class TokenCryptoController {
   @UseAbility(Actions.read, TokenCryptoEntity)
   @SkipAuth()
   async getTokenById(@Param('id') id: string): Promise<TokenCrypto> {
-    return this.tokenService.findOne(id);
+    const token = await this.tokenService.findOne(id);
+    if (!token) {
+      throw new NotFoundException(`Token không tồn tại: ${id}`);
+    }
+    return token;
   }
 
   @Post()

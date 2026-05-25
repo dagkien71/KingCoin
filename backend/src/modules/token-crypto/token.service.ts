@@ -214,7 +214,11 @@ export class TokenCryptoService {
     return this.tokenRepository
       .findOne({
         where: {
-          OR: [{ id: key }, { name: key }, { symbol: key }],
+          OR: [
+            { id: key },
+            { name: { equals: key, mode: 'insensitive' } },
+            { symbol: { equals: key, mode: 'insensitive' } },
+          ],
         },
       })
       .then((t) => (t ? withDerivedMarketCap(t) : null));

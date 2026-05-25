@@ -184,6 +184,7 @@ function TradeTerminal({
     data: cryptoBase,
     refetch: refetchCryptoData,
     loading: tokenLoading,
+    error: tokenLoadError,
   } = useFetchApi<ITokenCrypto>(tokenPath);
   const cryptoData = cryptoBase ?? seedToken;
   const tickerPatch = useLiveTicker(cryptoData?.id);
@@ -232,8 +233,27 @@ function TradeTerminal({
     onTradingEvent: updateUserInfo,
   });
 
+  const tokenUnavailable =
+    Boolean(pairSlug) && !tokenLoading && !cryptoData?.id;
+
   const renderMainTabContent = () => {
     if (activeMainTab === "Chart") {
+      if (tokenUnavailable) {
+        return (
+          <div className="flex min-h-[360px] flex-col items-center justify-center gap-2 px-4 text-center text-sm text-kc-muted lg:min-h-[400px]">
+            <p>Không tìm thấy cặp {pairSlug.toUpperCase()}.</p>
+            {tokenLoadError ? (
+              <p className="text-xs text-kc-down">{tokenLoadError}</p>
+            ) : null}
+            <Link
+              href="/token/list"
+              className="text-kc-accent hover:underline"
+            >
+              Xem thị trường
+            </Link>
+          </div>
+        );
+      }
       if (!cryptoData?.id) {
         return (
           <div className="flex min-h-[360px] items-center justify-center px-4 text-sm text-kc-muted lg:min-h-[400px]">
