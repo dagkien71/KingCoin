@@ -205,22 +205,12 @@ function TradeTerminal({
     stream: ["logs", "trades"],
   });
   const { user, isLogin, updateUserInfo } = useAuth();
-  const skipFillToastUntilRef = useRef(0);
   const refetchSpotOrdersRef = useRef<(() => void) | null>(null);
 
-  const handleOrderFilled = useCallback(
-    (opts?: { silent?: boolean }) => {
-      updateUserInfo();
-      if (
-        opts?.silent ||
-        Date.now() < skipFillToastUntilRef.current
-      ) {
-        return;
-      }
-      toast.success("Lệnh đã khớp!");
-    },
-    [updateUserInfo]
-  );
+  const handleOrderFilled = useCallback(() => {
+    void updateUserInfo();
+    refetchSpotOrdersRef.current?.();
+  }, [updateUserInfo]);
 
   useMyOrderFillNotify({
     tokenId: cryptoData?.id,
@@ -422,9 +412,6 @@ function TradeTerminal({
               <SetOrder
                 token={cryptoData}
                 refetch={fetchApiAll}
-                onOrderPlaced={() => {
-                  skipFillToastUntilRef.current = Date.now() + 2500;
-                }}
               />
             </div>
           ) : (

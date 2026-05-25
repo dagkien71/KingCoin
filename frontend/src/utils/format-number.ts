@@ -112,6 +112,11 @@ export function formatPrettyPercentPrice(percent: number): string {
   return `${percent.toFixed(2)}%`;
 }
 
-export function formatNumber(number: number) {
-  return number.toFixed(2);
+export function formatNumber(
+  number: number | null | undefined,
+  decimals = 2,
+): string {
+  const n = Number(number);
+  if (!Number.isFinite(n)) return "—";
+  return n.toFixed(decimals);
 }

@@ -187,16 +187,9 @@ const TradeForm = ({
       envelope && typeof envelope === "object" && "data" in envelope
         ? (envelope.data as IOrder)
         : (res as unknown as IOrder);
-    const matched = Number(order?.matchedQuantity) > 0;
-    const completed = order?.status === OrderStatus.completed;
-
     refetch?.();
 
-    if (matched) {
-      toast.success(
-        completed ? "Lệnh đã khớp!" : "Lệnh đã khớp một phần."
-      );
-    } else {
+    if (order?.status === OrderStatus.pending) {
       toast.success("Đặt lệnh thành công!");
     }
   };

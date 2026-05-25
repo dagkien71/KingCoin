@@ -37,6 +37,20 @@ const ORDER_STATUS_LABEL: Record<string, string> = {
   canceled: "Đã hủy",
 };
 
+function formatOrderDateTime(createdAt: IOrder["createdAt"] | undefined) {
+  if (createdAt == null || createdAt === "") {
+    return { date: "—", time: "—" };
+  }
+  const m = moment(createdAt);
+  if (!m.isValid()) {
+    return { date: "—", time: "—" };
+  }
+  return {
+    date: m.format("DD/MM/YYYY"),
+    time: m.format("HH:mm:ss"),
+  };
+}
+
 const MyOrder = ({
   refetch: refetchParent,
   onRegisterRefetch,
@@ -165,6 +179,9 @@ const MyOrder = ({
             <tbody>
               {filteredOrders.map((order, index) => {
                 const isPending = order?.status === OrderStatus.pending;
+                const { date: orderDate, time: orderTime } = formatOrderDateTime(
+                  order?.createdAt
+                );
                 return (
                   <tr
                     key={order?.id ?? index}
@@ -175,14 +192,8 @@ const MyOrder = ({
                       <FaChevronRight className="-mt-1 inline opacity-50" />
                     </td>
                     <td className="px-3 py-2">
-                      <div>
-                        {moment(order?.createdAt.toString()).format(
-                          "DD/MM/YYYY"
-                        )}
-                      </div>
-                      <div className="text-kc-muted">
-                        {moment(order?.createdAt.toString()).format("HH:mm:ss")}
-                      </div>
+                      <div>{orderDate}</div>
+                      <div className="text-kc-muted">{orderTime}</div>
                     </td>
                     <td
                       className={clsx(
@@ -202,7 +213,11 @@ const MyOrder = ({
                     </td>
                     <td className="num px-3 py-2">
                       {withQuoteUnit(
-                        formatTokenPrice(0, order?.quantity * order?.price)
+                        formatTokenPrice(
+                          0,
+                          (Number(order?.quantity) || 0) *
+                            (Number(order?.price) || 0)
+                        )
                       )}
                     </td>
                     <td className="num px-3 py-2">

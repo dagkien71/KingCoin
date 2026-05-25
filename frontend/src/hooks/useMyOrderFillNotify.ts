@@ -9,7 +9,7 @@ export type LiveTradePayload = {
 };
 
 /**
- * Khi có giao dịch khớp liên quan user trên cặp đang xem → refetch + toast (trừ khi silent).
+ * Khi có giao dịch khớp liên quan user trên cặp đang xem → refetch balances/orders (không toast).
  */
 export default function useMyOrderFillNotify(options: {
   tokenId: string | null | undefined;

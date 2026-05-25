@@ -26,6 +26,12 @@ import {
 } from "@/lib/user-realtime-socket";
 import { registerKingCoinServiceWorker } from "@/lib/register-service-worker";
 
+/** Không popup toast — UI trade/futures tự cập nhật qua WS. */
+const NO_TOAST_TYPES = new Set([
+  "ORDER_FILLED",
+  "ORDER_PARTIAL_FILL",
+]);
+
 type NotificationContextValue = {
   items: NotificationItem[];
   unreadCount: number;
@@ -106,6 +112,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       const showToast =
         typeof document !== "undefined" &&
         document.visibilityState === "visible" &&
+        !NO_TOAST_TYPES.has(payload.type) &&
         (priority === "critical" || priority === "high");
 
       if (showToast) {
