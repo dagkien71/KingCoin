@@ -9,6 +9,7 @@ import {
   sizeFromMargin,
   validateTpSlPrices,
 } from "@/lib/futures-math";
+import { poolAvailableKc } from "@/lib/wallet-pools";
 import { FuturesPanelModal } from "@/modules/futures/FuturesPanelModal";
 import { LiquidationEmphasis } from "@/modules/futures/LiquidationEmphasis";
 import {
@@ -214,7 +215,7 @@ export function FuturesOrderPanel({
   const [takeProfitInput, setTakeProfitInput] = useState("");
   const [stopLossInput, setStopLossInput] = useState("");
 
-  const quoteAvailable = balances?.quoteKc ?? 0;
+  const futuresAvailable = poolAvailableKc(balances, "futures");
   const maintenanceRate = config?.maintenanceRate ?? 0.005;
   const minMargin = config?.minMarginKc ?? 0;
 
@@ -227,7 +228,7 @@ export function FuturesOrderPanel({
     const notional = m * leverage;
     const liq = estimateLiqPrice(side, markPrice, leverage, maintenanceRate);
     const liqDist = liqDistancePct(side, markPrice, liq);
-    const marginPct = quoteAvailable > 0 ? (m / quoteAvailable) * 100 : 0;
+    const marginPct = futuresAvailable > 0 ? (m / futuresAvailable) * 100 : 0;
     const openFeeKc = feeFromNotional(notional, openFeeRate);
     return { size, notional, liq, liqDist, marginPct, entry: markPrice, openFeeKc };
   }, [
@@ -236,7 +237,7 @@ export function FuturesOrderPanel({
     markPrice,
     side,
     maintenanceRate,
-    quoteAvailable,
+    futuresAvailable,
     openFeeRate,
   ]);
 
@@ -251,8 +252,8 @@ export function FuturesOrderPanel({
   }, [side, markPrice, takeProfitInput, stopLossInput]);
 
   const applyMarginPct = (pct: number) => {
-    if (quoteAvailable <= 0) return;
-    const next = Math.max(0, quoteAvailable * pct);
+    if (futuresAvailable <= 0) return;
+    const next = Math.max(0, futuresAvailable * pct);
     setMarginKc(String(Math.floor(next * 100) / 100));
   };
 
@@ -272,14 +273,14 @@ export function FuturesOrderPanel({
       );
       return;
     }
-    if (m > quoteAvailable + 1e-9) {
+    if (m > futuresAvailable + 1e-9) {
       toast.error(
-        `Không đủ ${QUOTE_SYMBOL}. Có ${formatTokenPrice(2, quoteAvailable)}.`
+        `Không đủ KC ví Futures. Có ${formatTokenPrice(2, futuresAvailable)} — chuyển từ ví Spot nếu cần.`
       );
       return;
     }
     const openFee = preview?.openFeeKc ?? feeFromNotional(m * leverage, openFeeRate);
-    if (m + openFee > quoteAvailable + 1e-9) {
+    if (m + openFee > futuresAvailable + 1e-9) {
       toast.error(
         `Không đủ KC cho margin + phí mở (~${formatTokenPrice(4, openFee)} ${QUOTE_SYMBOL}).`
       );
@@ -425,16 +426,16 @@ export function FuturesOrderPanel({
               <button
                 type="button"
                 onClick={() => applyMarginPct(1)}
-                disabled={quoteAvailable <= 0}
+                disabled={futuresAvailable <= 0}
                 className="shrink-0 rounded-lg border border-kc-border bg-kc-bg px-2.5 text-[11px] font-semibold text-kc-muted hover:text-kc-accent disabled:opacity-40"
               >
                 Max
               </button>
             </div>
             <p className="mt-1.5 text-[10px] text-kc-muted">
-              Khả dụng{" "}
+              Khả dụng (Futures){" "}
               <span className="num font-medium text-kc-fg">
-                {formatTokenPrice(2, quoteAvailable)} {QUOTE_SYMBOL}
+                {formatTokenPrice(2, futuresAvailable)} {QUOTE_SYMBOL}
               </span>
             </p>
           </div>
@@ -504,8 +505,8 @@ export function FuturesOrderPanel({
       <FuturesPanelModal
         open={marginModalOpen}
         onClose={() => setMarginModalOpen(false)}
-        title="Chọn margin từ ví"
-        subtitle={`Khả dụng ${formatTokenPrice(2, quoteAvailable)} ${QUOTE_SYMBOL}`}
+        title="Chọn margin từ ví Futures"
+        subtitle={`Khả dụng ${formatTokenPrice(2, futuresAvailable)} ${QUOTE_SYMBOL}`}
       >
         <div className="grid grid-cols-2 gap-2">
           {MARGIN_PRESETS.map((pct) => (
@@ -516,12 +517,12 @@ export function FuturesOrderPanel({
                 applyMarginPct(pct);
                 setMarginModalOpen(false);
               }}
-              disabled={quoteAvailable <= 0}
+              disabled={futuresAvailable <= 0}
               className="rounded-xl border border-kc-border bg-kc-bg py-3 text-sm font-semibold text-kc-fg transition hover:border-kc-accent/40 hover:text-kc-accent disabled:opacity-40"
             >
               {pct === 1 ? "100% · Max" : `${pct * 100}% ví`}
               <span className="mt-0.5 block num text-[11px] font-normal text-kc-muted">
-                {formatTokenPrice(2, quoteAvailable * pct)} {QUOTE_SYMBOL}
+                {formatTokenPrice(2, futuresAvailable * pct)} {QUOTE_SYMBOL}
               </span>
             </button>
           ))}

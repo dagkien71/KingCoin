@@ -1,5 +1,9 @@
 /**
  * NAV / holdings — mọi alt quy đổi theo giá TOKEN/KC hiện tại (KC ≈ USDT).
+ *
+ * Tổng tài sản = ví Spot (KC + alt) + ví Funding + ví Futures (KC rảnh + ký quỹ + uPnL mở).
+ * Giao dịch spot chỉ trừ ví Spot; futures chỉ trừ ví Futures.
+ *
  * @see docs/STABLECOIN_KC_SPEC.md#quy-đổi-vốn-nav--kc-như-usdt
  */
 import type { IBalanceSnapshot } from "@/types/trade.type";

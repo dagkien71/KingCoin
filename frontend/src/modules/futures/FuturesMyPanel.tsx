@@ -10,6 +10,7 @@ import {
   roePercent,
 } from "@/lib/futures-math";
 import { futuresHref } from "@/lib/token-routes";
+import { poolAvailableKc } from "@/lib/wallet-pools";
 import { LiquidationEmphasis } from "@/modules/futures/LiquidationEmphasis";
 import { FuturesTpSlModal } from "@/modules/futures/FuturesTpSlModal";
 import useLiveFetch from "@/hooks/useLiveFetch";
@@ -167,7 +168,7 @@ export function FuturesMyPanel({ tokenId, refreshKey = 0, onRefetch }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch khi có giao dịch mới từ parent
   }, [refreshKey]);
 
-  const quoteAvailable = balances?.quoteKc ?? 0;
+  const futuresAvailable = poolAvailableKc(balances, "futures");
   const openInitialLoad = openLoading && openPos === null;
   const histInitialLoad = histLoading && history === null;
   const ordersInitialLoad = ordersLoading && orders === null;
@@ -238,7 +239,7 @@ export function FuturesMyPanel({ tokenId, refreshKey = 0, onRefetch }: Props) {
 
       {tab === "margin" && (
         <MarginDashboard
-          quoteAvailable={quoteAvailable}
+          futuresAvailable={futuresAvailable}
           marginLocked={marginLocked}
           openCount={openList.length}
           totalUpnl={totalUpnl}
@@ -750,25 +751,25 @@ function OrdersHistoryView({
 }
 
 function MarginDashboard({
-  quoteAvailable,
+  futuresAvailable,
   marginLocked,
   openCount,
   totalUpnl,
   totalNotional,
   openList,
 }: {
-  quoteAvailable: number;
+  futuresAvailable: number;
   marginLocked: number;
   openCount: number;
   totalUpnl: number;
   totalNotional: number;
   openList: FuturesPositionView[];
 }) {
-  const equity = quoteAvailable + marginLocked + totalUpnl;
+  const equity = futuresAvailable + marginLocked + totalUpnl;
   const up = totalUpnl >= 0;
   const utilization =
-    quoteAvailable + marginLocked > 0
-      ? (marginLocked / (quoteAvailable + marginLocked)) * 100
+    futuresAvailable + marginLocked > 0
+      ? (marginLocked / (futuresAvailable + marginLocked)) * 100
       : 0;
 
   return (
@@ -777,7 +778,7 @@ function MarginDashboard({
         <StatCard
           label="Equity ước tính"
           value={`${formatTokenPrice(2, equity)} ${QUOTE_SYMBOL}`}
-          hint="Khả dụng + margin khóa + uPnL"
+          hint="Ví Futures: KC rảnh + margin khóa + uPnL"
         />
         <StatCard
           label="Tỷ lệ dùng margin"

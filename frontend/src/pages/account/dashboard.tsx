@@ -187,7 +187,7 @@ export default function Dashboard() {
                     </button>
                   </div>
                   <p className="mt-1 text-xs text-kc-muted">
-                    Spot:{" "}
+                    Tổng = Spot + Futures + Funding · Spot:{" "}
                     {maskValue(
                       hideBalances,
                       formatTokenPrice(2, portfolio.spotNavKc)

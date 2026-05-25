@@ -49,6 +49,18 @@ KingCoin (**KC**) là **stablecoin nội bộ** của sàn: đơn vị quote, th
 }
 ```
 
+## Ba ví KC (Spot / Futures / Funding)
+
+| Ví | Dùng khi | Số dư API |
+|----|----------|-----------|
+| **Spot** | Khớp lệnh spot, swap, phí spot, listing | `quoteKc` (= `spotKc`) + alt trong `tokens[]` |
+| **Futures** | Mở/đóng hợp đồng, margin, phí mở/đóng futures | `futuresKc` (+ ký quỹ & uPnL trong vị thế mở) |
+| **Funding** | Phí funding định kỳ futures | `fundingKc` |
+
+- Giao dịch **spot** chỉ kiểm tra và trừ **ví Spot** (`getQuoteBalance` / `WalletPool.spot`).
+- Giao dịch **futures** chỉ kiểm tra và trừ **ví Futures** (`WalletPool.futures`).
+- User chuyển KC giữa các ví qua `POST /wallets/transfer-internal`.
+
 ## Quy đổi vốn (NAV) — KC như USDT
 
 ### Nguyên tắc
@@ -58,17 +70,21 @@ KingCoin (**KC**) là **stablecoin nội bộ** của sàn: đơn vị quote, th
 | Tiền quote | USDT | **KC** |
 | Cặp giao dịch | `BTC/USDT` | `SLR/KC`, `APX/KC` |
 | Giá token | USDT cho 1 BTC | **KC cho 1 token** (`TokenCrypto.price`) |
-| Số dư quote | USDT trong ví | `balances.quoteKc` |
-| Định giá alt | `số BTC × giá BTC/USDT` | `số token × giá token/KC` |
+| Số dư quote spot | USDT trong ví spot | `balances.quoteKc` |
+| Định giá alt | `số BTC × giá BTC/USDT` | `số token × giá token/KC` (thuộc ví Spot) |
 
-**NAV (tổng giá trị ước tính)** luôn tính **một đơn vị — KC**:
+**NAV (tổng tài sản ước tính)** = cộng **cả ba ví** (một đơn vị KC):
 
 ```
-NAV_KC = số_dư_KC + Σ (số_lượng_token_i × giá_spot_i_tính_bằng_KC)
+NAV_KC = spot_nav + funding_kc + futures_equity
+
+spot_nav     = quote_kc + Σ (amount_token × giá_TOKEN/KC)
+funding_kc   = số KC rảnh ví Funding
+futures_equity = futures_kc_rảnh + Σ (margin_kc + uPnL_mở) từng vị thế
 ```
 
 - `giá_spot_i_tính_bằng_KC` = giá hiện tại của cặp `TOKEN_i/KC` (ưu tiên ticker live WS, fallback `TokenCrypto.price`).
-- **KC trong ví không nhân thêm giá** (1 KC ≈ 1 đơn vị kế toán; peg ~1 USD danh nghĩa).
+- **KC quote spot** không nhân thêm giá (1 KC ≈ 1 đơn vị kế toán; peg ~1 USD danh nghĩa).
 - **Không** quy đổi alt → USD riêng rồi cộng; **không** dùng giá khớp lệnh cũ làm NAV nếu đã có giá thị trường mới.
 
 ### Ví dụ: mua SLR bằng KC
