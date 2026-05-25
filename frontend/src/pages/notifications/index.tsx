@@ -13,7 +13,7 @@ export default function NotificationsPage() {
   const { markRead, markAllRead, unreadCount, refresh } =
     useNotificationContext();
   const [items, setItems] = useState<NotificationItem[]>([]);
-  const [filter, setFilter] = useState<"all" | "unread" | "read">("all");
+  const [filter, setFilter] = useState<"all" | "unread">("all");
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -22,7 +22,6 @@ export default function NotificationsPage() {
       const res = await fetchNotifications({
         limit: 50,
         unreadOnly: filter === "unread",
-        readOnly: filter === "read",
       });
       setItems(res.items);
     } finally {
@@ -44,11 +43,16 @@ export default function NotificationsPage() {
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-kc-fg">Thông báo</h1>
-            <p className="text-sm text-kc-muted mt-1">
-              {unreadCount > 0
-                ? `${unreadCount} chưa đọc`
-                : "Tất cả đã đọc"}
-            </p>
+            {unreadCount > 0 ? (
+              <p className="text-sm text-kc-muted mt-1">
+                <span className="mr-2 inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-violet-500 px-2 text-xs font-bold text-white">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+                tin chưa đọc
+              </p>
+            ) : (
+              <p className="text-sm text-kc-muted mt-1">Không có tin mới</p>
+            )}
           </div>
           {unreadCount > 0 ? (
             <Button
@@ -58,32 +62,30 @@ export default function NotificationsPage() {
                 void markAllRead().then(load);
               }}
             >
-              Đánh dấu đã đọc tất cả
+              Đọc tất cả
             </Button>
           ) : null}
         </div>
 
         <div className="mb-4 flex gap-2">
-          {(
-            [
-              { id: "all", label: "Tất cả" },
-              { id: "unread", label: "Chưa đọc" },
-              { id: "read", label: "Đã đọc" },
-            ] as const
-          ).map((f) => (
+          {(["all", "unread"] as const).map((f) => (
             <button
-              key={f.id}
+              key={f}
               type="button"
-              onClick={() => setFilter(f.id)}
+              onClick={() => setFilter(f)}
               className={cn(
                 "rounded-lg px-3 py-1.5 text-sm font-medium",
-                filter === f.id
+                filter === f
                   ? "bg-violet-500/20 text-violet-300"
                   : "text-kc-muted hover:text-kc-fg"
               )}
             >
-              {f.label}
-              {f.id === "unread" && unreadCount > 0 ? ` (${unreadCount})` : ""}
+              {f === "all" ? "Tất cả" : "Chưa đọc"}
+              {f === "unread" && unreadCount > 0 ? (
+                <span className="ml-1.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-violet-500 px-1 text-[10px] font-bold text-white">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              ) : null}
             </button>
           ))}
         </div>
@@ -96,44 +98,45 @@ export default function NotificationsPage() {
               Không có thông báo
             </li>
           ) : (
-            items.map((item) => {
-              const deeplink =
-                typeof item.payload?.deeplink === "string"
-                  ? item.payload.deeplink
-                  : undefined;
-              return (
-                <li
-                  key={item.id}
-                  className={cn(
-                    "px-4 py-3",
-                    !item.readAt && "bg-violet-500/5"
-                  )}
-                >
-                  <div className="flex justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-medium text-kc-fg">{item.title}</p>
-                        <span
-                          className={cn(
-                            "rounded px-1.5 py-0.5 text-[10px] font-semibold",
-                            item.readAt
-                              ? "bg-kc-border/60 text-kc-muted"
-                              : "bg-violet-500/20 text-violet-300"
-                          )}
-                        >
-                          {item.readAt ? "Đã đọc" : "Chưa đọc"}
-                        </span>
+            (() => {
+              let unreadIdx = 0;
+              return items.map((item) => {
+                const deeplink =
+                  typeof item.payload?.deeplink === "string"
+                    ? item.payload.deeplink
+                    : undefined;
+                const num = !item.readAt ? ++unreadIdx : undefined;
+                return (
+                  <li
+                    key={item.id}
+                    className={cn(
+                      "px-4 py-3",
+                      !item.readAt && "bg-violet-500/5"
+                    )}
+                  >
+                    <div className="flex justify-between gap-2">
+                      <div className="flex min-w-0 flex-1 gap-3">
+                        {!item.readAt && num != null ? (
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-500 text-xs font-bold text-white">
+                            {num > 99 ? "99+" : num}
+                          </span>
+                        ) : (
+                          <span className="w-6 shrink-0" aria-hidden />
+                        )}
+                        <div className="min-w-0">
+                          <p className="font-medium text-kc-fg">{item.title}</p>
+                          <p className="text-sm text-kc-muted mt-0.5">
+                            {item.body}
+                          </p>
+                          <p className="text-xs text-kc-muted/70 mt-1">
+                            {new Date(item.createdAt).toLocaleString("vi-VN")}
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-sm text-kc-muted mt-0.5">{item.body}</p>
-                      <p className="text-xs text-kc-muted/70 mt-1">
-                        {new Date(item.createdAt).toLocaleString("vi-VN")}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 flex-col gap-1 items-end">
                       {deeplink ? (
                         <Link
                           href={deeplink}
-                          className="text-xs text-violet-400 hover:underline"
+                          className="shrink-0 text-xs text-violet-400 hover:underline"
                           onClick={() => {
                             if (!item.readAt) void markRead(item.id);
                           }}
@@ -141,20 +144,11 @@ export default function NotificationsPage() {
                           Mở
                         </Link>
                       ) : null}
-                      {!item.readAt ? (
-                        <button
-                          type="button"
-                          className="text-xs text-kc-muted hover:text-kc-fg"
-                          onClick={() => void markRead(item.id).then(load)}
-                        >
-                          Đã đọc
-                        </button>
-                      ) : null}
                     </div>
-                  </div>
-                </li>
-              );
-            })
+                  </li>
+                );
+              });
+            })()
           )}
         </ul>
       </div>

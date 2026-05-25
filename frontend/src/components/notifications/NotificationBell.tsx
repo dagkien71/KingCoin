@@ -17,9 +17,12 @@ function formatTime(iso: string) {
 
 function ItemRow({
   item,
+  unreadIndex,
   onRead,
 }: {
   item: NotificationItem;
+  /** Số thứ tự trong các tin chưa đọc (1, 2, 3…) */
+  unreadIndex?: number;
   onRead: (id: string) => void;
 }) {
   const deeplink =
@@ -37,18 +40,20 @@ function ItemRow({
         !item.readAt && "bg-violet-500/10"
       )}
     >
-      <div className="flex items-start justify-between gap-2">
-        <p className="font-medium text-kc-fg line-clamp-1">{item.title}</p>
-        <span
-          className={cn(
-            "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold",
-            item.readAt
-              ? "bg-kc-border/60 text-kc-muted"
-              : "bg-violet-500/25 text-violet-200"
-          )}
-        >
-          {item.readAt ? "Đã đọc" : "Chưa đọc"}
-        </span>
+      <div className="flex items-start gap-2">
+        {!item.readAt && unreadIndex != null ? (
+          <span
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-500 text-[10px] font-bold text-white"
+            aria-hidden
+          >
+            {unreadIndex > 99 ? "99+" : unreadIndex}
+          </span>
+        ) : (
+          <span className="h-5 w-5 shrink-0" aria-hidden />
+        )}
+        <p className="min-w-0 flex-1 font-medium text-kc-fg line-clamp-1">
+          {item.title}
+        </p>
       </div>
       <p className="text-xs text-kc-muted line-clamp-2 mt-0.5">{item.body}</p>
       <p className="text-[10px] text-kc-muted/80 mt-1">
@@ -88,11 +93,15 @@ export default function NotificationBell() {
           if (!open) void refresh();
         }}
         className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-kc-border text-kc-fg hover:bg-white/[0.04]"
-        aria-label="Thông báo"
+        aria-label={
+          unreadCount > 0
+            ? `Thông báo, ${unreadCount} chưa đọc`
+            : "Thông báo"
+        }
       >
         <HiOutlineBell className="h-5 w-5" />
         {unreadCount > 0 ? (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-violet-500 px-1 text-[10px] font-bold text-white">
+          <span className="absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full border-2 border-kc-bg bg-violet-500 px-1 text-[11px] font-bold leading-none text-white">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         ) : null}
@@ -104,8 +113,8 @@ export default function NotificationBell() {
             <span className="text-sm font-semibold text-kc-fg">
               Thông báo
               {unreadCount > 0 ? (
-                <span className="ml-1.5 font-normal text-violet-400">
-                  ({unreadCount} chưa đọc)
+                <span className="ml-2 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-violet-500 px-1.5 text-[11px] font-bold text-white">
+                  {unreadCount > 99 ? "99+" : unreadCount}
                 </span>
               ) : null}
             </span>
@@ -125,9 +134,20 @@ export default function NotificationBell() {
                 Chưa có thông báo
               </p>
             ) : (
-              items.slice(0, 10).map((item) => (
-                <ItemRow key={item.id} item={item} onRead={markRead} />
-              ))
+              (() => {
+                let unreadIdx = 0;
+                return items.slice(0, 10).map((item) => {
+                  const num = !item.readAt ? ++unreadIdx : undefined;
+                  return (
+                    <ItemRow
+                      key={item.id}
+                      item={item}
+                      unreadIndex={num}
+                      onRead={markRead}
+                    />
+                  );
+                });
+              })()
             )}
           </div>
           <div className="flex flex-col gap-1 border-t border-kc-border p-2">
