@@ -110,8 +110,9 @@ export default function MarketTokenTable({
                   key={crypto.id}
                   className="cursor-pointer border-b border-kc-border transition hover:bg-white/[0.03]"
                   onClick={() =>
-                    crypto?.id && router.push(tokenDetailPath(crypto.id))
+                    crypto?.id && router.push(tradeHref(crypto))
                   }
+                  title="Mở giao dịch Spot"
                 >
                   <td className="px-2 py-2">
                     <button
@@ -153,8 +154,18 @@ export default function MarketTokenTable({
                             </span>
                           )}
                         </div>
-                        <div className="text-xs text-kc-muted">
-                          {crypto.symbol}
+                        <div className="flex items-center gap-2 text-xs text-kc-muted">
+                          <span>{crypto.symbol}</span>
+                          <button
+                            type="button"
+                            className="text-kc-accent/80 hover:text-kc-accent hover:underline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(tokenDetailPath(crypto.id));
+                            }}
+                          >
+                            Hồ sơ
+                          </button>
                         </div>
                       </div>
                     </div>

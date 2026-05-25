@@ -28,7 +28,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { withQuoteUnit } from "@/constants/quote";
 import PriceAlertPanel from "@/components/notifications/PriceAlertPanel";
-import { tradeHref } from "@/lib/token-routes";
+import { tokenCryptoApiPath, tradeHref } from "@/lib/token-routes";
 import { cn } from "@/lib/cn";
 import useAuth from "@/hooks/useAuth";
 
@@ -44,18 +44,22 @@ const TokenDetail = () => {
   const { id } = router.query;
   const { isLogin } = useAuth();
 
-  const { data, refetch, loading } = useFetchApi<ITokenCrypto>(
-    typeof id === "string" ? `/token-crypto/${id}` : ""
+  const idKey =
+    typeof id === "string" ? id : Array.isArray(id) ? id[0] : "";
+  const tokenApiPath = idKey ? tokenCryptoApiPath(idKey) : "";
+
+  const { data, refetch, loading, error } = useFetchApi<ITokenCrypto>(
+    tokenApiPath
   );
 
   useEffect(() => {
-    if (!id) return;
+    if (!idKey) return;
     refetch();
     const intervalId = setInterval(() => {
       refetch();
     }, 30_000);
     return () => clearInterval(intervalId);
-  }, [id, refetch]);
+  }, [idKey, refetch]);
 
   if (!router.isReady) {
     return (
@@ -67,15 +71,25 @@ const TokenDetail = () => {
 
   if (!loading && !data) {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-kc-muted">
-        <p>Không tìm thấy token.</p>
-        <Button
-          variant="secondary"
-          className="mt-4"
-          onClick={() => router.push("/token/list")}
-        >
-          Về thị trường
-        </Button>
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-2 px-4 text-center text-kc-muted">
+        <p>Không tìm thấy token{idKey ? ` (${idKey})` : ""}.</p>
+        {error ? <p className="text-xs text-kc-down">{error}</p> : null}
+        <div className="mt-2 flex flex-wrap justify-center gap-3">
+          {idKey ? (
+            <Button
+              variant="primary"
+              onClick={() => router.push(tradeHref({ id: idKey, symbol: idKey }))}
+            >
+              Mở Spot
+            </Button>
+          ) : null}
+          <Button
+            variant="secondary"
+            onClick={() => router.push("/token/list")}
+          >
+            Về thị trường
+          </Button>
+        </div>
       </div>
     );
   }
