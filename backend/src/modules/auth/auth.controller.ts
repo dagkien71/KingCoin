@@ -22,6 +22,12 @@ import {
 import { User } from '@prisma/client';
 import { AuthService } from './auth.service';
 import { SignUpDto } from './dto/register';
+import {
+  ForgotPasswordDto,
+  ResendVerificationDto,
+  ResetPasswordDto,
+  VerifyEmailDto,
+} from './dto/verify-email.dto';
 import { TokenService } from './token.service';
 
 @ApiTags('Auth')
@@ -46,6 +52,30 @@ export class AuthController {
   @Post('login')
   signIn(@Body() signInDto: SignInDto): Promise<Auth.AuthResponse> {
     return this.authService.signIn(signInDto);
+  }
+
+  @SkipAuth()
+  @Post('verify-email')
+  verifyEmail(@Body() dto: VerifyEmailDto) {
+    return this.authService.verifyEmail(dto);
+  }
+
+  @SkipAuth()
+  @Post('resend-verification')
+  resendVerification(@Body() dto: ResendVerificationDto) {
+    return this.authService.resendVerification(dto);
+  }
+
+  @SkipAuth()
+  @Post('forgot-password')
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto);
+  }
+
+  @SkipAuth()
+  @Post('reset-password')
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
   }
 
   @ApiBody({ type: RefreshTokenDto })

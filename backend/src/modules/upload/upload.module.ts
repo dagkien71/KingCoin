@@ -1,9 +1,8 @@
 import { Module } from '@nestjs/common';
 import { UploadController } from './upload.controller';
-import { UploadService } from './upload.service';
-import { CloudinaryService } from '@modules/cloudinary/cloudinary.service';
 import { CloudinaryModule } from '@modules/cloudinary/cloudinary.module';
 import { ConfigModule } from '@nestjs/config';
+import { UploadImageService } from './upload-image.service';
 
 @Module({
   imports: [
@@ -13,6 +12,6 @@ import { ConfigModule } from '@nestjs/config';
     }),
   ],
   controllers: [UploadController],
-  providers: [UploadService, CloudinaryService],
+  providers: [UploadImageService],
 })
 export class UploadModule {}

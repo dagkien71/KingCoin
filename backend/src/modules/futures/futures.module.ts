@@ -3,6 +3,7 @@ import { FeesModule } from '@modules/fees/fees.module';
 import { OrderModule } from '@modules/order/order.module';
 import { TokenCryptoModule } from '@modules/token-crypto/token.module';
 import { UserModule } from '@modules/user/user.module';
+import { MailModule } from '@modules/mail/mail.module';
 import { NotificationModule } from '@modules/notification/notification.module';
 import { Module } from '@nestjs/common';
 import { FuturesController } from './futures.controller';
@@ -20,6 +21,7 @@ import { MarkPriceService } from './mark-price.service';
     UserModule,
     OrderModule,
     NotificationModule,
+    MailModule,
   ],
   controllers: [FuturesController],
   providers: [

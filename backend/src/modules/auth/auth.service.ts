@@ -1,17 +1,22 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { SignUpDto } from './dto/register';
 import { UserRepository } from '@modules/user/user.repository';
 import {
   INVALID_CREDENTIALS,
+  INVALID_VERIFICATION_CODE,
   NOT_FOUND,
+  UNVERIFIED_EMAIL,
   USER_CONFLICT,
 } from '@constants/errors.constants';
 import {
+  AuthTokenPurpose,
   NotificationPriority,
   NotificationType,
   Prisma,
@@ -21,7 +26,16 @@ import { SignInDto } from '@modules/auth/dto/login.dto';
 import { TokenService } from '@modules/auth/token.service';
 import { NotificationService } from '@modules/notification/notification.service';
 import { ReferralService } from '@modules/referral/referral.service';
+import { MailService } from '@modules/mail/mail.service';
+import { AuthTokenRepository } from './auth-token.repository';
+import {
+  ForgotPasswordDto,
+  ResendVerificationDto,
+  ResetPasswordDto,
+  VerifyEmailDto,
+} from './dto/verify-email.dto';
 import { Roles } from '@modules/app/app.roles';
+import { PrismaService } from '@providers/prisma';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -31,7 +45,27 @@ export class AuthService {
     private readonly tokenService: TokenService,
     private readonly referralService: ReferralService,
     private readonly notifications: NotificationService,
+    private readonly mail: MailService,
+    private readonly authTokens: AuthTokenRepository,
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
   ) {}
+
+  private verificationRequired(): boolean {
+    return this.config.get<boolean>('mail.verificationRequired') !== false;
+  }
+
+  private async hasPendingEmailVerify(userId: string): Promise<boolean> {
+    const n = await this.prisma.authToken.count({
+      where: {
+        userId,
+        purpose: AuthTokenPurpose.email_verify,
+        usedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+    });
+    return n > 0;
+  }
 
   /**
    * @desc Create a new user
@@ -76,18 +110,130 @@ export class AuthService {
     );
     const full = await this.userRepository.findOne({ where: { id: created.id } });
     const user = full ?? created;
+    const code = await this.authTokens.issue(
+      user.id,
+      AuthTokenPurpose.email_verify,
+    );
+    void this.mail.send({
+      to: user.email,
+      template: 'email_verify',
+      vars: {
+        code,
+        email: user.email,
+        name: user.username ?? undefined,
+      },
+    });
+
     if (initialKc > 0) {
       await this.notifications.notify({
         userId: user.id,
         type: NotificationType.SIGNUP_BONUS,
         priority: NotificationPriority.low,
         title: 'Chào mừng KingCoin',
-        body: `Bạn nhận ${initialKc.toLocaleString('vi-VN')} KC khi đăng ký.`,
+        body: `Bạn nhận ${initialKc.toLocaleString('vi-VN')} KC khi xác nhận email và đăng nhập.`,
         dedupeKey: `SIGNUP_BONUS:${user.id}`,
         payload: { deeplink: '/wallet', amountKc: initialKc },
       });
     }
     return user;
+  }
+
+  async verifyEmail(dto: VerifyEmailDto): Promise<{ verified: true }> {
+    const user = await this.userRepository.findOne({
+      where: { email: dto.email },
+    });
+    if (!user) {
+      throw new BadRequestException(INVALID_VERIFICATION_CODE);
+    }
+    if (user.emailVerifiedAt) {
+      return { verified: true };
+    }
+    const ok = await this.authTokens.consume(
+      user.id,
+      AuthTokenPurpose.email_verify,
+      dto.code,
+    );
+    if (!ok) {
+      throw new BadRequestException(INVALID_VERIFICATION_CODE);
+    }
+    await this.userRepository.update(user.id, {
+      emailVerifiedAt: new Date(),
+    });
+    const initialKc = Number(process.env.INITIAL_KC_BALANCE ?? '2000');
+    void this.mail.send({
+      to: user.email,
+      template: 'signup_welcome',
+      vars: {
+        email: user.email,
+        name: user.username ?? undefined,
+        bonusKc: initialKc > 0 ? initialKc : undefined,
+      },
+    });
+    return { verified: true };
+  }
+
+  async resendVerification(
+    dto: ResendVerificationDto,
+  ): Promise<{ sent: boolean }> {
+    const user = await this.userRepository.findOne({
+      where: { email: dto.email },
+    });
+    if (!user || user.emailVerifiedAt) {
+      return { sent: true };
+    }
+    const code = await this.authTokens.issue(
+      user.id,
+      AuthTokenPurpose.email_verify,
+    );
+    await this.mail.send({
+      to: user.email,
+      template: 'email_verify',
+      vars: {
+        code,
+        email: user.email,
+        name: user.username ?? undefined,
+      },
+    });
+    return { sent: true };
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto): Promise<{ sent: boolean }> {
+    const user = await this.userRepository.findOne({
+      where: { email: dto.email },
+    });
+    if (!user) {
+      return { sent: true };
+    }
+    const code = await this.authTokens.issue(
+      user.id,
+      AuthTokenPurpose.password_reset,
+    );
+    await this.mail.send({
+      to: user.email,
+      template: 'password_reset',
+      vars: { code, email: user.email },
+    });
+    return { sent: true };
+  }
+
+  async resetPassword(dto: ResetPasswordDto): Promise<{ reset: true }> {
+    const user = await this.userRepository.findOne({
+      where: { email: dto.email },
+    });
+    if (!user) {
+      throw new BadRequestException(INVALID_VERIFICATION_CODE);
+    }
+    const ok = await this.authTokens.consume(
+      user.id,
+      AuthTokenPurpose.password_reset,
+      dto.code,
+    );
+    if (!ok) {
+      throw new BadRequestException(INVALID_VERIFICATION_CODE);
+    }
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
+    await this.userRepository.update(user.id, { password: hashedPassword });
+    return { reset: true };
   }
 
   private generateRandomWalletAddress(): string {
@@ -125,6 +271,19 @@ export class AuthService {
     if (!passwordOk) {
       // 401001: Invalid credentials
       throw new UnauthorizedException(INVALID_CREDENTIALS);
+    }
+
+    if (!testUser.emailVerifiedAt) {
+      const pending = await this.hasPendingEmailVerify(testUser.id);
+      if (pending && this.verificationRequired()) {
+        throw new UnauthorizedException(UNVERIFIED_EMAIL);
+      }
+      if (!pending) {
+        await this.userRepository.update(testUser.id, {
+          emailVerifiedAt: new Date(),
+        });
+        testUser.emailVerifiedAt = new Date();
+      }
     }
 
     if (this.tokenService.isLegacyPlainPassword(testUser.password)) {

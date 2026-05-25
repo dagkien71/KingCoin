@@ -47,6 +47,13 @@ const Login = () => {
     });
 
     if (isMutationFailure(result)) {
+      const msg = result.message ?? "";
+      if (msg.includes("401004") || /xác minh|verified/i.test(msg)) {
+        router.push(
+          `/register/verify?email=${encodeURIComponent(email.trim())}`
+        );
+        return;
+      }
       const apiErrors = apiFieldErrorsToForm<{ email?: string; password?: string }>(
         result
       );
@@ -131,6 +138,14 @@ const Login = () => {
               {errors.password && (
                 <p className="mt-1 text-xs text-kc-down">{errors.password}</p>
               )}
+              <p className="mt-2 text-right text-sm">
+                <Link
+                  href="/forgot-password"
+                  className="text-kc-accent hover:underline"
+                >
+                  Quên mật khẩu?
+                </Link>
+              </p>
             </div>
             <Button type="submit" variant="primary" className="w-full" size="lg">
               Đăng nhập

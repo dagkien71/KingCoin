@@ -86,6 +86,16 @@ Trên UI: mở **http://localhost:3000/token/list** — danh sách token gọi `
 
 Đặc tả: [NOTIFICATION_SPEC.md](./NOTIFICATION_SPEC.md). Web Push chỉ hoạt động trên `localhost` hoặc HTTPS. Sau schema notification: `cd backend && npm run db:push`.
 
+## Email SMTP (đăng ký, quên MK, futures)
+
+| Biến | Mô tả |
+|------|--------|
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` | Gmail/ SendGrid / Mailtrap |
+| `MAIL_FROM` | `KingCoin <noreply@…>` |
+| `EMAIL_VERIFICATION_REQUIRED` | `false` = dev bỏ qua chặn login chưa verify |
+
+Không cấu hình SMTP → mã OTP in ra log backend. Chi tiết: [EMAIL_SMTP.md](./EMAIL_SMTP.md). Sau schema `AuthToken`: `cd backend && npm run db:push`.
+
 ## Ghi chú
 
 - Swagger backend: `http://localhost:3001/docs` (có thể cần basic auth theo `swagger` trong config).

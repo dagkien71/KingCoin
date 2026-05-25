@@ -54,6 +54,8 @@ export default class UserEntity implements User {
 
   readonly yearPnLPercent!: number;
 
+  readonly emailVerifiedAt!: Date | null;
+
   readonly createdAt!: Date;
 
   readonly updatedAt!: Date;

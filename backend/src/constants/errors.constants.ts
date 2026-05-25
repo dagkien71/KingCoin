@@ -36,7 +36,10 @@ export const UNAUTHORIZED_RESOURCE = '401000: Unauthorized resource';
 export const INVALID_CREDENTIALS = '401001: Invalid credentials';
 export const INVALID_MFA_CODE = '401002: Invalid one-time code';
 export const INVALID_TOKEN = '401003: Invalid token';
-export const UNVERIFIED_EMAIL = '401004: Email is not verified';
+export const UNVERIFIED_EMAIL =
+  '401004: Email chưa được xác minh. Kiểm tra hộp thư hoặc nhập mã tại trang xác nhận.';
+export const INVALID_VERIFICATION_CODE =
+  '400024: Mã xác nhận không hợp lệ hoặc đã hết hạn.';
 export const UNVERIFIED_LOCATION = '401005: Location is not verified';
 export const MFA_BACKUP_CODE_USED = '401007: Backup code is already used';
 export const INVALID_FCM_TOKEN = '401008: Invalid FCM token';
@@ -81,7 +84,6 @@ export const USER_NOT_FOUND_KC = '404104: Không tìm thấy người dùng';
 export const INSUFFICIENT_KC = '400101: Không đủ KC';
 export const INSUFFICIENT_TOKEN = '400102: Không đủ số dư token';
 export const DUPLICATE_RECORD = '409101: Dữ liệu đã tồn tại';
-export const INVALID_VERIFICATION_CODE = '400024: Invalid verification code';
 export const AUTH_CREDENTIALS_INVALID =
   '400025: Authentication credentials were missing or incorrect';
 export const PHONE_OR_EMAIL_IS_REQUIRED = '400026: Phone or email is required';

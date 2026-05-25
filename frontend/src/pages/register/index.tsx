@@ -63,8 +63,12 @@ export default function Signup() {
     }
 
     if (result) {
-      toast.success("Đăng ký thành công!");
-      router.push("/login");
+      toast.success(
+        "Đăng ký thành công! Kiểm tra email để lấy mã xác nhận."
+      );
+      router.push(
+        `/register/verify?email=${encodeURIComponent(formData.email?.trim() ?? "")}`
+      );
     }
   };
 

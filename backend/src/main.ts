@@ -6,6 +6,9 @@ import { configureApp } from '@common/configure-app';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from '@modules/app/app.module';
+import { join } from 'path';
+import express from 'express';
+import { existsSync, mkdirSync } from 'fs';
 
 async function bootstrap(): Promise<{ port: number }> {
   /**
@@ -31,6 +34,12 @@ async function bootstrap(): Promise<{ port: number }> {
   }
 
   configureApp(app);
+
+  const uploadsDir = join(process.cwd(), 'uploads');
+  if (!existsSync(uploadsDir)) {
+    mkdirSync(uploadsDir, { recursive: true });
+  }
+  app.use('/api/v1/uploads', express.static(uploadsDir));
 
   {
     /**

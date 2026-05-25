@@ -1,3 +1,4 @@
+import { MailService } from '@modules/mail/mail.service';
 import { NotificationService } from '@modules/notification/notification.service';
 import { futuresDeeplink } from '../../common/token-route.util';
 import { LedgerService } from '@modules/ledger/ledger.service';
@@ -101,7 +102,21 @@ export class FuturesEngineService {
     private readonly tradingFees: TradingFeeService,
     private readonly portfolioPnl: PortfolioPnlService,
     private readonly notifications: NotificationService,
+    private readonly mail: MailService,
   ) {}
+
+  private async sendFuturesMail(
+    userId: string,
+    template: 'futures_margin_warning' | 'futures_liquidated',
+    vars: Record<string, string | number | undefined>,
+  ): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+    if (!user?.email) return;
+    void this.mail.send({ to: user.email, template, vars });
+  }
 
   async getMarkPrice(tokenId: string) {
     const markPrice = await this.markPrice.getMarkPrice(tokenId);
@@ -833,6 +848,11 @@ export class FuturesEngineService {
 
     const token = await this.tokenCryptoService.findOne(position.tokenId);
     const sym = token?.symbol ?? token?.name ?? 'token';
+    const liqDeeplink = futuresDeeplink(
+      token?.symbol,
+      token?.name,
+      position.tokenId,
+    );
     await this.notifications.notify({
       userId: position.userId,
       type: NotificationType.FUTURES_LIQUIDATED,
@@ -841,17 +861,20 @@ export class FuturesEngineService {
       body: `${sym} ${position.side} đã bị thanh lý tại ${mark.toFixed(4)} KC`,
       dedupeKey: `FUTURES_LIQUIDATED:${position.id}`,
       payload: {
-        deeplink: futuresDeeplink(
-          token?.symbol,
-          token?.name,
-          position.tokenId,
-        ),
+        deeplink: liqDeeplink,
         positionId: position.id,
         tokenId: position.tokenId,
         symbol: sym,
         markPrice: mark,
         returnKc,
       },
+    });
+    void this.sendFuturesMail(position.userId, 'futures_liquidated', {
+      symbol: sym,
+      side: position.side,
+      markPrice: mark.toFixed(4),
+      returnKc: returnKc.toFixed(2),
+      deeplink: liqDeeplink,
     });
     this.notifications.clearMarginWarning(position.id);
     return true;
@@ -876,6 +899,11 @@ export class FuturesEngineService {
         ) {
           const token = await this.tokenCryptoService.findOne(p.tokenId);
           const sym = token?.symbol ?? token?.name ?? 'token';
+          const warnDeeplink = futuresDeeplink(
+            token?.symbol,
+            token?.name,
+            p.tokenId,
+          );
           await this.notifications.notify({
             userId: p.userId,
             type: NotificationType.FUTURES_MARGIN_WARNING,
@@ -884,16 +912,19 @@ export class FuturesEngineService {
             body: `${sym}: margin ratio ${(ratio * 100).toFixed(2)}% — gần ngưỡng thanh lý`,
             dedupeKey: `FUTURES_MARGIN_WARN:${p.id}`,
             payload: {
-              deeplink: futuresDeeplink(
-                token?.symbol,
-                token?.name,
-                p.tokenId,
-              ),
+              deeplink: warnDeeplink,
               positionId: p.id,
               tokenId: p.tokenId,
               symbol: sym,
               marginRatio: ratio,
             },
+          });
+          void this.sendFuturesMail(p.userId, 'futures_margin_warning', {
+            symbol: sym,
+            side: p.side,
+            marginRatioPct: (ratio * 100).toFixed(2),
+            markPrice: mark.toFixed(4),
+            deeplink: warnDeeplink,
           });
         }
         if (ratio <= cfg.maintenanceRate) {

@@ -1,5 +1,6 @@
 import appConfig from '@config/app.config';
 import jwtConfig from '@config/jwt.config';
+import mailConfig from '@config/mail.config';
 import s3Config from '@config/s3.config';
 import sqsConfig from '@config/sqs.config';
 import swaggerConfig from '@config/swagger.config';
@@ -16,6 +17,7 @@ import { FeesModule } from '@modules/fees/fees.module';
 import { FuturesModule } from '@modules/futures/futures.module';
 import { LedgerModule } from '@modules/ledger/ledger.module';
 import { MarketMakerModule } from '@modules/market-maker/market-maker.module';
+import { MailModule } from '@modules/mail/mail.module';
 import { NotificationModule } from '@modules/notification/notification.module';
 import { OrderModule } from '@modules/order/order.module';
 import { RealtimeModule } from '@modules/realtime/realtime.module';
@@ -38,7 +40,7 @@ import { PrismaModule } from '@providers/prisma/prisma.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, swaggerConfig, jwtConfig, s3Config, sqsConfig],
+      load: [appConfig, swaggerConfig, jwtConfig, mailConfig, s3Config, sqsConfig],
     }),
     PrismaModule.forRoot({
       isGlobal: true,
@@ -74,6 +76,7 @@ import { PrismaModule } from '@providers/prisma/prisma.module';
     CommentModule,
     MarketMakerModule,
     NotificationModule,
+    MailModule,
   ],
   providers: [
     TokenService,
