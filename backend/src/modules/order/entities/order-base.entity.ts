@@ -10,6 +10,10 @@ export enum OrderType {
 
 @Exclude()
 export default class OrderBaseEntity extends PartialType(OrderEntity) {
+  @ApiProperty({ type: String, description: 'Order ID' })
+  @Expose()
+  declare readonly id: string;
+
   @ApiProperty({
     type: String,
     description: 'The ID of the user who created the order',
@@ -64,10 +68,26 @@ export default class OrderBaseEntity extends PartialType(OrderEntity) {
   declare readonly quantity: number;
 
   @ApiProperty({
+    type: Number,
+    description: 'Quantity already matched',
+    example: 0,
+  })
+  @Expose()
+  declare readonly matchedQuantity: number;
+
+  @ApiProperty({
     type: String,
     description: 'The pair of order',
     example: 'BTC/KC',
   })
   @Expose()
   declare readonly pair: string;
+
+  @ApiProperty({ type: Date, description: 'When the order was placed' })
+  @Expose()
+  declare readonly createdAt: Date;
+
+  @ApiProperty({ type: Date, description: 'Last update time' })
+  @Expose()
+  declare readonly updatedAt: Date;
 }

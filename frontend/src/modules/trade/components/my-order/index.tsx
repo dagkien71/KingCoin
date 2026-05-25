@@ -37,18 +37,36 @@ const ORDER_STATUS_LABEL: Record<string, string> = {
   canceled: "Đã hủy",
 };
 
-function formatOrderDateTime(createdAt: IOrder["createdAt"] | undefined) {
-  if (createdAt == null || createdAt === "") {
-    return { date: "—", time: "—" };
+function parseOrderCreatedAt(createdAt: unknown): moment.Moment | null {
+  if (createdAt == null) return null;
+  if (typeof createdAt === "string") {
+    if (createdAt.trim() === "") return null;
+    const m = moment(createdAt);
+    return m.isValid() ? m : null;
   }
-  const m = moment(createdAt);
-  if (!m.isValid()) {
-    return { date: "—", time: "—" };
+  if (createdAt instanceof Date) {
+    const m = moment(createdAt);
+    return m.isValid() ? m : null;
   }
+  if (typeof createdAt === "object" && "$date" in createdAt) {
+    const m = moment(String((createdAt as { $date: unknown }).$date));
+    return m.isValid() ? m : null;
+  }
+  return null;
+}
+
+function formatOrderDateTime(createdAt: unknown) {
+  const m = parseOrderCreatedAt(createdAt);
+  if (!m) return { date: "—", time: "—" };
   return {
     date: m.format("DD/MM/YYYY"),
     time: m.format("HH:mm:ss"),
   };
+}
+
+function orderNum(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
 }
 
 const MyOrder = ({
@@ -206,22 +224,21 @@ const MyOrder = ({
                       {order?.type}
                     </td>
                     <td className="num px-3 py-2">
-                      {formatNumber(order?.quantity)}
+                      {formatNumber(orderNum(order?.quantity))}
                     </td>
                     <td className="num px-3 py-2">
-                      {withQuoteUnit(formatTokenPrice(0, order?.price))}
+                      {withQuoteUnit(formatTokenPrice(0, orderNum(order?.price)))}
                     </td>
                     <td className="num px-3 py-2">
                       {withQuoteUnit(
                         formatTokenPrice(
                           0,
-                          (Number(order?.quantity) || 0) *
-                            (Number(order?.price) || 0)
+                          orderNum(order?.quantity) * orderNum(order?.price)
                         )
                       )}
                     </td>
                     <td className="num px-3 py-2">
-                      {formatNumber(order?.matchedQuantity)}
+                      {formatNumber(orderNum(order?.matchedQuantity))}
                     </td>
                     <td className="px-3 py-2">
                       <button
@@ -242,7 +259,8 @@ const MyOrder = ({
                         {ORDER_STATUS_LABEL[order?.status] ?? order?.status}
                       </div>
                       <div className="num text-kc-muted">
-                        {formatNumber(order?.quantity)}
+                        {formatNumber(orderNum(order?.matchedQuantity))} /{" "}
+                        {formatNumber(orderNum(order?.quantity))}
                       </div>
                     </td>
                     <td className="px-3 py-2 text-sky-400">

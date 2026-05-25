@@ -8,8 +8,8 @@ export interface IOrder {
   quantity: number;
   matchedQuantity: number;
   status: OrderStatus;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | string;
+  updatedAt: Date | string;
 }
 
 export enum ETypeOrder {

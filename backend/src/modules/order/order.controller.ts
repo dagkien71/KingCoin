@@ -171,9 +171,9 @@ export class OrderController {
   }
 
   @Post()
-  @ApiOkBaseResponse({ dto: CreateOrderDto })
+  @ApiOkBaseResponse({ dto: OrderBaseEntity })
   @ApiBody({ type: CreateOrderDto })
-  @Serialize(CreateOrderDto)
+  @Serialize(OrderBaseEntity)
   @ApiBearerAuth()
   @UseGuards(AccessGuard)
   @UseAbility(Actions.create, CreateOrderDto)
