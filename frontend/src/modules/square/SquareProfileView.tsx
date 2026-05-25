@@ -12,6 +12,7 @@ import { useSquareStartConversation } from "@/hooks/useSquareStartConversation";
 import { parseUserSocialLinks } from "@/lib/user-social-links";
 import type { SquarePublicProfile } from "@/types/square.type";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { useMemo, useState } from "react";
 import { HiOutlineArrowLeft, HiOutlineChatAlt2 } from "react-icons/hi";
 
@@ -20,6 +21,9 @@ type Props = {
 };
 
 export function SquareProfileView({ handle }: Props) {
+  const router = useRouter();
+  const highlightPostId =
+    typeof router.query.post === "string" ? router.query.post : null;
   const { isLogin, user } = useAuth();
   const { startWithUser, loading: startingChat } = useSquareStartConversation();
   const [feedBump, setFeedBump] = useState(0);
@@ -140,7 +144,11 @@ export function SquareProfileView({ handle }: Props) {
         <h2 className="mb-3 px-1 text-xs font-semibold uppercase tracking-wider text-kc-muted">
           Bài viết
         </h2>
-        <SquareFeed key={feedBump} feedPath={feedPath} />
+        <SquareFeed
+          key={feedBump}
+          feedPath={feedPath}
+          highlightPostId={highlightPostId}
+        />
       </section>
     </SquareCommunityLayout>
   );

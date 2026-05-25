@@ -33,15 +33,22 @@ export function SquarePanel({
   children,
   className,
   noPadding,
+  id,
+  clip = true,
 }: {
   children: ReactNode;
   className?: string;
   noPadding?: boolean;
+  id?: string;
+  /** false — popup/dropdown trong card không bị cắt (vd menu chia sẻ) */
+  clip?: boolean;
 }) {
   return (
     <div
+      id={id}
       className={cn(
-        "overflow-hidden rounded-2xl border border-kc-border bg-kc-surface/80 shadow-kc-glow backdrop-blur-sm",
+        clip ? "overflow-hidden" : "overflow-visible",
+        "rounded-2xl border border-kc-border bg-kc-surface/80 shadow-kc-glow backdrop-blur-sm",
         !noPadding && "p-4 sm:p-5",
         className
       )}

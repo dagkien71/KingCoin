@@ -453,6 +453,23 @@ export class SquareService {
     return { ok: true };
   }
 
+  async getPublicPost(
+    postId: string,
+    viewer?: User | null,
+  ): Promise<SquarePostItemDto> {
+    const row = await this.repo.findPostById(postId);
+    if (!row || row.status !== SQUARE_VISIBLE) {
+      throw new NotFoundException('Không tìm thấy bài viết');
+    }
+    const withAuthor = (await this.repo.findPosts({
+      where: { id: postId, status: SQUARE_VISIBLE },
+      take: 1,
+      include: { author: { select: authorSelect } },
+    })) as PostWithAuthor[];
+    const [item] = await this.enrichPosts(withAuthor, viewer);
+    return item;
+  }
+
   async getFeed(
     options: { limit?: number; cursor?: string },
     viewer?: User | null,

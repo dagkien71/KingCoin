@@ -57,6 +57,15 @@ export class SquareController {
     );
   }
 
+  @Get('posts/:id')
+  @SkipAuth()
+  async getPost(
+    @Param('id') id: string,
+    @Req() req?: Request & { user?: User },
+  ) {
+    return this.squareService.getPublicPost(id, req?.user ?? null);
+  }
+
   @Post('posts')
   @Throttle(10, 60)
   @ApiBearerAuth()

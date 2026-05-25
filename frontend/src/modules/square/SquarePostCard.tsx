@@ -11,6 +11,7 @@ import {
 } from "@/modules/square/square-utils";
 import { SquareOrderShareCard } from "@/modules/square/SquareOrderShareCard";
 import { SquarePostComments } from "@/modules/square/SquarePostComments";
+import { SquarePostShareMenu } from "@/modules/square/SquarePostShareMenu";
 import {
   SquareAvatar,
   SquareKindBadge,
@@ -41,6 +42,7 @@ type Props = {
   onDeleted?: () => void;
   /** Ẩn nút hồ sơ khi đang xem feed trên chính profile đó */
   hideProfileLink?: boolean;
+  highlighted?: boolean;
 };
 
 export function SquarePostCard({
@@ -48,6 +50,7 @@ export function SquarePostCard({
   onUpdated,
   onDeleted,
   hideProfileLink,
+  highlighted,
 }: Props) {
   const { isLogin, user } = useAuth();
   const isOwnPost =
@@ -102,7 +105,14 @@ export function SquarePostCard({
   const totalReactions = post.reactions.reduce((s, r) => s + r.count, 0);
 
   return (
-    <SquarePanel className="transition hover:border-kc-border-strong">
+    <SquarePanel
+      id={`square-post-${post.id}`}
+      clip={false}
+      className={cn(
+        "transition hover:border-kc-border-strong",
+        highlighted && "ring-2 ring-kc-accent/40"
+      )}
+    >
       <header className="mb-3 flex items-start gap-3">
         <Link href={squareProfilePath(post.author)} className="shrink-0">
           <SquareAvatar author={post.author} />
@@ -221,7 +231,7 @@ export function SquarePostCard({
         </div>
       ) : null}
 
-      <footer className="flex flex-wrap items-center gap-2 border-t border-kc-border/60 pt-3">
+      <footer className="relative z-[1] flex flex-wrap items-center gap-2 border-t border-kc-border/60 pt-3">
         <div className="relative flex items-center gap-1">
           <button
             type="button"
@@ -279,6 +289,8 @@ export function SquarePostCard({
               <span className="num">{r.count}</span>
             </span>
           ))}
+
+        <SquarePostShareMenu post={post} />
 
         {!hideProfileLink && !isOwnPost ? (
           <Link href={squareProfilePath(post.author)} className="ml-auto">

@@ -19,6 +19,7 @@ Square cho phép:
 | Method | Path | Auth |
 |--------|------|------|
 | GET | `/square/feed` | Optional |
+| GET | `/square/posts/:id` | Optional |
 | POST | `/square/posts` | JWT |
 | DELETE | `/square/posts/:id` | JWT (author/admin) |
 | PATCH | `/square/posts/:id/reactions` | JWT |
@@ -59,9 +60,17 @@ Subscribe (user socket + JWT):
 ## Frontend routes
 
 - `/square` — feed + composer
-- `/square/u/[handle]` — profile
+- `/square/posts/[id]` — trang bài (SSR + **Open Graph** cho chia sẻ MXH)
+- `/square/u/[handle]` — profile (`?post=` highlight bài trên hồ sơ)
 - `/square/messages` — inbox
 - `/square/messages/[id]` — thread
+
+## Chia sẻ & OGP
+
+- **Link canonical (OGP):** `https://{APP}/square/posts/{postId}` — crawler đọc `og:title`, `og:description`, `og:image` (ảnh bài hoặc `/og-default.svg`).
+- **Link hồ sơ:** `/square/u/{handle}?post={postId}` — scroll tới bài trên feed profile.
+- **UI:** nút「Chia sẻ」→ copy link, Facebook, X, LinkedIn, Zalo, Web Share API.
+- Env: `NEXT_PUBLIC_APP_URL` (production, vd `https://king-coin-crypto-cex.vercel.app`).
 
 ## Kiểm thử thủ công
 

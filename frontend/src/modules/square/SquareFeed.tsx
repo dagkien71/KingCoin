@@ -11,9 +11,14 @@ import { useCallback, useEffect, useState } from "react";
 
 type Props = {
   feedPath?: string;
+  /** Scroll + highlight bài (từ ?post= trên hồ sơ) */
+  highlightPostId?: string | null;
 };
 
-export function SquareFeed({ feedPath = "/square/feed" }: Props) {
+export function SquareFeed({
+  feedPath = "/square/feed",
+  highlightPostId,
+}: Props) {
   const liveRevision = useSquareFeedLive();
   const [cursor, setCursor] = useState<string | null>(null);
   const [items, setItems] = useState<SquareFeed["items"]>([]);
@@ -59,6 +64,18 @@ export function SquareFeed({ feedPath = "/square/feed" }: Props) {
     }
   }, [liveRevision, cursor, refetch]);
 
+  useEffect(() => {
+    if (!highlightPostId || items.length === 0) return;
+    const el = document.getElementById(`square-post-${highlightPostId}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("ring-2", "ring-kc-accent/50");
+    const t = window.setTimeout(() => {
+      el.classList.remove("ring-2", "ring-kc-accent/50");
+    }, 4000);
+    return () => window.clearTimeout(t);
+  }, [highlightPostId, items]);
+
   if (loading && items.length === 0) {
     return <SquareFeedSkeleton />;
   }
@@ -85,6 +102,7 @@ export function SquareFeed({ feedPath = "/square/feed" }: Props) {
         <SquarePostCard
           key={post.id}
           post={post}
+          highlighted={highlightPostId === post.id}
           onUpdated={refreshFeed}
           onDeleted={refreshFeed}
         />
