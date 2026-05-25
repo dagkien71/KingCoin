@@ -1,11 +1,13 @@
 import useAuth from "@/hooks/useAuth";
+import useLiveFetch from "@/hooks/useLiveFetch";
 import useMutation, { isMutationFailure } from "@/hooks/useMutation";
+import { unwrapPaginatedData } from "@/lib/unwrap-paginated";
 import { ETypeOrder, IOrder, OrderStatus } from "@/types/order.type";
 import { withQuoteUnit } from "@/constants/quote";
 import { formatNumber, formatTokenPrice } from "@/utils/format-number";
 import clsx from "clsx";
 import moment from "moment";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FaChevronRight, FaPlus } from "react-icons/fa";
 import { toast } from "react-toastify";
 
@@ -29,19 +31,32 @@ const SECTIONS: {
   { id: "bots", label: "Bot", placeholder: true },
 ];
 
+const ORDER_STATUS_LABEL: Record<string, string> = {
+  pending: "Chờ khớp",
+  completed: "Đã khớp",
+  canceled: "Đã hủy",
+};
+
 const MyOrder = ({
-  orders,
-  refetch,
+  refetch: refetchParent,
+  onRegisterRefetch,
 }: {
-  orders?: IOrder[];
   refetch?: () => void;
+  /** Gọi một lần khi mount — parent gắn refetch lệnh vào fetchApiAll sau đặt lệnh */
+  onRegisterRefetch?: (refetchOrders: () => void) => void;
 }) => {
   const { mutate } = useMutation("DELETE", "/orders");
-  const { user } = useAuth();
+  const { isLogin } = useAuth();
   const [section, setSection] = useState<OrderSection>("pending");
 
+  const { data: ordersRaw, refetch: refetchOrders, loading } = useLiveFetch<
+    { data: IOrder[] } | IOrder[]
+  >(isLogin ? "/orders" : "", { stream: "trades" });
+
+  const orders = useMemo(() => unwrapPaginatedData(ordersRaw), [ordersRaw]);
+
   const filteredOrders = useMemo(() => {
-    if (!orders?.length) return [];
+    if (!orders.length) return [];
     if (section === "pending") {
       return orders.filter((o) => o.status === OrderStatus.pending);
     }
@@ -54,9 +69,18 @@ const MyOrder = ({
     return [];
   }, [orders, section]);
 
-  const pendingCount =
-    user?.orders?.filter((item) => item?.status === OrderStatus.pending)
-      .length ?? 0;
+  const pendingCount = orders.filter(
+    (item) => item?.status === OrderStatus.pending
+  ).length;
+
+  const refreshOrders = () => {
+    refetchOrders();
+    refetchParent?.();
+  };
+
+  useEffect(() => {
+    onRegisterRefetch?.(refetchOrders);
+  }, [onRegisterRefetch, refetchOrders]);
 
   const handleAdjust = () => {
     toast.info("Điều chỉnh lệnh đang được phát triển.");
@@ -69,9 +93,23 @@ const MyOrder = ({
   const handleCancel = async (idOrder: string) => {
     const ok = await mutate({}, `/orders/${idOrder}`);
     if (!ok || isMutationFailure(ok)) return;
-    refetch?.();
+    refreshOrders();
     toast.success("Huỷ lệnh thành công!");
   };
+
+  if (!isLogin) {
+    return (
+      <p className="py-6 text-center text-sm text-kc-muted">
+        Đăng nhập để xem lệnh spot của bạn.
+      </p>
+    );
+  }
+
+  if (loading && orders.length === 0) {
+    return (
+      <p className="py-6 text-center text-sm text-kc-muted">Đang tải lệnh…</p>
+    );
+  }
 
   return (
     <div className="p-3 text-xs text-kc-fg sm:p-4">
@@ -186,7 +224,7 @@ const MyOrder = ({
                           statusColor[order?.status || OrderStatus.pending]
                         )}
                       >
-                        {order?.status}
+                        {ORDER_STATUS_LABEL[order?.status] ?? order?.status}
                       </div>
                       <div className="num text-kc-muted">
                         {formatNumber(order?.quantity)}

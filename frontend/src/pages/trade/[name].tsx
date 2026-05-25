@@ -205,6 +205,7 @@ function TradeTerminal({
   });
   const { user, isLogin, updateUserInfo } = useAuth();
   const skipFillToastUntilRef = useRef(0);
+  const refetchSpotOrdersRef = useRef<(() => void) | null>(null);
 
   const handleOrderFilled = useCallback(
     (opts?: { silent?: boolean }) => {
@@ -264,7 +265,8 @@ function TradeTerminal({
   const fetchApiAll = useCallback(() => {
     refetchCryptoData();
     void refetchLogData();
-    updateUserInfo();
+    void updateUserInfo();
+    refetchSpotOrdersRef.current?.();
   }, [refetchCryptoData, refetchLogData, updateUserInfo]);
 
   return (
@@ -452,7 +454,12 @@ function TradeTerminal({
               Lệnh của tôi
             </span>
           </div>
-          <MyOrder orders={user?.orders} refetch={fetchApiAll} />
+          <MyOrder
+            refetch={fetchApiAll}
+            onRegisterRefetch={(fn) => {
+              refetchSpotOrdersRef.current = fn;
+            }}
+          />
         </section>
       </div>
     </div>
