@@ -18,7 +18,7 @@ const AccountHeader = () => {
   const pathname = router.pathname;
 
   return (
-    <nav className="fixed left-0 right-0 top-16 z-40 border-b border-kc-border bg-kc-bg/95 backdrop-blur-md">
+    <nav className="fixed left-0 right-0 top-16 z-40 border-b border-kc-border bg-kc-bg shadow-[0_4px_20px_rgba(0,0,0,0.4)] lg:bg-kc-bg/95 lg:backdrop-blur-md lg:shadow-none">
       <div className="mx-auto flex max-w-6xl items-center gap-1 px-4 sm:px-6">
         {ACCOUNT_ROUTE.map((route) => (
           <Link

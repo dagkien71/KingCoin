@@ -74,7 +74,11 @@ export function SquareCommunityLayout({
             </div>
 
             <nav
-              className="rounded-2xl border border-kc-border bg-kc-surface/80 p-2"
+              className={cn(
+                "rounded-2xl border border-kc-border p-2",
+                "max-lg:sticky max-lg:top-16 max-lg:z-30 max-lg:bg-kc-bg max-lg:shadow-[0_4px_20px_rgba(0,0,0,0.35)]",
+                "lg:bg-kc-surface/80"
+              )}
               aria-label="Điều hướng cộng đồng"
             >
               <ul className="space-y-1">

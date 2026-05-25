@@ -82,7 +82,13 @@ export default function Header() {
   };
 
   return (
-    <header className="fixed left-0 right-0 top-0 z-50 border-b border-kc-border bg-kc-bg/90 backdrop-blur-lg">
+    <header
+      className={cn(
+        "fixed left-0 right-0 top-0 z-50 border-b border-kc-border",
+        "bg-kc-bg shadow-[0_4px_24px_rgba(0,0,0,0.45)]",
+        "lg:bg-kc-bg/90 lg:backdrop-blur-lg lg:shadow-none"
+      )}
+    >
       <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6">
         <div className="flex min-w-0 flex-1 items-center gap-8 lg:gap-10">
           <Link href="/" className="group flex shrink-0 items-center gap-2">
@@ -183,8 +189,8 @@ export default function Header() {
             aria-label="Đóng menu"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute right-0 top-0 flex h-full w-[min(100%,20rem)] flex-col border-l border-kc-border bg-kc-elevated shadow-kc animate-fade-in">
-            <div className="flex items-center justify-between border-b border-kc-border px-4 py-4">
+          <div className="absolute right-0 top-0 flex h-full w-[min(100%,20rem)] flex-col border-l border-kc-border bg-kc-bg shadow-kc-glow animate-fade-in">
+            <div className="flex items-center justify-between border-b border-kc-border bg-kc-surface px-4 py-4">
               <span className="font-semibold text-kc-fg">Menu</span>
               <button
                 type="button"
