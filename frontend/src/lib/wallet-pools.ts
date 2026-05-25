@@ -2,7 +2,7 @@ import type { IBalanceSnapshot, WalletPoolId } from "@/types/trade.type";
 
 /** KC khả dụng theo ví — spot dùng cho giao dịch spot, futures cho hợp đồng. */
 export function poolAvailableKc(
-  balances: IBalanceSnapshot | undefined,
+  balances: IBalanceSnapshot | null | undefined,
   pool: WalletPoolId
 ): number {
   if (!balances) return 0;
