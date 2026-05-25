@@ -28,6 +28,7 @@ const NAV = [
   { label: "Thị trường", href: "/token/list", tourId: "nav-markets" },
   { label: "Giao dịch", href: defaultTradeHref(), tourId: "nav-trade" },
   { label: "Futures", href: "/futures", tourId: "nav-futures" },
+  { label: "Cộng đồng", href: "/square", tourId: "nav-square" },
   { label: "Tài sản", href: "/account/dashboard", tourId: "nav-account" },
   { label: "Nhiệm vụ", href: "/quest", tourId: "nav-quest" },
   { label: "Chuyển đổi", href: "/convert", tourId: "nav-convert" },
@@ -41,6 +42,7 @@ function isNavActive(pathname: string, href: string) {
     return pathname.startsWith("/account");
   if (href === "/quest") return pathname.startsWith("/quest");
   if (href === "/convert") return pathname.startsWith("/convert");
+  if (href === "/square") return pathname.startsWith("/square");
   return pathname === href;
 }
 

@@ -10,6 +10,7 @@ import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { PrismaService } from '@providers/prisma';
 
 @WebSocketGateway({
   cors: { origin: '*' },
@@ -24,6 +25,7 @@ export class RealtimeGateway implements OnGatewayConnection {
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async handleConnection(@ConnectedSocket() client: Socket): Promise<void> {
@@ -67,6 +69,30 @@ export class RealtimeGateway implements OnGatewayConnection {
         );
         return;
       }
+    }
+
+    if (channel.startsWith('square:conv:')) {
+      const convId = channel.slice('square:conv:'.length);
+      const userId = client.data.userId as string | undefined;
+      if (!userId || !convId) {
+        this.logger.warn(`Blocked subscribe to ${channel} — no auth`);
+        return;
+      }
+      void this.prisma.squareConversation
+        .findUnique({ where: { id: convId } })
+        .then((conv) => {
+          if (!conv) return;
+          const member =
+            String(conv.participantA) === String(userId) ||
+            String(conv.participantB) === String(userId);
+          if (!member) {
+            this.logger.warn(`Blocked subscribe to ${channel}`);
+            return;
+          }
+          void client.join(channel);
+          this.logger.debug(`Client ${client.id} joined ${channel}`);
+        });
+      return;
     }
 
     void client.join(channel);

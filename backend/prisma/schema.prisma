@@ -46,6 +46,11 @@ model User {
   orders            Order[]
   TokenComment      TokenComment[]
   authTokens        AuthToken[]
+  squarePosts       SquarePost[]
+  squareReactions   SquareReaction[]
+  squarePollVotes   SquarePollVote[]
+  squareMessages    SquareMessage[]
+  squareComments    SquareComment[]
 }
 
 enum AuthTokenPurpose {
@@ -488,6 +493,9 @@ enum NotificationType {
   /** Chỉ gửi admin — user (không phải bot) mở / cộng vị thế futures */
   ADMIN_FUTURES_OPENED
   WALLET_TRANSFER_RECEIVED
+  SQUARE_REACTION
+  SQUARE_DM
+  SQUARE_POLL_ENDED
 }
 
 enum NotificationPriority {
@@ -557,4 +565,113 @@ model NotificationPreference {
   webPushEnabled  Boolean  @default(true)
   disabledTypes   String[] @default([])
   updatedAt       DateTime @default(now()) @updatedAt
+}
+
+/** Square — feed xã hội toàn sàn */
+model SquarePost {
+  id        String           @id @default(auto()) @map("_id") @db.ObjectId
+  authorId  String           @db.ObjectId
+  author    User             @relation(fields: [authorId], references: [id])
+  body      String           @default("")
+  /** text | order_spot | order_futures | poll */
+  kind      String           @default("text")
+  embed     Json?
+  /** URL ảnh đính kèm (upload /api/v1/upload) */
+  imageUrls String[]         @default([])
+  status    String           @default("visible")
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  poll      SquarePoll?
+  reactions SquareReaction[]
+  comments  SquareComment[]
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([authorId, createdAt(sort: Desc)])
+}
+
+model SquareComment {
+  id        String     @id @default(auto()) @map("_id") @db.ObjectId
+  postId    String     @db.ObjectId
+  post      SquarePost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String     @db.ObjectId
+  user      User       @relation(fields: [userId], references: [id])
+  body      String
+  status    String     @default("visible")
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([postId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model SquarePoll {
+  id             String             @id @default(auto()) @map("_id") @db.ObjectId
+  postId         String             @unique @db.ObjectId
+  post           SquarePost         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  multipleChoice Boolean            @default(false)
+  endsAt         DateTime?
+  options        SquarePollOption[]
+  votes          SquarePollVote[]
+}
+
+model SquarePollOption {
+  id        String           @id @default(auto()) @map("_id") @db.ObjectId
+  pollId    String           @db.ObjectId
+  poll      SquarePoll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  label     String
+  sortOrder Int              @default(0)
+  votes     SquarePollVote[]
+}
+
+model SquarePollVote {
+  id        String           @id @default(auto()) @map("_id") @db.ObjectId
+  pollId    String           @db.ObjectId
+  optionId  String           @db.ObjectId
+  userId    String           @db.ObjectId
+  user      User             @relation(fields: [userId], references: [id])
+  poll      SquarePoll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  option    SquarePollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  createdAt DateTime         @default(now())
+
+  @@unique([pollId, userId])
+}
+
+model SquareReaction {
+  id        String     @id @default(auto()) @map("_id") @db.ObjectId
+  postId    String     @db.ObjectId
+  post      SquarePost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String     @db.ObjectId
+  user      User       @relation(fields: [userId], references: [id])
+  emoji     String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([postId, userId])
+  @@index([postId])
+}
+
+model SquareConversation {
+  id            String          @id @default(auto()) @map("_id") @db.ObjectId
+  participantA  String          @db.ObjectId
+  participantB  String          @db.ObjectId
+  lastMessageAt DateTime        @default(now())
+  createdAt     DateTime        @default(now())
+  messages      SquareMessage[]
+
+  @@unique([participantA, participantB])
+  @@index([participantA, lastMessageAt(sort: Desc)])
+  @@index([participantB, lastMessageAt(sort: Desc)])
+}
+
+model SquareMessage {
+  id             String             @id @default(auto()) @map("_id") @db.ObjectId
+  conversationId String             @db.ObjectId
+  conversation   SquareConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String             @db.ObjectId
+  sender         User               @relation(fields: [senderId], references: [id])
+  body           String
+  readAt         DateTime?
+  createdAt      DateTime           @default(now())
+
+  @@index([conversationId, createdAt(sort: Desc)])
 }

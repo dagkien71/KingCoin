@@ -78,4 +78,28 @@ export class RealtimeService {
       payload,
     );
   }
+
+  squareFeedChannel(): string {
+    return 'square:feed';
+  }
+
+  emitSquareFeed(event: string, payload: Record<string, unknown>): void {
+    this.gateway.emitToChannel(this.squareFeedChannel(), event, payload);
+  }
+
+  emitUserSquareEvent(
+    userId: string,
+    event: string,
+    payload: Record<string, unknown>,
+  ): void {
+    this.gateway.emitToChannel(this.userChannel(userId), event, payload);
+  }
+
+  emitToChannel(
+    channel: string,
+    event: string,
+    payload: Record<string, unknown>,
+  ): void {
+    this.gateway.emitToChannel(channel, event, payload);
+  }
 }

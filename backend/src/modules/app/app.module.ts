@@ -12,6 +12,7 @@ import { TokenService } from '@modules/auth/token.service';
 import { CaslModule } from '@modules/casl';
 import HealthModule from '@modules/health/health.module';
 import { CommentModule } from '@modules/comment/comment.module';
+import { SquareModule } from '@modules/square/square.module';
 import { ConvertModule } from '@modules/convert/convert.module';
 import { FeesModule } from '@modules/fees/fees.module';
 import { FuturesModule } from '@modules/futures/futures.module';
@@ -75,6 +76,7 @@ import { PrismaModule } from '@providers/prisma/prisma.module';
     FuturesModule,
     QuestModule,
     CommentModule,
+    SquareModule,
     MarketMakerModule,
     NotificationModule,
     MailModule,

@@ -20,6 +20,18 @@ import {
   HiOutlineShieldCheck,
 } from "react-icons/hi";
 import { toast } from "react-toastify";
+import {
+  UserSocialIconLinks,
+  UserSocialLinksEditor,
+  UserSocialLinksList,
+  userSocialSummary,
+} from "@/modules/account/components/UserSocialLinksBlock";
+import {
+  parseUserSocialLinks,
+  serializeUserSocialLinks,
+  validateUserSocialLinks,
+  type UserSocialLinks,
+} from "@/lib/user-social-links";
 
 function FieldModal({
   open,
@@ -99,8 +111,11 @@ export function AccountProfileView() {
 
   const [editUsername, setEditUsername] = useState(false);
   const [editIntro, setEditIntro] = useState(false);
+  const [editSocial, setEditSocial] = useState(false);
   const [usernameInput, setUsernameInput] = useState("");
   const [introInput, setIntroInput] = useState("");
+  const [socialInput, setSocialInput] = useState<UserSocialLinks>({});
+  const [socialErrors, setSocialErrors] = useState<Record<string, string>>({});
 
   const patchAndRefresh = async (field: Record<string, unknown>) => {
     const body = await patchMe(field);
@@ -112,6 +127,7 @@ export function AccountProfileView() {
   useEffect(() => {
     setUsernameInput(data?.username ?? "");
     setIntroInput(data?.introduction ?? "");
+    setSocialInput(parseUserSocialLinks(data?.socialLinks));
   }, [data]);
 
   const handleChangeAvatar = (avt: string) => {
@@ -183,6 +199,11 @@ export function AccountProfileView() {
                 <p className="mt-0.5 max-w-full truncate text-sm text-kc-muted">
                   {data?.email ?? "—"}
                 </p>
+                <UserSocialIconLinks
+                  socialLinksRaw={data?.socialLinks}
+                  size="sm"
+                  className="mt-3"
+                />
                 <div className="mt-3 flex flex-wrap justify-center gap-1.5">
                   <span
                     className={cn(
@@ -286,6 +307,29 @@ export function AccountProfileView() {
                     <span className="text-kc-muted">Chưa có nội dung.</span>
                   )}
                 </p>
+              </SettingRow>
+
+              <SettingRow
+                label="Mạng xã hội"
+                hint="Website, X, Telegram, Discord…"
+                action={
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    type="button"
+                    onClick={() => {
+                      setSocialInput(parseUserSocialLinks(data?.socialLinks));
+                      setSocialErrors({});
+                      setEditSocial(true);
+                    }}
+                  >
+                    {userSocialSummary(data?.socialLinks) === "Chưa có"
+                      ? "Thêm"
+                      : "Sửa"}
+                  </Button>
+                }
+              >
+                <UserSocialLinksList socialLinksRaw={data?.socialLinks} />
               </SettingRow>
             </CardContent>
           </Card>
@@ -401,6 +445,36 @@ export function AccountProfileView() {
           maxLength={500}
           placeholder="Viết vài dòng về bạn…"
           autoFocus
+        />
+      </FieldModal>
+
+      <FieldModal
+        open={editSocial}
+        title="Mạng xã hội & liên kết"
+        saving={saving}
+        onClose={() => {
+          setEditSocial(false);
+          setSocialErrors({});
+        }}
+        onSave={async () => {
+          const errs = validateUserSocialLinks(socialInput);
+          if (Object.keys(errs).length > 0) {
+            setSocialErrors(errs);
+            toast.error("Kiểm tra lại URL.");
+            return;
+          }
+          await patchAndRefresh({
+            socialLinks: serializeUserSocialLinks(socialInput),
+          });
+          toast.success("Đã cập nhật liên kết");
+          setEditSocial(false);
+          setSocialErrors({});
+        }}
+      >
+        <UserSocialLinksEditor
+          value={socialInput}
+          onChange={setSocialInput}
+          errors={socialErrors}
         />
       </FieldModal>
     </>

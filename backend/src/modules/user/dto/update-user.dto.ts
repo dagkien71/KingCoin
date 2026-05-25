@@ -8,7 +8,6 @@ import {
   IsOptional,
   IsEnum,
   IsArray,
-  ArrayNotEmpty,
   IsNumber,
   IsDateString,
 } from 'class-validator';
@@ -81,7 +80,7 @@ export class UpdateUserDto {
     description: 'Social links of the user',
   })
   @IsArray({ message: 'socialLinks must be an array' })
-  @ArrayNotEmpty({ message: 'socialLinks cannot be empty if provided' })
+  @IsString({ each: true, message: 'each social link must be a string' })
   @IsOptional()
   readonly socialLinks?: string[];
 
