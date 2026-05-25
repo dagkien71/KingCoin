@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useLiveTicker } from "@/context/market-live-context";
 import { applyTickerPatch } from "@/lib/apply-ticker-patch";
 import useFetchApi from "@/hooks/useFetchApi";
+import { unwrapPaginatedData } from "@/lib/unwrap-paginated";
 import useMutation from "@/hooks/useMutation";
 import useAuth from "@/hooks/useAuth";
 import { ITokenCrypto } from "@/types/token.type";
@@ -35,7 +36,10 @@ function useLiveToken(
 const Converter = () => {
   const router = useRouter();
   const { isLogin } = useAuth();
-  const { data: tokens } = useFetchApi<ITokenCrypto[]>("/token-crypto/all");
+  const { data: tokensRaw } = useFetchApi<{ data?: ITokenCrypto[] } | ITokenCrypto[]>(
+    "/token-crypto/all"
+  );
+  const tokens = useMemo(() => unwrapPaginatedData(tokensRaw), [tokensRaw]);
   const { mutate: swap, loading } = useMutation("POST", "/convert/swap");
 
   const [fromTokenId, setFromTokenId] = useState("");

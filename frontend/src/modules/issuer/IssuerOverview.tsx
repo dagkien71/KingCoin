@@ -5,6 +5,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { QUOTE_SYMBOL } from "@/constants/quote";
 import useAuth from "@/hooks/useAuth";
 import useFetchApi from "@/hooks/useFetchApi";
+import {
+  getPaginatedMeta,
+  unwrapPaginatedData,
+  type PaginatedPayload,
+} from "@/lib/unwrap-paginated";
 import { TOKEN_LISTING_FEE_KC, ISSUER_TAGLINE } from "@/modules/issuer/constants";
 import type { ITokenCrypto } from "@/types/token.type";
 import { tokenDetailPath } from "@/lib/token-routes";
@@ -17,26 +22,16 @@ import {
   HiOutlinePlusCircle,
 } from "react-icons/hi";
 
-type PaginatedTokens = {
-  data?: ITokenCrypto[];
-  meta?: { total?: number };
-};
-
-function unwrapTokens(raw: PaginatedTokens | ITokenCrypto[] | null): ITokenCrypto[] {
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw;
-  if (Array.isArray(raw.data)) return raw.data;
-  return [];
-}
-
 export function IssuerOverview() {
   const router = useRouter();
   const { user, isLogin } = useAuth();
-  const { data, loading } = useFetchApi<PaginatedTokens | ITokenCrypto[]>(
-    isLogin ? "/token-crypto" : ""
-  );
-  const tokens = unwrapTokens(data);
-  const tokenCount = tokens.length;
+  const { data, loading } = useFetchApi<
+    PaginatedPayload<ITokenCrypto> | ITokenCrypto[]
+  >(isLogin ? "/token-crypto" : "", {
+    defaultParams: { page: 1, perPage: 20 },
+  });
+  const tokens = unwrapPaginatedData(data);
+  const tokenCount = getPaginatedMeta(data)?.total ?? tokens.length;
 
   const steps = [
     {

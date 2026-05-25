@@ -269,7 +269,11 @@ export function MarketLiveProvider({
           const json = (await res.json()) as
             | ITokenCrypto[]
             | { data?: ITokenCrypto[] };
-          const list = Array.isArray(json) ? json : (json.data ?? []);
+          const list = Array.isArray(json)
+            ? json
+            : Array.isArray(json?.data)
+              ? json.data
+              : [];
           if (list.length > 0) {
             ingestFromTokenList(list);
           }

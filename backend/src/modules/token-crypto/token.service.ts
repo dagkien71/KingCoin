@@ -5,6 +5,7 @@ import { RealtimeService } from '@modules/realtime/realtime.service';
 import { LedgerService } from '@modules/ledger/ledger.service';
 import { UserRepository } from '@modules/user/user.repository';
 import { TokenCryptoRepository } from '@modules/token-crypto/token.repository';
+import { TOKEN_MARKETS_LIST_MAX } from '@modules/token-crypto/token-pagination.util';
 import { TokenCryptoLogService } from '@modules/token-crypto/token-log.service';
 import {
   buildPriceChangePercents,
@@ -229,23 +230,54 @@ export class TokenCryptoService {
    * @param where
    * @param orderBy
    */
-  async findAll(params: {
-    name?: string;
-    orderBy?: Prisma.TokenCryptoOrderByWithRelationInput;
-  }): Promise<PaginatorTypes.PaginatedResult<TokenCrypto>> {
-    const { name, orderBy } = params;
+  private buildTokenListWhere(name?: string): Prisma.TokenCryptoWhereInput {
     const where: Prisma.TokenCryptoWhereInput = {};
-
     if (name) {
       where.OR = [
         { name: { contains: name, mode: 'insensitive' } },
         { symbol: { contains: name, mode: 'insensitive' } },
       ];
     }
+    return where;
+  }
 
-    const result = await this.tokenRepository.findAll(
-      where,
+  /** Toàn bộ mã niêm yết (trần TOKEN_MARKETS_LIST_MAX) — markets, search, convert. */
+  async findAllListed(params: {
+    name?: string;
+    orderBy?: Prisma.TokenCryptoOrderByWithRelationInput;
+  }): Promise<PaginatorTypes.PaginatedResult<TokenCrypto>> {
+    const { name, orderBy } = params;
+    const rows = await this.tokenRepository.findListed(
+      this.buildTokenListWhere(name),
       orderBy ?? { marketCap: 'desc' },
+      TOKEN_MARKETS_LIST_MAX,
+    );
+    const data = withDerivedMarketCapList(rows);
+    const total = data.length;
+    return {
+      data,
+      meta: {
+        total,
+        lastPage: 1,
+        currentPage: 1,
+        perPage: total,
+        prev: null,
+        next: null,
+      },
+    };
+  }
+
+  async findAll(params: {
+    name?: string;
+    orderBy?: Prisma.TokenCryptoOrderByWithRelationInput;
+    page?: number;
+    perPage?: number;
+  }): Promise<PaginatorTypes.PaginatedResult<TokenCrypto>> {
+    const { name, orderBy, page, perPage } = params;
+    const result = await this.tokenRepository.findAll(
+      this.buildTokenListWhere(name),
+      orderBy ?? { marketCap: 'desc' },
+      { page, perPage },
     );
     return {
       ...result,
@@ -262,12 +294,13 @@ export class TokenCryptoService {
     userId: string;
     name?: string;
     orderBy?: Prisma.TokenCryptoOrderByWithRelationInput;
+    page?: number;
+    perPage?: number;
   }): Promise<PaginatorTypes.PaginatedResult<TokenCrypto>> {
-    const { name, orderBy, userId } = params;
+    const { name, orderBy, userId, page, perPage } = params;
     const where: Prisma.TokenCryptoWhereInput = {
       ownerId: userId,
     };
-
     if (name) {
       where.OR = [
         { name: { contains: name, mode: 'insensitive' } },
@@ -278,6 +311,7 @@ export class TokenCryptoService {
     const result = await this.tokenRepository.findAll(
       where,
       orderBy ?? { marketCap: 'desc' },
+      { page, perPage },
     );
     return {
       ...result,

@@ -37,7 +37,9 @@ export function AdminOverview() {
   );
   const { data: tokens } = useFetchApi<
     { data: ITokenCrypto[] } | ITokenCrypto[]
-  >("/admin/token-crypto");
+  >("/admin/token-crypto", {
+    defaultParams: { perPage: 100, orderBy: "marketCap:desc" },
+  });
   const { data: dashboard } = useFetchApi<Dashboard>("/admin/market-control", {
     refreshInterval: 10_000,
   });

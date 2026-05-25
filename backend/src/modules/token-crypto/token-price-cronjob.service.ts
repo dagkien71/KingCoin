@@ -23,7 +23,7 @@ export class TokenPriceCronJobService {
   /** Đồng bộ volume từ log giao dịch thật (khớp lệnh / MM), không mô phỏng ngẫu nhiên */
   @Cron(CronExpression.EVERY_HOUR)
   async syncVolumesFromTradeLogs() {
-    const tokens = await this.tokenCryptoService.findAll({});
+    const tokens = await this.tokenCryptoService.findAllListed({});
 
     await Promise.all(
       (tokens?.data ?? []).map(async (token) => {

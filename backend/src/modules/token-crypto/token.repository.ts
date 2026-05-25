@@ -18,7 +18,7 @@ export class TokenCryptoRepository {
      */
     this.paginate = paginator({
       page: 1,
-      perPage: 10,
+      perPage: 50,
     });
   }
 
@@ -64,10 +64,25 @@ export class TokenCryptoRepository {
   async findAll(
     where: Prisma.TokenCryptoWhereInput,
     orderBy: Prisma.TokenCryptoOrderByWithRelationInput,
+    pagination?: { page?: number; perPage?: number },
   ): Promise<PaginatorTypes.PaginatedResult<TokenCrypto>> {
-    return this.paginate(this.prisma.tokenCrypto, {
+    return this.paginate(
+      this.prisma.tokenCrypto,
+      { where, orderBy },
+      pagination,
+    );
+  }
+
+  /** Một lần lấy tối đa `max` token — dùng cho /token-crypto/all và cron. */
+  async findListed(
+    where: Prisma.TokenCryptoWhereInput,
+    orderBy: Prisma.TokenCryptoOrderByWithRelationInput,
+    max: number,
+  ): Promise<TokenCrypto[]> {
+    return this.prisma.tokenCrypto.findMany({
       where,
       orderBy,
+      take: max,
     });
   }
 

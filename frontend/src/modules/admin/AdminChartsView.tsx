@@ -8,6 +8,7 @@ import {
 } from "@/constants/chart-timeframe";
 import { MarketLiveProvider } from "@/context/market-live-context";
 import useFetchApi from "@/hooks/useFetchApi";
+import { unwrapPaginatedData } from "@/lib/unwrap-paginated";
 import { ADMIN_CHART_CARD_HEIGHT_PX } from "@/constants/admin-charts";
 import { cn } from "@/lib/cn";
 import { isStablecoinToken } from "@/types/stablecoin.type";
@@ -21,18 +22,17 @@ export function AdminChartsView() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [hideStable, setHideStable] = useState(false);
 
-  const { data: tokens, loading, refetch } = useFetchApi<ITokenCrypto[]>(
-    "/token-crypto/all",
-    { refreshInterval: 30_000 }
-  );
+  const { data: tokensRaw, loading, refetch } = useFetchApi<
+    { data?: ITokenCrypto[] } | ITokenCrypto[]
+  >("/token-crypto/all", { refreshInterval: 30_000 });
 
   const list = useMemo(() => {
-    const raw = tokens ?? [];
+    const raw = unwrapPaginatedData(tokensRaw);
     const filtered = hideStable ? raw.filter((t) => !isStablecoinToken(t)) : raw;
     return [...filtered].sort((a, b) =>
       (a.symbol ?? "").localeCompare(b.symbol ?? "")
     );
-  }, [tokens, hideStable]);
+  }, [tokensRaw, hideStable]);
 
   return (
     <MarketLiveProvider>

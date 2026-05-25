@@ -5,11 +5,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { QUOTE_SYMBOL } from "@/constants/quote";
 import useAuth from "@/hooks/useAuth";
 import useFetchApi from "@/hooks/useFetchApi";
+import useAccumulatedPaginated from "@/hooks/useAccumulatedPaginated";
+import { ListLoadMore } from "@/components/ui/ListLoadMore";
+import type { PaginatedPayload } from "@/lib/unwrap-paginated";
 import { TokenIdentity } from "@/components/token/TokenLogo";
 import { tokenDetailPath, tradeHref } from "@/lib/token-routes";
 import type { ITokenCrypto } from "@/types/token.type";
 import Link from "next/link";
 import { useRouter } from "next/router";
+import { useEffect, useState } from "react";
 import { HiOutlinePlusCircle } from "react-icons/hi";
 import type { IListingRequest } from "@/types/listing-request.type";
 import {
@@ -18,22 +22,23 @@ import {
 } from "@/types/listing-request.type";
 import { cn } from "@/lib/cn";
 
-type PaginatedTokens = {
-  data?: ITokenCrypto[];
-};
-
-function unwrapTokens(raw: PaginatedTokens | ITokenCrypto[] | null): ITokenCrypto[] {
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw;
-  if (Array.isArray(raw.data)) return raw.data;
-  return [];
-}
-
 export function IssuerMyTokens() {
   const router = useRouter();
   const { isLogin } = useAuth();
-  const { data, loading } = useFetchApi<PaginatedTokens | ITokenCrypto[]>(
-    isLogin ? "/token-crypto" : ""
+  const [page, setPage] = useState(1);
+  const { data: pagedRaw, loading, setQueryParams } = useFetchApi<
+    PaginatedPayload<ITokenCrypto> | ITokenCrypto[]
+  >(isLogin ? "/token-crypto" : "", {
+    defaultParams: { page: 1, perPage: 20, orderBy: "createdAt:desc" },
+  });
+
+  useEffect(() => {
+    setQueryParams({ page, perPage: 20, orderBy: "createdAt:desc" });
+  }, [page, setQueryParams]);
+
+  const { items: tokens, hasMore, total } = useAccumulatedPaginated(
+    pagedRaw,
+    page
   );
   const { data: requestsRaw, loading: requestsLoading } = useFetchApi<
     IListingRequest[]
@@ -41,15 +46,14 @@ export function IssuerMyTokens() {
   const requests = requestsRaw ?? [];
   const pendingRequests = requests.filter((r) => r.status === "pending");
 
-  const tokens = unwrapTokens(data);
-
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-kc-fg">Token của tôi</h1>
           <p className="mt-1 text-sm text-kc-muted">
-            Token đã lên sàn và yêu cầu niêm yết đang chờ duyệt.
+            Token đã lên sàn và yêu cầu niêm yết đang chờ duyệt
+            {total > 0 ? ` · ${tokens.length}/${total} token` : ""}.
           </p>
         </div>
         <Button
@@ -166,6 +170,12 @@ export function IssuerMyTokens() {
           ))}
         </ul>
       )}
+
+      <ListLoadMore
+        hasMore={hasMore}
+        loading={loading}
+        onLoadMore={() => setPage((p) => p + 1)}
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { QUOTE_SYMBOL } from "@/constants/quote";
 import { useMarketLive } from "@/context/market-live-context";
 import useAuth from "@/hooks/useAuth";
 import useFetchApi from "@/hooks/useFetchApi";
+import { unwrapPaginatedData } from "@/lib/unwrap-paginated";
 import useLiveFetch from "@/hooks/useLiveFetch";
 import { tradeHref } from "@/lib/token-routes";
 import { AllocationDonut } from "@/modules/account/components/AllocationDonut";
@@ -33,7 +34,10 @@ export default function Dashboard() {
   const [hideBalances, setHideBalances] = useState(false);
 
   /** Giá thị trường mọi mã (SLR, …) — không dùng /token-crypto (chỉ token user tạo). */
-  const { data: coins } = useFetchApi<ITokenCrypto[]>("/token-crypto/all");
+  const { data: coinsRaw } = useFetchApi<{ data?: ITokenCrypto[] } | ITokenCrypto[]>(
+    "/token-crypto/all"
+  );
+  const coins = useMemo(() => unwrapPaginatedData(coinsRaw), [coinsRaw]);
   const { data: balances, loading: balancesLoading } =
     useLiveFetch<IBalanceSnapshot>("/users/me/balances", {
       stream: "trades",

@@ -5,6 +5,7 @@ import { TokenIdentity } from "@/components/token/TokenLogo";
 import { QUOTE_SYMBOL, withQuoteUnit } from "@/constants/quote";
 import { useLiveTokenDisplay } from "@/hooks/useLiveTokenDisplay";
 import useFetchApi from "@/hooks/useFetchApi";
+import { unwrapPaginatedData } from "@/lib/unwrap-paginated";
 import { filterSpotTokensForFutures } from "@/lib/futures-markets";
 import { futuresHref, tradeHref } from "@/lib/token-routes";
 import { ITokenCrypto } from "@/types/token.type";
@@ -98,7 +99,10 @@ const SearchForm: React.FC = () => {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [mode, setMode] = useState<MarketMode>("spot");
-  const { data: tokens } = useFetchApi<ITokenCrypto[]>("/token-crypto/all");
+  const { data: tokensRaw } = useFetchApi<{ data?: ITokenCrypto[] } | ITokenCrypto[]>(
+    "/token-crypto/all"
+  );
+  const tokens = useMemo(() => unwrapPaginatedData(tokensRaw), [tokensRaw]);
 
   useEffect(() => {
     if (router.pathname.startsWith("/futures")) {

@@ -24,9 +24,11 @@ import type { IUpcomingListing } from "@/types/upcoming-listing.type";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { unwrapPaginatedData } from "@/lib/unwrap-paginated";
+import { ListLoadMore } from "@/components/ui/ListLoadMore";
 import { debounce } from "lodash";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   HiOutlineArrowRight,
   HiOutlineRefresh,
@@ -35,22 +37,28 @@ import {
 import { TOKEN_ASSET_CATEGORIES } from "@/lib/token-categories";
 import { toast } from "react-toastify";
 
+const MARKETS_TABLE_CHUNK = 50;
+
 export default function MarketsHub() {
   const [category, setCategory] = useState<MarketCategoryId>("all");
   const [assetCategory, setAssetCategory] = useState("all");
   const [searchLocal, setSearchLocal] = useState("");
   const [sortColumn, setSortColumn] = useState("marketCap");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [visibleCount, setVisibleCount] = useState(MARKETS_TABLE_CHUNK);
 
   const { watchList, updateUserInfo, isLogin } = useAuth();
   const {
-    data: coins,
+    data: coinsRaw,
     setQueryParams,
     refetch,
     loading,
-  } = useFetchApi<ITokenCrypto[]>("/token-crypto/all", {
-    defaultParams: { orderBy: `${sortColumn}:${sortDirection}` },
-  });
+  } = useFetchApi<{ data?: ITokenCrypto[] } | ITokenCrypto[]>(
+    "/token-crypto/all",
+    {
+      defaultParams: { orderBy: `${sortColumn}:${sortDirection}` },
+    }
+  );
   const { data: upcomingRaw, loading: upcomingLoading } = useFetchApi<
     IUpcomingListing[]
   >("/token-crypto/upcoming/listings");
@@ -61,7 +69,7 @@ export default function MarketsHub() {
     [setQueryParams]
   );
 
-  const allTokens = coins ?? [];
+  const allTokens = useMemo(() => unwrapPaginatedData(coinsRaw), [coinsRaw]);
 
   const overview = useMemo(
     () => computeMarketOverview(allTokens),
@@ -87,6 +95,16 @@ export default function MarketsHub() {
     }
     return list;
   }, [allTokens, category, assetCategory, watchList, searchLocal]);
+
+  useEffect(() => {
+    setVisibleCount(MARKETS_TABLE_CHUNK);
+  }, [category, assetCategory, searchLocal, sortColumn, sortDirection]);
+
+  const tableTokens = useMemo(
+    () => filteredTokens.slice(0, visibleCount),
+    [filteredTokens, visibleCount]
+  );
+  const tableHasMore = visibleCount < filteredTokens.length;
 
   const handleSort = (column: string) => {
     if (column === "rating" || column === "actions") return;
@@ -267,7 +285,7 @@ export default function MarketsHub() {
           </div>
 
           <MarketTokenTable
-            tokens={filteredTokens}
+            tokens={tableTokens}
             loading={loading}
             sortColumn={sortColumn}
             sortDirection={sortDirection}
@@ -276,8 +294,22 @@ export default function MarketsHub() {
             onToggleWatch={watchCoin}
           />
 
+          <ListLoadMore
+            hasMore={tableHasMore}
+            loading={loading}
+            remaining={filteredTokens.length - visibleCount}
+            onLoadMore={() =>
+              setVisibleCount((c) =>
+                Math.min(c + MARKETS_TABLE_CHUNK, filteredTokens.length)
+              )
+            }
+          />
+
           <p className="text-center text-xs text-kc-muted">
-            Hiển thị {filteredTokens.length} token
+            Hiển thị {tableTokens.length}/{filteredTokens.length} token
+            {allTokens.length !== filteredTokens.length
+              ? ` (tổng sàn ${allTokens.length})`
+              : ""}
             {category !== "all" ? ` · nhóm ${category}` : ""}. Giá cập nhật live.
           </p>
         </div>

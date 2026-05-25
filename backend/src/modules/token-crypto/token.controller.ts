@@ -39,6 +39,7 @@ import { PaginatorTypes } from '@nodeteam/nestjs-prisma-pagination';
 import { Prisma, TokenCrypto, User } from '@prisma/client';
 import { Roles } from '@modules/app/app.roles';
 import { CreateTokenCryptoDto } from './dto/create-token-crypto-dto';
+import { parseTokenListPagination } from './token-pagination.util';
 import { TokenCryptoService } from './token.service';
 import { UpcomingListingService } from './upcoming-listing.service';
 
@@ -73,12 +74,14 @@ export class TokenCryptoController {
     @Query('orderBy', OrderByPipe)
     orderBy?: Prisma.TokenCryptoOrderByWithRelationInput,
   ): Promise<PaginatorTypes.PaginatedResult<TokenCrypto>> {
-    return this.tokenService.findAll({ name, orderBy });
+    return this.tokenService.findAllListed({ name, orderBy });
   }
 
   @Get()
   @ApiQuery({ name: 'name', required: false, type: 'string' })
   @ApiQuery({ name: 'orderBy', required: false, type: 'string' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'perPage', required: false, type: Number })
   @ApiOkBaseResponse({ dto: TokenCryptoBaseEntity, isArray: true })
   @ApiBearerAuth()
   @Serialize(TokenCryptoBaseEntity)
@@ -87,14 +90,22 @@ export class TokenCryptoController {
     @Query('name') name?: string,
     @Query('orderBy', OrderByPipe)
     orderBy?: Prisma.TokenCryptoOrderByWithRelationInput,
+    @Query('page') page?: string,
+    @Query('perPage') perPage?: string,
     @CaslUser() userProxy?: UserProxy<User>,
   ): Promise<PaginatorTypes.PaginatedResult<TokenCrypto>> {
     const tokenUser = await userProxy.get();
     if (!tokenUser?.id) return;
+    const pg = parseTokenListPagination(page, perPage, {
+      perPage: 20,
+      maxPerPage: 50,
+    });
     return this.tokenService.findTokenByUserId({
       name,
       orderBy,
       userId: tokenUser?.id,
+      page: pg.page,
+      perPage: pg.perPage,
     });
   }
 
