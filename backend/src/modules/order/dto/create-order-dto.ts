@@ -3,6 +3,7 @@ import {
   IsEnum,
   IsNotEmpty,
   IsNumber,
+  IsOptional,
   IsPositive,
   IsString,
 } from 'class-validator';
@@ -56,4 +57,13 @@ export class CreateOrderDto {
   @IsPositive({ message: 'quantity phải lớn hơn 0.' })
   @IsNotEmpty({ message: 'quantity không được để trống.' })
   quantity: number;
+
+  /** Client cũ có thể gửi — server tự gán pair từ symbol token, không tin giá trị này. */
+  @ApiProperty({
+    required: false,
+    description: 'Deprecated — ignored; pair is set server-side',
+  })
+  @IsOptional()
+  @IsString()
+  pair?: string;
 }

@@ -35,6 +35,7 @@ import OrderEntity from '@modules/order/entities/order.entity';
 import { OrderByPipe } from '@nodeteam/nestjs-pipes';
 import { PaginatorTypes } from '@nodeteam/nestjs-prisma-pagination';
 import { Order, Prisma, TradeFill, User } from '@prisma/client';
+import { TokenCryptoService } from '@modules/token-crypto/token.service';
 import { CreateOrderDto } from './dto/create-order-dto';
 import { UpdateOrderDto } from './dto/update-order-dto';
 import { OrderService } from './order.service';
@@ -44,7 +45,10 @@ import { OrderService } from './order.service';
 @ApiBaseResponses()
 @Controller('orders')
 export class OrderController {
-  constructor(private readonly orderService: OrderService) {}
+  constructor(
+    private readonly orderService: OrderService,
+    private readonly tokenCryptoService: TokenCryptoService,
+  ) {}
 
   @Get('market-price')
   @SkipAuth()
@@ -180,13 +184,24 @@ export class OrderController {
     const user = await userProxy.get();
     if (!user?.id) return;
     const quote = process.env.QUOTE_DISPLAY_SYMBOL?.trim() || 'KC';
+    let baseSymbol = 'TOKEN';
+    try {
+      const token = await this.tokenCryptoService.findById(
+        createOrderDto.tokenId,
+      );
+      if (token?.symbol?.trim()) {
+        baseSymbol = token.symbol.trim().toUpperCase();
+      }
+    } catch {
+      /* giữ TOKEN nếu không resolve được */
+    }
     const payload: Prisma.OrderCreateInput = {
       tokenId: createOrderDto.tokenId,
       price: createOrderDto.price,
       quantity: createOrderDto.quantity,
       user: { connect: { id: user.id } },
       type: createOrderDto.type as 'buy' | 'sell',
-      pair: `TOKEN/${quote}`,
+      pair: `${baseSymbol}/${quote}`,
     };
     return this.orderService.create(payload);
   }
