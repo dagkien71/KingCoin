@@ -7,6 +7,10 @@ import { PrismaService } from '@providers/prisma';
 
 export type BalanceSnapshot = {
   quoteKc: number;
+  spotKc: number;
+  futuresKc: number;
+  fundingKc: number;
+  walletCode: string | null;
   tokens: { tokenId: string; symbol: string | null; amount: number }[];
 };
 
@@ -71,10 +75,13 @@ export class LedgerService {
 
   async getBalances(userId: string): Promise<BalanceSnapshot> {
     const quoteKc = await this.userRepository.getQuoteBalance(userId);
+    const walletCode = await this.userRepository.ensureWalletCode(userId);
     const balance = await this.prisma.balance.findUnique({
       where: { userId },
       include: { tokens: true },
     });
+    const futuresKc = balance?.futuresKc ?? 0;
+    const fundingKc = balance?.fundingKc ?? 0;
     const quoteId = await this.userRepository.getQuoteTokenId();
     const tokenIds = (balance?.tokens ?? [])
       .filter((t) => t.tokenId !== quoteId && t.amount > 1e-12)
@@ -98,6 +105,13 @@ export class LedgerService {
         amount: t.amount,
       }));
 
-    return { quoteKc, tokens };
+    return {
+      quoteKc,
+      spotKc: quoteKc,
+      futuresKc,
+      fundingKc,
+      walletCode,
+      tokens,
+    };
   }
 }

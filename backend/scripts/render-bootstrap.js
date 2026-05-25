@@ -84,6 +84,12 @@ async function main() {
     await prisma.$disconnect();
   }
 
+  try {
+    run("node scripts/backfill-wallet-codes.js");
+  } catch (e) {
+    console.warn("[bootstrap] backfill-wallet-codes:", e.message || e);
+  }
+
   console.log("[bootstrap] done\n");
 }
 

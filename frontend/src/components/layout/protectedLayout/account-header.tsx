@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 
 const ACCOUNT_ROUTE = [
   { href: "/account/dashboard", name: "Tổng quát" },
+  { href: "/account/transfer", name: "Chuyển ví" },
   { href: "/account/history", name: "Lịch sử" },
   { href: "/account", name: "Thông tin" },
 ] as const;

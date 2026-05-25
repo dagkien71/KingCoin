@@ -24,6 +24,7 @@ import { RealtimeModule } from '@modules/realtime/realtime.module';
 import { QuestModule } from '@modules/quest/quest.module';
 import { TokenCryptoModule } from '@modules/token-crypto/token.module';
 import { UploadModule } from '@modules/upload/upload.module';
+import { WalletModule } from '@modules/wallet/wallet.module';
 import { UserModule } from '@modules/user/user.module';
 import { UserAdminModule } from '@modules/user/user-admin.module';
 import { Module } from '@nestjs/common';
@@ -77,6 +78,7 @@ import { PrismaModule } from '@providers/prisma/prisma.module';
     MarketMakerModule,
     NotificationModule,
     MailModule,
+    WalletModule,
   ],
   providers: [
     TokenService,

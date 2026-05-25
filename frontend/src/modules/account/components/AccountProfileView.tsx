@@ -297,6 +297,37 @@ export function AccountProfileView() {
             <CardContent className="pt-0">
               <SettingRow label="Email">{data?.email ?? "—"}</SettingRow>
               <SettingRow
+                label="Mã ví chuyển KC"
+                hint="Chia sẻ để nhận KC — quản lý tại Chuyển ví"
+                action={
+                  (data as IUser & { walletCode?: string })?.walletCode ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      type="button"
+                      onClick={() => {
+                        const code = (data as IUser & { walletCode?: string })
+                          .walletCode;
+                        if (code) {
+                          void navigator.clipboard?.writeText(code);
+                          toast.success("Đã sao chép mã ví");
+                        }
+                      }}
+                    >
+                      <HiOutlineClipboardCopy className="h-4 w-4" />
+                    </Button>
+                  ) : null
+                }
+              >
+                <code className="font-mono text-sm text-kc-accent">
+                  {(data as IUser & { walletCode?: string })?.walletCode ?? (
+                    <Link href="/account/transfer" className="text-kc-accent underline">
+                      Lấy mã tại Chuyển ví
+                    </Link>
+                  )}
+                </code>
+              </SettingRow>
+              <SettingRow
                 label="ID người dùng"
                 hint="Dùng khi liên hệ hỗ trợ"
                 action={

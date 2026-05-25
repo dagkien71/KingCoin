@@ -14,6 +14,8 @@ export default class UserEntity implements User {
 
   readonly walletAddress!: string | null;
 
+  readonly walletCode!: string | null;
+
   readonly avatar!: string | null;
 
   readonly balance!: number;

@@ -13,6 +13,7 @@ export interface IUser {
   username?: string;
   password: string;
   walletAddress?: string;
+  walletCode?: string | null;
   avatar?: string;
   balance?: number;
   dailyPnL?: number;

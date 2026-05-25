@@ -5,6 +5,7 @@ import {
 import { LedgerService } from '@modules/ledger/ledger.service';
 import { UserRepository } from '@modules/user/user.repository';
 import { Injectable } from '@nestjs/common';
+import { WalletPool } from '@prisma/client';
 
 export type TradingFeeRatesDto = {
   spot: { makerRate: number; takerRate: number };
@@ -71,11 +72,13 @@ export class TradingFeeService {
     refType: string;
     refId: string;
     note: string;
+    wallet?: WalletPool;
   }): Promise<void> {
     const { userId, quoteId, feeKc, refType, refId, note } = params;
+    const wallet = params.wallet ?? WalletPool.spot;
     if (feeKc <= 1e-12) return;
 
-    await this.userRepository.adjustQuoteKcByUserId(userId, -feeKc);
+    await this.userRepository.adjustWalletKc(userId, wallet, -feeKc);
     await this.ledgerService.append({
       userId,
       amount: -feeKc,
@@ -95,11 +98,13 @@ export class TradingFeeService {
     refType: string;
     refId: string;
     note: string;
+    wallet?: WalletPool;
   }): Promise<void> {
     const { userId, quoteId, amountKc, refType, refId, note } = params;
+    const wallet = params.wallet ?? WalletPool.spot;
     if (amountKc <= 1e-12) return;
 
-    await this.userRepository.adjustQuoteKcByUserId(userId, amountKc);
+    await this.userRepository.adjustWalletKc(userId, wallet, amountKc);
     await this.ledgerService.append({
       userId,
       amount: amountKc,

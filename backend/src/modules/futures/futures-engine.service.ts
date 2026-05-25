@@ -36,6 +36,7 @@ import {
   NotificationPriority,
   NotificationType,
   Prisma,
+  WalletPool,
 } from '@prisma/client';
 import { PrismaService } from '@providers/prisma';
 
@@ -300,14 +301,18 @@ export class FuturesEngineService {
     const openFee = this.tradingFees.futuresOpenFee(notional);
     const totalRequired = marginKc + openFee;
 
-    const kc = await this.userRepository.getQuoteBalance(userId);
+    const kc = await this.userRepository.getWalletKc(userId, WalletPool.futures);
     if (kc < totalRequired - 1e-9) {
       throw new BadRequestException(
-        `Không đủ KC. Cần ${totalRequired.toFixed(4)} KC (margin + phí mở), có ${kc.toFixed(4)}.`,
+        `Không đủ KC ví Futures. Cần ${totalRequired.toFixed(4)} KC (margin + phí mở), có ${kc.toFixed(4)}. Chuyển KC sang ví Futures trước.`,
       );
     }
 
-    await this.userRepository.adjustQuoteKcByUserId(userId, -marginKc);
+    await this.userRepository.adjustWalletKc(
+      userId,
+      WalletPool.futures,
+      -marginKc,
+    );
     if (openFee > 0) {
       await this.tradingFees.collectKcFee({
         userId,
@@ -316,6 +321,7 @@ export class FuturesEngineService {
         refType: 'futures_open_fee',
         refId: tokenId,
         note: `Phí mở futures ${token.symbol ?? token.name ?? 'token'} ${side}`,
+        wallet: WalletPool.futures,
       });
     }
 
@@ -447,14 +453,18 @@ export class FuturesEngineService {
     const openFee = this.tradingFees.futuresOpenFee(notional);
     const totalRequired = addMarginKc + openFee;
 
-    const kc = await this.userRepository.getQuoteBalance(userId);
+    const kc = await this.userRepository.getWalletKc(userId, WalletPool.futures);
     if (kc < totalRequired - 1e-9) {
       throw new BadRequestException(
-        `Không đủ KC. Cần ${totalRequired.toFixed(4)} KC (margin + phí mở), có ${kc.toFixed(4)}.`,
+        `Không đủ KC ví Futures. Cần ${totalRequired.toFixed(4)} KC, có ${kc.toFixed(4)}.`,
       );
     }
 
-    await this.userRepository.adjustQuoteKcByUserId(userId, -addMarginKc);
+    await this.userRepository.adjustWalletKc(
+      userId,
+      WalletPool.futures,
+      -addMarginKc,
+    );
     if (openFee > 0) {
       await this.tradingFees.collectKcFee({
         userId,
@@ -463,6 +473,7 @@ export class FuturesEngineService {
         refType: 'futures_open_fee',
         refId: existing.id,
         note: `Phí cộng thêm futures ${token.symbol ?? token.name ?? 'token'} ${side}`,
+        wallet: WalletPool.futures,
       });
     }
 
@@ -648,7 +659,11 @@ export class FuturesEngineService {
     const closeFee = this.tradingFees.futuresCloseFee(closeNotional);
     const returnKc = Math.max(0, grossReturn - closeFee);
 
-    await this.userRepository.adjustQuoteKcByUserId(params.userId, grossReturn);
+    await this.userRepository.adjustWalletKc(
+      params.userId,
+      WalletPool.futures,
+      grossReturn,
+    );
     if (closeFee > 0) {
       await this.tradingFees.collectKcFee({
         userId: params.userId,
@@ -657,6 +672,7 @@ export class FuturesEngineService {
         refType: 'futures_close_fee',
         refId: position.id,
         note: `Phí đóng futures`,
+        wallet: WalletPool.futures,
       });
     }
 
@@ -804,7 +820,11 @@ export class FuturesEngineService {
       closeReturnKc(marginPortion, uPnl) - fee,
     );
 
-    await this.userRepository.adjustQuoteKcByUserId(position.userId, returnKc);
+    await this.userRepository.adjustWalletKc(
+      position.userId,
+      WalletPool.futures,
+      returnKc,
+    );
 
     await this.prisma.futuresPosition.update({
       where: { id: position.id },

@@ -14,6 +14,8 @@ model User {
   username          String?
   password          String
   walletAddress     String?       @unique
+  /** Mã ví chuyển KC giữa tài khoản (vd KC-A1B2C3D4) */
+  walletCode        String?       @unique
   avatar            String?
   balance           Balance?
   balanceId         String?       @db.ObjectId
@@ -69,8 +71,32 @@ model Balance {
   id         String         @id @default(auto()) @map("_id") @db.ObjectId
   user       User           @relation(fields: [userId], references: [id])
   userId     String         @unique @db.ObjectId
-  stableCoin Float          @default(0) // Số dư stable coin
+  stableCoin Float          @default(0) // Số dư stable coin (legacy)
+  futuresKc  Float          @default(0) // Ví Futures — KC khả dụng
+  fundingKc  Float          @default(0) // Ví Funding — KC khả dụng
   tokens     BalanceToken[]
+}
+
+enum WalletPool {
+  spot
+  futures
+  funding
+}
+
+model WalletTransfer {
+  id         String     @id @default(auto()) @map("_id") @db.ObjectId
+  fromUserId String     @db.ObjectId
+  toUserId   String     @db.ObjectId
+  amount     Float
+  fromWallet WalletPool
+  toWallet   WalletPool
+  fromCode   String?
+  toCode     String?
+  note       String?
+  createdAt  DateTime   @default(now())
+
+  @@index([fromUserId, createdAt(sort: Desc)])
+  @@index([toUserId, createdAt(sort: Desc)])
 }
 
 model BalanceToken {
@@ -445,6 +471,7 @@ enum NotificationType {
   PRICE_ALERT
   /** Chỉ gửi admin — user (không phải bot) đặt lệnh spot */
   ADMIN_ORDER_PLACED
+  WALLET_TRANSFER_RECEIVED
 }
 
 enum NotificationPriority {

@@ -3,7 +3,7 @@ import { MarkPriceService } from '@modules/futures/mark-price.service';
 import { UserRepository } from '@modules/user/user.repository';
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { FuturesPositionStatus, FuturesSide } from '@prisma/client';
+import { FuturesPositionStatus, FuturesSide, WalletPool } from '@prisma/client';
 import { PrismaService } from '@providers/prisma';
 import { TRADING_FEES } from '../../common/trading-fees.config';
 
@@ -41,7 +41,10 @@ export class FuturesFundingService {
 
         const batchId = `funding:${Date.now()}`;
         if (pos.side === FuturesSide.long) {
-          const kc = await this.userRepository.getQuoteBalance(pos.userId);
+          const kc = await this.userRepository.getWalletKc(
+            pos.userId,
+            WalletPool.funding,
+          );
           const charge = Math.min(kc, payment);
           if (charge <= 1e-12) continue;
           await this.tradingFees.collectKcFee({
@@ -51,6 +54,7 @@ export class FuturesFundingService {
             refType: 'futures_funding',
             refId: pos.id,
             note: `Funding fee (long) — ${batchId}`,
+            wallet: WalletPool.funding,
           });
         } else {
           await this.tradingFees.creditKc({
@@ -60,6 +64,7 @@ export class FuturesFundingService {
             refType: 'futures_funding',
             refId: pos.id,
             note: `Funding nhận (short) — ${batchId}`,
+            wallet: WalletPool.funding,
           });
         }
         applied += 1;

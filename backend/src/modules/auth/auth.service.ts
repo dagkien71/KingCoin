@@ -35,6 +35,7 @@ import {
   VerifyEmailDto,
 } from './dto/verify-email.dto';
 import { Roles } from '@modules/app/app.roles';
+import { generateWalletCode } from '@common/wallet-code.util';
 import { PrismaService } from '@providers/prisma';
 import * as bcrypt from 'bcrypt';
 
@@ -84,12 +85,14 @@ export class AuthService {
     }
 
     const hashedPassword = await bcrypt.hash(signUpDto.password, 10);
+    const walletCode = await this.uniqueWalletCode();
 
     const newUserData: Prisma.UserCreateInput = {
       email: signUpDto.email,
       password: hashedPassword,
       username: signUpDto.username,
       phone: signUpDto.phone,
+      walletCode,
       walletAddress: this.generateRandomWalletAddress(),
       role: Roles.user,
       avatar: this.getRandomAvatarUrl(signUpDto.username),
@@ -234,6 +237,17 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(dto.password, 10);
     await this.userRepository.update(user.id, { password: hashedPassword });
     return { reset: true };
+  }
+
+  private async uniqueWalletCode(): Promise<string> {
+    for (let i = 0; i < 8; i++) {
+      const code = generateWalletCode();
+      const exists = await this.userRepository.findOne({
+        where: { walletCode: code },
+      });
+      if (!exists) return code;
+    }
+    return generateWalletCode();
   }
 
   private generateRandomWalletAddress(): string {

@@ -32,6 +32,10 @@ export default class UserBaseEntity extends PartialType(UserEntity) {
 
   @ApiProperty({ type: String, nullable: true })
   @Expose()
+  declare readonly walletCode: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  @Expose()
   declare readonly avatar: string | null;
 
   @ApiProperty({ type: Number })

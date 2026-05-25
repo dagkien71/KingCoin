@@ -16,6 +16,8 @@ const LABELS: Record<string, string> = {
   futures_close_fee: "Futures — phí đóng lệnh",
   futures_funding: "Futures — funding fee",
   futures_liquidation: "Futures — thanh lý",
+  wallet_transfer_out: "Chuyển ví — gửi",
+  wallet_transfer_in: "Chuyển ví — nhận",
 };
 
 export function ledgerEntryLabel(

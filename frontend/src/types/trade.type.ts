@@ -10,9 +10,28 @@ export interface ITradeFill {
   createdAt: string;
 }
 
+export type WalletPoolId = "spot" | "futures" | "funding";
+
 export interface IBalanceSnapshot {
   quoteKc: number;
+  spotKc?: number;
+  futuresKc?: number;
+  fundingKc?: number;
+  walletCode?: string | null;
   tokens: { tokenId: string; symbol: string | null; amount: number }[];
+}
+
+export interface IWalletTransfer {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  amount: number;
+  fromWallet: WalletPoolId;
+  toWallet: WalletPoolId;
+  fromCode?: string | null;
+  toCode?: string | null;
+  note?: string | null;
+  createdAt: string;
 }
 
 export interface ILedgerEntry {

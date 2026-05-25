@@ -8,7 +8,12 @@ import {
 import { badRequest } from '@common/errors/app-error.util';
 import { paginator } from '@nodeteam/nestjs-prisma-pagination';
 import { PaginatorTypes } from '@nodeteam/nestjs-prisma-pagination';
-import { Prisma, User } from '@prisma/client';
+import { Prisma, User, WalletPool } from '@prisma/client';
+import {
+  generateWalletCode,
+  isValidWalletCode,
+  normalizeWalletCode,
+} from '@common/wallet-code.util';
 
 @Injectable()
 export class UserRepository {
@@ -350,5 +355,90 @@ export class UserRepository {
         amount,
       },
     });
+  }
+
+  async ensureBalanceRow(userId: string) {
+    let balance = await this.prisma.balance.findUnique({ where: { userId } });
+    if (!balance) {
+      balance = await this.prisma.balance.create({
+        data: { userId, stableCoin: 0, futuresKc: 0, fundingKc: 0 },
+      });
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { balanceId: balance.id },
+      });
+    }
+    return balance;
+  }
+
+  async getWalletKc(userId: string, pool: WalletPool): Promise<number> {
+    if (pool === WalletPool.spot) {
+      return this.getQuoteBalance(userId);
+    }
+    const balance = await this.prisma.balance.findUnique({
+      where: { userId },
+    });
+    if (!balance) return 0;
+    return pool === WalletPool.futures
+      ? balance.futuresKc ?? 0
+      : balance.fundingKc ?? 0;
+  }
+
+  async adjustWalletKc(
+    userId: string,
+    pool: WalletPool,
+    delta: number,
+  ): Promise<void> {
+    if (pool === WalletPool.spot) {
+      await this.adjustQuoteKcByUserId(userId, delta);
+      return;
+    }
+    await this.ensureBalanceRow(userId);
+    const field = pool === WalletPool.futures ? 'futuresKc' : 'fundingKc';
+    const balance = await this.prisma.balance.findUnique({
+      where: { userId },
+    });
+    const current = balance?.[field] ?? 0;
+    const next = current + delta;
+    if (next < -1e-9) {
+      throw badRequest(INSUFFICIENT_KC);
+    }
+    await this.prisma.balance.update({
+      where: { userId },
+      data: { [field]: next },
+    });
+  }
+
+  async findByWalletCode(code: string): Promise<User | null> {
+    const normalized = normalizeWalletCode(code);
+    if (!isValidWalletCode(normalized)) {
+      return null;
+    }
+    return this.prisma.user.findUnique({
+      where: { walletCode: normalized },
+    });
+  }
+
+  async ensureWalletCode(userId: string): Promise<string> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { walletCode: true },
+    });
+    if (user?.walletCode) {
+      return user.walletCode;
+    }
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const code = generateWalletCode();
+      try {
+        const updated = await this.prisma.user.update({
+          where: { id: userId },
+          data: { walletCode: code },
+        });
+        return updated.walletCode ?? code;
+      } catch {
+        /* unique collision */
+      }
+    }
+    throw badRequest('Không tạo được mã ví — thử lại.');
   }
 }
