@@ -471,6 +471,8 @@ enum NotificationType {
   PRICE_ALERT
   /** Chỉ gửi admin — user (không phải bot) đặt lệnh spot */
   ADMIN_ORDER_PLACED
+  /** Chỉ gửi admin — user (không phải bot) mở / cộng vị thế futures */
+  ADMIN_FUTURES_OPENED
   WALLET_TRANSFER_RECEIVED
 }
 

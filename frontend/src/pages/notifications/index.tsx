@@ -13,7 +13,7 @@ export default function NotificationsPage() {
   const { markRead, markAllRead, unreadCount, refresh } =
     useNotificationContext();
   const [items, setItems] = useState<NotificationItem[]>([]);
-  const [filter, setFilter] = useState<"all" | "unread">("all");
+  const [filter, setFilter] = useState<"all" | "unread" | "read">("all");
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -22,6 +22,7 @@ export default function NotificationsPage() {
       const res = await fetchNotifications({
         limit: 50,
         unreadOnly: filter === "unread",
+        readOnly: filter === "read",
       });
       setItems(res.items);
     } finally {
@@ -63,19 +64,26 @@ export default function NotificationsPage() {
         </div>
 
         <div className="mb-4 flex gap-2">
-          {(["all", "unread"] as const).map((f) => (
+          {(
+            [
+              { id: "all", label: "Tất cả" },
+              { id: "unread", label: "Chưa đọc" },
+              { id: "read", label: "Đã đọc" },
+            ] as const
+          ).map((f) => (
             <button
-              key={f}
+              key={f.id}
               type="button"
-              onClick={() => setFilter(f)}
+              onClick={() => setFilter(f.id)}
               className={cn(
                 "rounded-lg px-3 py-1.5 text-sm font-medium",
-                filter === f
+                filter === f.id
                   ? "bg-violet-500/20 text-violet-300"
                   : "text-kc-muted hover:text-kc-fg"
               )}
             >
-              {f === "all" ? "Tất cả" : "Chưa đọc"}
+              {f.label}
+              {f.id === "unread" && unreadCount > 0 ? ` (${unreadCount})` : ""}
             </button>
           ))}
         </div>
@@ -103,7 +111,19 @@ export default function NotificationsPage() {
                 >
                   <div className="flex justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-kc-fg">{item.title}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium text-kc-fg">{item.title}</p>
+                        <span
+                          className={cn(
+                            "rounded px-1.5 py-0.5 text-[10px] font-semibold",
+                            item.readAt
+                              ? "bg-kc-border/60 text-kc-muted"
+                              : "bg-violet-500/20 text-violet-300"
+                          )}
+                        >
+                          {item.readAt ? "Đã đọc" : "Chưa đọc"}
+                        </span>
+                      </div>
                       <p className="text-sm text-kc-muted mt-0.5">{item.body}</p>
                       <p className="text-xs text-kc-muted/70 mt-1">
                         {new Date(item.createdAt).toLocaleString("vi-VN")}

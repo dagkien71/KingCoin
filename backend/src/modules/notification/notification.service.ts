@@ -103,11 +103,17 @@ export class NotificationService {
 
   async list(
     userId: string,
-    opts: { limit?: number; unreadOnly?: boolean; cursor?: string },
+    opts: {
+      limit?: number;
+      unreadOnly?: boolean;
+      readOnly?: boolean;
+      cursor?: string;
+    },
   ): Promise<{ items: NotificationPayload[]; nextCursor: string | null }> {
     const limit = Math.min(opts.limit ?? 30, 100);
     const where: Prisma.NotificationWhereInput = { userId };
     if (opts.unreadOnly) where.readAt = null;
+    else if (opts.readOnly) where.readAt = { not: null };
     if (opts.cursor) {
       where.id = { lt: opts.cursor };
     }

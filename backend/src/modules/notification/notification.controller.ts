@@ -45,12 +45,14 @@ export class NotificationController {
     @CaslUser() userProxy: UserProxy<User>,
     @Query('limit') limit?: string,
     @Query('unreadOnly') unreadOnly?: string,
+    @Query('readOnly') readOnly?: string,
     @Query('cursor') cursor?: string,
   ) {
     const user = await userProxy.get();
     return this.notifications.list(user.id, {
       limit: limit ? Number(limit) : undefined,
       unreadOnly: unreadOnly === 'true',
+      readOnly: readOnly === 'true',
       cursor,
     });
   }

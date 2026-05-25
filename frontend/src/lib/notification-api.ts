@@ -33,11 +33,13 @@ export type PriceAlertRow = {
 export async function fetchNotifications(params?: {
   limit?: number;
   unreadOnly?: boolean;
+  readOnly?: boolean;
   cursor?: string;
 }) {
   const q = new URLSearchParams();
   if (params?.limit) q.set("limit", String(params.limit));
   if (params?.unreadOnly) q.set("unreadOnly", "true");
+  if (params?.readOnly) q.set("readOnly", "true");
   if (params?.cursor) q.set("cursor", params.cursor);
   const suffix = q.toString() ? `?${q}` : "";
   const res = await Api.get<IResponse<NotificationListResult>>(

@@ -70,6 +70,13 @@ export function AdminUserDetail() {
   );
 
   useEffect(() => {
+    const t = router.query.tab;
+    if (typeof t === "string" && TABS.some((x) => x.id === t)) {
+      setTab(t as TabId);
+    }
+  }, [router.query.tab]);
+
+  useEffect(() => {
     if (!userId || tab !== "orders") return;
     setOrderParams(
       orderFilter ? { status: orderFilter, perPage: 50 } : { perPage: 50 }
@@ -191,7 +198,14 @@ export function AdminUserDetail() {
           <button
             key={t.id}
             type="button"
-            onClick={() => setTab(t.id)}
+            onClick={() => {
+              setTab(t.id);
+              void router.replace(
+                { pathname: `/admin/users/${userId}`, query: { tab: t.id } },
+                undefined,
+                { shallow: true }
+              );
+            }}
             className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
               tab === t.id
                 ? "bg-violet-500/20 text-violet-200"

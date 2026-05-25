@@ -1,3 +1,4 @@
+import { isLiquidityBotEmail } from '@common/system-accounts.util';
 import { MailService } from '@modules/mail/mail.service';
 import { NotificationService } from '@modules/notification/notification.service';
 import { futuresDeeplink } from '../../common/token-route.util';
@@ -105,6 +106,57 @@ export class FuturesEngineService {
     private readonly notifications: NotificationService,
     private readonly mail: MailService,
   ) {}
+
+  /** Thông báo admin khi user thật mở / cộng vị thế futures. */
+  private async notifyAdminsFuturesOpened(params: {
+    userId: string;
+    positionId: string;
+    tokenId: string;
+    symbol: string;
+    side: FuturesSide;
+    marginKc: number;
+    size: number;
+    leverage: number;
+    markPrice: number;
+    merged?: boolean;
+    orderId?: string;
+  }): Promise<void> {
+    const user = await this.userRepository.findOne({
+      where: { id: params.userId },
+    });
+    if (!user || isLiquidityBotEmail(user.email, user.username)) {
+      return;
+    }
+
+    const sideLabel = params.side === FuturesSide.long ? 'Long' : 'Short';
+    const who = user.username?.trim() || user.email;
+    const verb = params.merged ? 'Cộng thêm' : 'Mở';
+    const sym = params.symbol;
+
+    await this.notifications.notifyAdmins({
+      type: NotificationType.ADMIN_FUTURES_OPENED,
+      priority: NotificationPriority.normal,
+      title: 'User mở lệnh futures',
+      body: `${who}: ${verb} ${sideLabel} ${sym} — margin ${params.marginKc.toFixed(2)} KC, size ${params.size.toFixed(4)}, ${params.leverage}x @ ${params.markPrice.toFixed(4)} KC`,
+      dedupeKey: params.orderId
+        ? `ADMIN_FUTURES_OPENED:${params.orderId}`
+        : `ADMIN_FUTURES_OPENED:${params.positionId}`,
+      payload: {
+        deeplink: `/admin/users/${params.userId}?tab=futures`,
+        userId: params.userId,
+        userEmail: user.email,
+        positionId: params.positionId,
+        tokenId: params.tokenId,
+        symbol: sym,
+        side: params.side,
+        marginKc: params.marginKc,
+        size: params.size,
+        leverage: params.leverage,
+        markPrice: params.markPrice,
+        merged: params.merged ?? false,
+      },
+    });
+  }
 
   private async sendFuturesMail(
     userId: string,
@@ -340,7 +392,7 @@ export class FuturesEngineService {
       },
     });
 
-    await this.prisma.futuresOrder.create({
+    const openOrder = await this.prisma.futuresOrder.create({
       data: {
         userId,
         positionId: position.id,
@@ -388,6 +440,19 @@ export class FuturesEngineService {
         marginKc,
         size,
       },
+    });
+    await this.notifyAdminsFuturesOpened({
+      userId,
+      positionId: position.id,
+      tokenId,
+      symbol: sym,
+      side,
+      marginKc,
+      size,
+      leverage,
+      markPrice: mark,
+      orderId: openOrder.id,
+      merged: false,
     });
     return {
       position: view,
@@ -500,7 +565,7 @@ export class FuturesEngineService {
       },
     });
 
-    await this.prisma.futuresOrder.create({
+    const addOrder = await this.prisma.futuresOrder.create({
       data: {
         userId,
         positionId: position.id,
@@ -549,6 +614,19 @@ export class FuturesEngineService {
         size: mergedSize,
         merged: true,
       },
+    });
+    await this.notifyAdminsFuturesOpened({
+      userId,
+      positionId: position.id,
+      tokenId,
+      symbol: sym,
+      side,
+      marginKc: addMarginKc,
+      size: addSize,
+      leverage: mergedLev,
+      markPrice: mark,
+      orderId: addOrder.id,
+      merged: true,
     });
 
     return {

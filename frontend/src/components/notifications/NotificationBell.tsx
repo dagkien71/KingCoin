@@ -37,7 +37,19 @@ function ItemRow({
         !item.readAt && "bg-violet-500/10"
       )}
     >
-      <p className="font-medium text-kc-fg line-clamp-1">{item.title}</p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="font-medium text-kc-fg line-clamp-1">{item.title}</p>
+        <span
+          className={cn(
+            "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold",
+            item.readAt
+              ? "bg-kc-border/60 text-kc-muted"
+              : "bg-violet-500/25 text-violet-200"
+          )}
+        >
+          {item.readAt ? "Đã đọc" : "Chưa đọc"}
+        </span>
+      </div>
       <p className="text-xs text-kc-muted line-clamp-2 mt-0.5">{item.body}</p>
       <p className="text-[10px] text-kc-muted/80 mt-1">
         {formatTime(item.createdAt)}
@@ -89,7 +101,14 @@ export default function NotificationBell() {
       {open ? (
         <div className="absolute right-0 top-full z-[60] mt-2 w-[min(100vw-2rem,22rem)] overflow-hidden rounded-xl border border-kc-border bg-kc-bg shadow-xl">
           <div className="flex items-center justify-between border-b border-kc-border px-3 py-2">
-            <span className="text-sm font-semibold text-kc-fg">Thông báo</span>
+            <span className="text-sm font-semibold text-kc-fg">
+              Thông báo
+              {unreadCount > 0 ? (
+                <span className="ml-1.5 font-normal text-violet-400">
+                  ({unreadCount} chưa đọc)
+                </span>
+              ) : null}
+            </span>
             {unreadCount > 0 ? (
               <button
                 type="button"

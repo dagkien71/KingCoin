@@ -989,7 +989,7 @@ export class OrderService {
       body: `${who}: ${side} ${qty.toFixed(4)} ${sym} @ ${price.toFixed(4)} KC — ${statusNote}`,
       dedupeKey: `ADMIN_ORDER_PLACED:${order.id}`,
       payload: {
-        deeplink: `/admin/users/${userId}`,
+        deeplink: `/admin/users/${userId}?tab=orders`,
         orderId: order.id,
         tokenId: order.tokenId,
         symbol: sym,
