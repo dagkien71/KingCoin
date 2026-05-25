@@ -18,6 +18,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "dotenv -e .env.test npm run test:config:e2e",
+    "test:futures-flow": "node scripts/e2e-futures-nav-flow.mjs",
     "test:config:e2e": "jest --config jest-e2e.json --runInBand",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",

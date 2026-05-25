@@ -9,7 +9,8 @@
     "start": "npm run start:all",
     "dev": "npm run dev:all",
     "graphify:update": "graphify update .",
-    "reset:market": "npm run reset:market --prefix backend"
+    "reset:market": "npm run reset:market --prefix backend",
+    "test:futures-flow": "npm run test:futures-flow --prefix backend"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
