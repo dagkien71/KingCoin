@@ -166,6 +166,17 @@ Giá sổ lệnh dao động mỗi chu kỳ refresh (không cố định một m
 
 Mặc định email `marketmaker@kingcoin.local`, mật khẩu seed `mm-dev-change-me` (đổi qua `MARKET_MAKER_PASSWORD` khi chạy script).
 
+## Xử lý sự cố — `/admin/mm-bots` hiện 0 bot, ENV false
+
+1. **Vercel `NEXT_PUBLIC_API_URL`** phải trỏ Render, vd `https://kingcoin-mlnz.onrender.com/api/v1`. Nếu thiếu, web gọi `localhost:3001` → API lỗi → UI hiện `0/0` và env “tắt” dù Render đã set env.
+2. **Render**: sau khi sửa env, bấm **Manual Deploy** (env chỉ áp vào process mới).
+3. **`MARKET_MAKER_ENABLED=true`** trên service **backend** (không phải Vercel). Giá trị không có dấu ngoặc thừa.
+4. **Đăng nhập admin** — `GET /admin/mm-bots` trả 401 nếu không có JWT admin.
+5. **Bootstrap**: log deploy có `[bootstrap] liquidity-bots` / `ensure-liquidity-bots.js` — tạo `mm1@…mm12@`, `flow1@…`.
+6. **Tắt MM trong RAM**: nếu đã tắt tại Điều khiển thị trường, bật lại hoặc restart API (override mất khi restart).
+
+Trang `/admin/mm-bots` (sau deploy mới) có khối **Runtime server** và banner lỗi API nếu gọi sai URL.
+
 ## Lưu ý
 
 - **Giá mid** lấy từ `TokenCrypto.price`; cập nhật giá token (admin / job khác) sẽ ảnh hưởng lượt refresh MM tiếp theo.

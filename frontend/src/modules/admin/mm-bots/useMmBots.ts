@@ -11,7 +11,7 @@ function botPath(email: string, suffix = "") {
 }
 
 export function useMmBots() {
-  const { data, loading, refetch } = useFetchApi<MmBotsDashboard>(
+  const { data, loading, error, refetch } = useFetchApi<MmBotsDashboard>(
     "/admin/mm-bots",
     { refreshInterval: 4000 }
   );
@@ -74,10 +74,16 @@ export function useMmBots() {
   const runningMm = mmBots.filter((b) => b.running).length;
   const runningFlow = flowBots.filter((b) => b.running).length;
 
+  const unconfiguredMm = mmBots.filter((b) => !b.configured).length;
+  const unconfiguredFlow = flowBots.filter((b) => !b.configured).length;
+
   return {
     data,
     loading,
+    error,
     refetch,
+    unconfiguredMm,
+    unconfiguredFlow,
     busyEmail,
     mmBots,
     flowBots,

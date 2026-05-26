@@ -1,5 +1,9 @@
 import { MmControlService } from '@modules/market-maker/mm-control.service';
 import {
+  buildMmEnvDiagnostics,
+  envMmEnabledFromProcess,
+} from '@modules/market-maker/mm-env.util';
+import {
   flowLiquidityEmails,
   mmLiquidityEmails,
 } from '@modules/market-maker/liquidity-bots.util';
@@ -125,6 +129,9 @@ export class MmBotRegistryService {
     globalMmEnabled: boolean;
     globalFlowEnabled: boolean;
     envMmEnabled: boolean;
+    adminOverrideMmEnabled: boolean | null;
+    adminOverrideFlowEnabled: boolean | null;
+    diagnostics: ReturnType<typeof buildMmEnvDiagnostics>;
     bots: MmBotAdminRow[];
   }> {
     const { mm, flow } = this.configuredEmails();
@@ -207,10 +214,14 @@ export class MmBotRegistryService {
       ...flow.map((email) => buildRow(email, 'flow', true)),
     ];
 
+    const global = this.mmControl.getGlobalOverrideSnapshot();
     return {
       globalMmEnabled: this.mmControl.isMmEnabled(),
       globalFlowEnabled: this.mmControl.isFlowEnabled(),
-      envMmEnabled: process.env.MARKET_MAKER_ENABLED === 'true',
+      envMmEnabled: envMmEnabledFromProcess(),
+      adminOverrideMmEnabled: global.mmEnabled ?? null,
+      adminOverrideFlowEnabled: global.flowEnabled ?? null,
+      diagnostics: buildMmEnvDiagnostics({ mm, flow }),
       bots,
     };
   }

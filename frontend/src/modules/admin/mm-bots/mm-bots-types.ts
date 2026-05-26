@@ -17,9 +17,22 @@ export type MmBotRow = {
   refreshCount: number;
 };
 
+export type MmEnvDiagnostics = {
+  nodeEnv: string | null;
+  marketMakerEnabledRaw: string | null;
+  marketFlowEnabledRaw: string | null;
+  marketMakerBotCountRaw: string | null;
+  marketFlowBotCountRaw: string | null;
+  configuredMmEmails: string[];
+  configuredFlowEmails: string[];
+};
+
 export type MmBotsDashboard = {
   globalMmEnabled: boolean;
   globalFlowEnabled: boolean;
   envMmEnabled: boolean;
+  adminOverrideMmEnabled: boolean | null;
+  adminOverrideFlowEnabled: boolean | null;
+  diagnostics: MmEnvDiagnostics;
   bots: MmBotRow[];
 };

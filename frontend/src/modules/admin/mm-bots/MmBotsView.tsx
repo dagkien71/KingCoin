@@ -1,22 +1,35 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { API_URL } from "@/constant/config";
 import { ADMIN_TAGLINE } from "@/modules/admin/constants";
 import { MmBotCard, MmBotsSummaryStat } from "@/modules/admin/mm-bots/MmBotCard";
 import { useMmBots } from "@/modules/admin/mm-bots/useMmBots";
 import Link from "next/link";
 import { HiOutlineTrendingUp } from "react-icons/hi";
 
+function envMmLabel(data: ReturnType<typeof useMmBots>["data"]): string {
+  if (!data) return "—";
+  const raw = data.diagnostics?.marketMakerEnabledRaw;
+  if (raw != null && String(raw).trim()) {
+    return `${data.envMmEnabled ? "bật" : "tắt"} (raw: ${raw})`;
+  }
+  return data.envMmEnabled ? "bật (mặc định dev)" : "tắt (mặc định prod)";
+}
+
 export function MmBotsView() {
   const {
     data,
     loading,
+    error,
     refetch,
     busyEmail,
     mmBots,
     flowBots,
     runningMm,
     runningFlow,
+    unconfiguredMm,
+    unconfiguredFlow,
     setEnabled,
     cancelOrders,
     refreshBot,
@@ -57,6 +70,26 @@ export function MmBotsView() {
         </div>
       </header>
 
+      {error ? (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+          <p className="font-medium">Không tải được dữ liệu bot từ API</p>
+          <p className="mt-1 text-red-100/90">{error}</p>
+          <p className="mt-2 text-xs text-red-100/80">
+            Frontend đang gọi:{" "}
+            <code className="break-all">{API_URL}/admin/mm-bots</code>. Trên
+            Vercel cần{" "}
+            <code className="text-xs">NEXT_PUBLIC_API_URL=https://kingcoin-mlnz.onrender.com/api/v1</code>{" "}
+            rồi redeploy web. Đăng nhập tài khoản <strong>admin</strong>.
+          </p>
+        </div>
+      ) : null}
+
+      {!loading && !error && !data ? (
+        <p className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/90">
+          API không trả dữ liệu — kiểm tra token admin hoặc URL API ở trên.
+        </p>
+      ) : null}
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <MmBotsSummaryStat
           label="MM đang chạy"
@@ -78,11 +111,45 @@ export function MmBotsView() {
         />
         <MmBotsSummaryStat
           label="Env MARKET_MAKER"
-          value={data?.envMmEnabled ? "true" : "false / mặc định"}
+          value={envMmLabel(data)}
         />
       </div>
 
-      {!data?.globalMmEnabled ? (
+      {data?.diagnostics ? (
+        <details className="rounded-lg border border-kc-border/60 bg-kc-surface/40 px-4 py-3 text-xs text-kc-muted">
+          <summary className="cursor-pointer font-medium text-kc-fg">
+            Runtime server (Render)
+          </summary>
+          <ul className="mt-2 space-y-1 font-mono">
+            <li>NODE_ENV: {data.diagnostics.nodeEnv ?? "—"}</li>
+            <li>
+              MARKET_MAKER_ENABLED:{" "}
+              {data.diagnostics.marketMakerEnabledRaw ?? "(không set)"}
+            </li>
+            <li>
+              MARKET_MAKER_BOT_COUNT:{" "}
+              {data.diagnostics.marketMakerBotCountRaw ?? "(mặc định prod=12)"}
+            </li>
+            <li>
+              Cấu hình MM: {data.diagnostics.configuredMmEmails.length} email —{" "}
+              {data.diagnostics.configuredMmEmails.slice(0, 3).join(", ")}
+              {data.diagnostics.configuredMmEmails.length > 3 ? "…" : ""}
+            </li>
+            <li>
+              Cấu hình Flow: {data.diagnostics.configuredFlowEmails.length}{" "}
+              email
+            </li>
+            {data.adminOverrideMmEnabled != null ? (
+              <li className="text-amber-200">
+                Admin override MM: {String(data.adminOverrideMmEnabled)} (từ Điều
+                khiển thị trường — mất khi restart server)
+              </li>
+            ) : null}
+          </ul>
+        </details>
+      ) : null}
+
+      {!data?.globalMmEnabled && data && !error ? (
         <p className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/90">
           MM toàn cục đang tắt — bật tại{" "}
           <Link href="/admin/market-control" className="underline">
@@ -90,6 +157,15 @@ export function MmBotsView() {
           </Link>{" "}
           hoặc set <code className="text-xs">MARKET_MAKER_ENABLED=true</code> trên
           server.
+        </p>
+      ) : null}
+
+      {data && unconfiguredMm + unconfiguredFlow > 0 ? (
+        <p className="rounded-lg border border-violet-500/25 bg-violet-500/10 px-4 py-3 text-sm text-violet-100/90">
+          {unconfiguredMm + unconfiguredFlow} bot chưa có user trong DB — sau
+          deploy Render, bootstrap chạy{" "}
+          <code className="text-xs">ensure-liquidity-bots.js</code>. Xem log
+          deploy hoặc redeploy backend.
         </p>
       ) : null}
 

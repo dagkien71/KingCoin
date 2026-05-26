@@ -15,6 +15,10 @@ import {
 import { PrismaService } from '@providers/prisma';
 import { TokenCrypto } from '@prisma/client';
 import { randomUUID } from 'crypto';
+import {
+  envMmEnabledFromProcess,
+  readEnvFlag,
+} from '@modules/market-maker/mm-env.util';
 import { mmLiquidityEmails } from '@modules/market-maker/liquidity-bots.util';
 import {
   anchorPathParamsToSpot,
@@ -213,11 +217,13 @@ export class MmControlService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  getGlobalOverrideSnapshot(): MmGlobalOverride {
+    return { ...this.globalOverride };
+  }
+
   /** Dev: bật MM mặc định. Production: chỉ khi MARKET_MAKER_ENABLED=true. */
   envMmEnabled(): boolean {
-    if (process.env.MARKET_MAKER_ENABLED === 'false') return false;
-    if (process.env.MARKET_MAKER_ENABLED === 'true') return true;
-    return process.env.NODE_ENV !== 'production';
+    return envMmEnabledFromProcess();
   }
 
   isMmEnabled(): boolean {
@@ -229,7 +235,7 @@ export class MmControlService implements OnModuleInit, OnModuleDestroy {
   isFlowEnabled(): boolean {
     if (this.globalOverride.flowEnabled === false) return false;
     if (this.globalOverride.flowEnabled === true) return true;
-    if (process.env.MARKET_FLOW_ENABLED === 'false') return false;
+    if (readEnvFlag('MARKET_FLOW_ENABLED') === false) return false;
     return this.isMmEnabled();
   }
 
