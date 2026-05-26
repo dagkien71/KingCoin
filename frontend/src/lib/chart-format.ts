@@ -1,14 +1,19 @@
-/** Định dạng trục giá / legend — đồng bộ DbTokenPriceChart. */
+import { resolveTokenPriceFractionDigits } from "@/utils/format-number";
+
+/** Định dạng trục giá / legend — đồng bộ hiển thị giá token. */
 
 export function formatChartPrice(value: number): string {
   if (!Number.isFinite(value)) return "—";
   const abs = Math.abs(value);
   if (abs >= 1_000_000) {
-    return value.toLocaleString("en-US", { maximumFractionDigits: 2 });
+    return value.toLocaleString("vi-VN", { maximumFractionDigits: 2 });
   }
-  if (abs >= 1) return value.toFixed(4);
-  if (abs >= 0.0001) return value.toFixed(6);
-  return value.toFixed(8);
+  const fd = resolveTokenPriceFractionDigits(abs);
+  const rounded = Number(value.toFixed(fd));
+  return rounded.toLocaleString("vi-VN", {
+    minimumFractionDigits: fd,
+    maximumFractionDigits: fd,
+  });
 }
 
 export function formatChartVolume(value: number): string {

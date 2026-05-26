@@ -27,21 +27,52 @@ export function formatMarketCap(number: number | null | undefined): string {
   return `${number.toFixed(2)}${units[unitIndex]} KC`;
 }
 
+/** Số chữ số thập phân chuẩn cho giá token (vd 0,4320). */
+export const TOKEN_PRICE_STANDARD_FRACTION_DIGITS = 4;
+
+/** Giá ≥ ngưỡng này → 4 số sau dấu phẩy; nhỏ hơn → đủ số để không làm tròn về 0. */
+export const TOKEN_PRICE_MICRO_THRESHOLD = 0.0001;
+
+export const TOKEN_PRICE_MAX_FRACTION_DIGITS = 12;
+
 /** Số chữ số thập phân trong ô nhập giá (trade, v.v.). */
-export const INPUT_PRICE_FRACTION_DIGITS = 4;
+export const INPUT_PRICE_FRACTION_DIGITS = TOKEN_PRICE_STANDARD_FRACTION_DIGITS;
+
+/**
+ * Số chữ số sau dấu phẩy khi hiển thị giá token.
+ * - 0,432032… → 4 (0,4320)
+ * - 0,0000001 → đủ chữ số (7)
+ */
+export function resolveTokenPriceFractionDigits(price: number): number {
+  if (!Number.isFinite(price) || price <= 0) {
+    return TOKEN_PRICE_STANDARD_FRACTION_DIGITS;
+  }
+  const abs = Math.abs(price);
+  if (abs >= TOKEN_PRICE_MICRO_THRESHOLD) {
+    return TOKEN_PRICE_STANDARD_FRACTION_DIGITS;
+  }
+  const needed = Math.ceil(-Math.log10(abs));
+  return Math.min(
+    Math.max(needed, TOKEN_PRICE_STANDARD_FRACTION_DIGITS),
+    TOKEN_PRICE_MAX_FRACTION_DIGITS,
+  );
+}
 
 export function roundInputPrice(value: number): number {
   if (!Number.isFinite(value)) return 0;
-  const f = 10 ** INPUT_PRICE_FRACTION_DIGITS;
+  const digits = resolveTokenPriceFractionDigits(value);
+  const f = 10 ** digits;
   return Math.round(value * f) / f;
 }
 
-/** Hiển thị giá trong input — vi-VN, đúng 4 số sau dấu phẩy. */
+/** Hiển thị giá trong input — vi-VN, theo `resolveTokenPriceFractionDigits`. */
 export function formatInputPrice(value: number | null | undefined): string {
   if (value == null || Number.isNaN(Number(value))) return "";
-  return roundInputPrice(Number(value)).toLocaleString("vi-VN", {
-    minimumFractionDigits: INPUT_PRICE_FRACTION_DIGITS,
-    maximumFractionDigits: INPUT_PRICE_FRACTION_DIGITS,
+  const n = Number(value);
+  const digits = resolveTokenPriceFractionDigits(n);
+  return roundInputPrice(n).toLocaleString("vi-VN", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
   });
 }
 
@@ -65,27 +96,30 @@ export function parseInputPrice(raw: string): number | null {
   return Number.isFinite(n) ? roundInputPrice(n) : null;
 }
 
-/** Giá cố định số chữ số thập phân (sổ lệnh, giá tham chiếu). */
-export function formatFixedPrice(decimals: number, price: number): string {
-  if (!Number.isFinite(price) || price < 0) {
-    return "—";
-  }
-  return price.toLocaleString("en-US", {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
+function formatPriceLocale(price: number, fractionDigits: number): string {
+  const rounded = Number(price.toFixed(fractionDigits));
+  return rounded.toLocaleString("vi-VN", {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
   });
 }
 
+/** Giá cố định (sổ lệnh, mark, entry) — 4 số thập phân, trừ giá cực nhỏ. */
+export function formatFixedPrice(_decimals: number, price: number): string {
+  if (!Number.isFinite(price) || price < 0) {
+    return "—";
+  }
+  const fd = resolveTokenPriceFractionDigits(price);
+  return formatPriceLocale(price, fd);
+}
+
 /** Giá spot / mark / entry — luôn ≥ 0. Không dùng cho PnL (có thể âm). */
-export function formatTokenPrice(decimals: number, price: number): string {
+export function formatTokenPrice(_decimals: number, price: number): string {
   if (!Number.isFinite(price) || price < 0) {
     return "Invalid price";
   }
-
-  return price.toLocaleString("en-US", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: decimals,
-  });
+  const fd = resolveTokenPriceFractionDigits(price);
+  return formatPriceLocale(price, fd);
 }
 
 /** PnL, delta KC — cho phép âm (lỗ). */

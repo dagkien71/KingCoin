@@ -7,6 +7,7 @@ import {
   type PriceAlertRow,
 } from "@/lib/notification-api";
 import { Button } from "@/components/ui/button";
+import { formatTokenPrice } from "@/utils/format-number";
 
 type Props = {
   tokenId: string;
@@ -79,7 +80,7 @@ export default function PriceAlertPanel({
       </p>
       {currentPrice != null && currentPrice > 0 ? (
         <p className="text-xs text-kc-muted mb-2">
-          Giá hiện tại: {currentPrice.toFixed(4)} KC
+          Giá hiện tại: {formatTokenPrice(4, currentPrice)} KC
         </p>
       ) : null}
       <div className="flex flex-wrap gap-2 mb-2">
@@ -115,7 +116,7 @@ export default function PriceAlertPanel({
             >
               <span>
                 {a.direction === "above" ? "≥" : "≤"}{" "}
-                {a.targetPrice.toFixed(4)} KC
+                {formatTokenPrice(4, a.targetPrice)} KC
               </span>
               <button
                 type="button"
