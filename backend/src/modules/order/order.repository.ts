@@ -153,8 +153,6 @@ export class OrderRepository {
 
   /**
    * @desc Find pending buy orders for a specific coin
-   * @param tokenId string
-   * @returns Promise<Order[]>
    */
   async findPendingBuyOrders(tokenId: string): Promise<Order[]> {
     return this.prisma.order.findMany({
@@ -167,6 +165,29 @@ export class OrderRepository {
         price: 'desc',
       },
     });
+  }
+
+  /**
+   * Pending orders cho sổ lệnh — fallback không orderBy nếu Mongo/Prisma P2023.
+   */
+  async findPendingOrdersForBook(
+    tokenId: string,
+    type: 'buy' | 'sell',
+  ): Promise<Order[]> {
+    const where = { tokenId, type, status: OrderStatus.pending } as const;
+    try {
+      return type === 'buy'
+        ? await this.findPendingBuyOrders(tokenId)
+        : await this.findPendingSellOrders(tokenId);
+    } catch {
+      const rows = await this.prisma.order.findMany({ where });
+      rows.sort((a, b) =>
+        type === 'buy'
+          ? Number(b.price) - Number(a.price)
+          : Number(a.price) - Number(b.price),
+      );
+      return rows;
+    }
   }
 
   /**

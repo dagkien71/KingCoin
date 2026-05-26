@@ -360,6 +360,8 @@ export class OrderService {
 
   /**
    * Top N mức giá pending mỗi bên — chỉ price/qty (UI sổ lệnh, không trả full Order).
+   * Dùng findPending* (cùng query market-price) rồi sort/slice in-memory — tránh P2023
+   * khi Prisma filter/select gặp document Mongo lệch kiểu.
    */
   async getOrderbookDepth(
     tokenId: string,
@@ -371,33 +373,46 @@ export class OrderService {
     asks: { price: number; quantity: number }[];
   }> {
     const cap = Math.min(50, Math.max(1, Math.floor(levels)));
-    const pending = { status: OrderStatus.pending, quantity: { gt: 0 } };
 
-    const [bidsRaw, asksRaw] = await Promise.all([
-      this.orderRepository.findMany({
-        where: { tokenId, type: 'buy', ...pending },
-        orderBy: { price: 'desc' },
-        take: cap,
-        select: { price: true, quantity: true },
-      }),
-      this.orderRepository.findMany({
-        where: { tokenId, type: 'sell', ...pending },
-        orderBy: { price: 'asc' },
-        take: cap,
-        select: { price: true, quantity: true },
-      }),
+    const [buys, sells] = await Promise.all([
+      this.orderRepository.findPendingOrdersForBook(tokenId, 'buy'),
+      this.orderRepository.findPendingOrdersForBook(tokenId, 'sell'),
     ]);
 
-    const mapRow = (o: { price: unknown; quantity: unknown }) => ({
-      price: Number(o.price),
-      quantity: Number(o.quantity),
-    });
+    const toLevel = (
+      o: Order,
+    ): { price: number; quantity: number } | null => {
+      const price = Number(o.price);
+      const remaining =
+        Number(o.quantity) - Number(o.matchedQuantity ?? 0);
+      if (
+        !Number.isFinite(price) ||
+        price <= 0 ||
+        !Number.isFinite(remaining) ||
+        remaining <= 1e-12
+      ) {
+        return null;
+      }
+      return { price, quantity: remaining };
+    };
+
+    const bids = buys
+      .map(toLevel)
+      .filter((r): r is { price: number; quantity: number } => r != null)
+      .sort((a, b) => b.price - a.price)
+      .slice(0, cap);
+
+    const asks = sells
+      .map(toLevel)
+      .filter((r): r is { price: number; quantity: number } => r != null)
+      .sort((a, b) => a.price - b.price)
+      .slice(0, cap);
 
     return {
       tokenId,
       at: Date.now(),
-      bids: bidsRaw.map(mapRow).filter((r) => r.price > 0 && r.quantity > 0),
-      asks: asksRaw.map(mapRow).filter((r) => r.price > 0 && r.quantity > 0),
+      bids,
+      asks,
     };
   }
 
