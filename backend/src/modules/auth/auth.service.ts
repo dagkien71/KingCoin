@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -29,6 +30,7 @@ import { TokenService } from '@modules/auth/token.service';
 import { NotificationService } from '@modules/notification/notification.service';
 import { ReferralService } from '@modules/referral/referral.service';
 import { MailService } from '@modules/mail/mail.service';
+import type { MailTemplateId, MailTemplateVars } from '@modules/mail/mail.templates';
 import { AuthTokenRepository } from './auth-token.repository';
 import {
   ConfirmEmailChangeDto,
@@ -186,16 +188,12 @@ export class AuthService {
       user.id,
       AuthTokenPurpose.email_verify,
     );
-    await this.mail.send({
-      to: user.email,
-      template: 'email_verify',
-      vars: {
-        code,
-        email: user.email,
-        name: user.username ?? undefined,
-      },
+    const sent = await this.deliverMail(user.email, 'email_verify', {
+      code,
+      email: user.email,
+      name: user.username ?? undefined,
     });
-    return { sent: true };
+    return { sent };
   }
 
   async forgotPassword(dto: ForgotPasswordDto): Promise<{ sent: boolean }> {
@@ -209,12 +207,11 @@ export class AuthService {
       user.id,
       AuthTokenPurpose.password_reset,
     );
-    await this.mail.send({
-      to: user.email,
-      template: 'password_reset',
-      vars: { code, email: user.email },
+    const sent = await this.deliverMail(user.email, 'password_reset', {
+      code,
+      email: user.email,
     });
-    return { sent: true };
+    return { sent };
   }
 
   async resetPassword(dto: ResetPasswordDto): Promise<{ reset: true }> {
@@ -314,6 +311,27 @@ export class AuthService {
     return email.trim().toLowerCase();
   }
 
+  /** Gửi SMTP; `false` khi chưa cấu hình hoặc lỗi — API phải phản ánh `sent`, không luôn `true`. */
+  private async deliverMail(
+    to: string,
+    template: MailTemplateId,
+    vars: MailTemplateVars,
+  ): Promise<boolean> {
+    const sent = await this.mail.send({ to, template, vars });
+    if (!sent) {
+      const code = vars.code != null ? String(vars.code) : '';
+      this.logger.warn(
+        `[auth] Không gửi được mail (${template}) → ${to}` +
+          (code ? ` — mã (chỉ log server): ${code}` : '') +
+          `. SMTP configured=${this.mail.isConfigured()}` +
+          (this.mail.getLastVerifyError()
+            ? ` verifyErr=${this.mail.getLastVerifyError()}`
+            : ''),
+      );
+    }
+    return sent;
+  }
+
   private async assertCurrentPassword(
     user: User,
     currentPassword: string,
@@ -330,7 +348,7 @@ export class AuthService {
   async requestEmailChange(
     userId: string,
     dto: RequestEmailChangeDto,
-  ): Promise<{ pendingEmail: string; sent: true }> {
+  ): Promise<{ pendingEmail: string; sent: boolean }> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException(NOT_FOUND);
@@ -356,20 +374,16 @@ export class AuthService {
       userId,
       AuthTokenPurpose.email_change,
     );
-    await this.mail.send({
-      to: newEmail,
-      template: 'email_change_verify',
-      vars: {
-        code,
-        email: newEmail,
-        name: user.username ?? undefined,
-      },
+    const sent = await this.deliverMail(newEmail, 'email_change_verify', {
+      code,
+      email: newEmail,
+      name: user.username ?? undefined,
     });
 
-    return { pendingEmail: newEmail, sent: true };
+    return { pendingEmail: newEmail, sent };
   }
 
-  async resendEmailChange(userId: string): Promise<{ sent: true }> {
+  async resendEmailChange(userId: string): Promise<{ sent: boolean }> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user?.pendingEmail) {
       throw new BadRequestException(EMAIL_CHANGE_NONE_PENDING);
@@ -379,16 +393,16 @@ export class AuthService {
       userId,
       AuthTokenPurpose.email_change,
     );
-    await this.mail.send({
-      to: user.pendingEmail,
-      template: 'email_change_verify',
-      vars: {
+    const sent = await this.deliverMail(
+      user.pendingEmail,
+      'email_change_verify',
+      {
         code,
         email: user.pendingEmail,
         name: user.username ?? undefined,
       },
-    });
-    return { sent: true };
+    );
+    return { sent };
   }
 
   async confirmEmailChange(

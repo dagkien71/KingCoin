@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import useMutation, { isMutationFailure } from "@/hooks/useMutation";
+import { unwrapMutationPayload } from "@/lib/unwrap-mutation-payload";
 import Link from "next/link";
 import { HiOutlineMail } from "react-icons/hi";
 import { toast } from "react-toastify";
@@ -18,7 +19,14 @@ export function EmailVerificationNotice({ email, onVerified }: Props) {
     if (!email.trim()) return;
     const result = await resend.mutate({ email: email.trim() });
     if (isMutationFailure(result)) return;
-    toast.success("Đã gửi mã 6 số tới email — kiểm tra cả hộp thư spam.");
+    const body = unwrapMutationPayload<{ sent?: boolean }>(result);
+    if (body?.sent === false) {
+      toast.warn(
+        "Server chưa gửi được email (SMTP). Xem log backend `[mail]` hoặc cấu hình Render."
+      );
+    } else {
+      toast.success("Đã gửi mã 6 số tới email — kiểm tra cả hộp thư spam.");
+    }
     onVerified?.();
   };
 

@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import useMutation, { isMutationFailure } from "@/hooks/useMutation";
+import { unwrapMutationPayload } from "@/lib/unwrap-mutation-payload";
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 
@@ -65,7 +66,16 @@ export function ChangeEmailModal({
       currentPassword: password,
     });
     if (isMutationFailure(result)) return;
-    toast.success("Đã gửi mã 6 số tới email mới — kiểm tra cả spam.");
+    const body = unwrapMutationPayload<{ sent?: boolean; pendingEmail?: string }>(
+      result
+    );
+    if (body?.sent === false) {
+      toast.warn(
+        "Đã lưu yêu cầu nhưng server chưa gửi được email (SMTP). Bấm «Gửi lại mã» sau khi admin sửa cấu hình, hoặc xem log Render `[mail]`."
+      );
+    } else {
+      toast.success("Đã gửi mã 6 số tới email mới — kiểm tra cả hộp thư spam.");
+    }
     setStep("code");
     setPassword("");
     onSuccess();
@@ -88,7 +98,13 @@ export function ChangeEmailModal({
 
   const onResend = async () => {
     const result = await resend.mutate({});
-    if (!isMutationFailure(result)) {
+    if (isMutationFailure(result)) return;
+    const body = unwrapMutationPayload<{ sent?: boolean }>(result);
+    if (body?.sent === false) {
+      toast.warn(
+        "Chưa gửi được email — kiểm tra SMTP_HOST/SMTP_USER/SMTP_PASS trên Render và redeploy."
+      );
+    } else {
       toast.success("Đã gửi lại mã tới email mới.");
     }
   };
