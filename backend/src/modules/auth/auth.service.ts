@@ -35,6 +35,7 @@ import {
   VerifyEmailDto,
 } from './dto/verify-email.dto';
 import { Roles } from '@modules/app/app.roles';
+import { SignUpResponseEntity } from '@modules/auth/entities/sign-up-response.entity';
 import { generateWalletCode } from '@common/wallet-code.util';
 import { PrismaService } from '@providers/prisma';
 import * as bcrypt from 'bcrypt';
@@ -75,7 +76,7 @@ export class AuthService {
    * @throws ConflictException - User with this email or phone already exists
    */
 
-  async signUp(signUpDto: SignUpDto): Promise<User> {
+  async signUp(signUpDto: SignUpDto): Promise<SignUpResponseEntity> {
     const existingUser: User = await this.userRepository.findOne({
       where: { email: signUpDto.email },
     });
@@ -117,7 +118,7 @@ export class AuthService {
       user.id,
       AuthTokenPurpose.email_verify,
     );
-    void this.mail.send({
+    const verificationEmailSent = await this.mail.send({
       to: user.email,
       template: 'email_verify',
       vars: {
@@ -126,6 +127,11 @@ export class AuthService {
         name: user.username ?? undefined,
       },
     });
+    if (!verificationEmailSent) {
+      this.logger.error(
+        `Đăng ký ${user.email} — không gửi được email xác minh (kiểm tra SMTP trên Render log)`,
+      );
+    }
 
     if (initialKc > 0) {
       await this.notifications.notify({
@@ -138,7 +144,12 @@ export class AuthService {
         payload: { deeplink: '/wallet', amountKc: initialKc },
       });
     }
-    return user;
+    return {
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      verificationEmailSent,
+    };
   }
 
   async verifyEmail(dto: VerifyEmailDto): Promise<{ verified: true }> {

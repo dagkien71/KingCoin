@@ -11,7 +11,7 @@ import {
   UseAbility,
   UserProxy,
 } from '@modules/casl';
-import UserBaseEntity from '@modules/user/entities/user-base.entity';
+import { SignUpResponseEntity } from '@modules/auth/entities/sign-up-response.entity';
 import { Body, Controller, HttpCode, Post, UseGuards } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
@@ -40,10 +40,10 @@ export class AuthController {
   ) {}
 
   @ApiBody({ type: SignUpDto })
-  @Serialize(UserBaseEntity)
+  @Serialize(SignUpResponseEntity)
   @SkipAuth()
   @Post('register')
-  create(@Body() signUpDto: SignUpDto): Promise<User> {
+  create(@Body() signUpDto: SignUpDto): Promise<SignUpResponseEntity> {
     return this.authService.signUp(signUpDto);
   }
 

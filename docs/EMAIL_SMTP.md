@@ -29,6 +29,16 @@ EMAIL_VERIFICATION_REQUIRED=true
 
 **Dev không có SMTP:** mail in ra log Nest (`[mail:dev]`) — vẫn lấy mã từ console để test `/register/verify`.
 
+## Production (Render) — không nhận email đăng ký
+
+1. **Redeploy** sau khi thêm/sửa env SMTP (env không áp vào process cũ).
+2. Log Render khi start: `[mail] SMTP OK` hoặc `SMTP verify thất bại` — đọc message (sai app password, Gmail chặn IP, v.v.).
+3. `SMTP_USER` = `kienngu752@gmail.com`, `MAIL_FROM` = `KingCoin <kienngu752@gmail.com>` (cùng địa chỉ).
+4. `SMTP_PASS` = **mật khẩu ứng dụng** 16 ký tự, không khoảng trắng, không MK đăng nhập Gmail.
+5. Kiểm tra **Spam / Quảng cáo**; thử đăng ký email khác (Gmail → Gmail thường ổn hơn).
+6. API đăng ký trả `verificationEmailSent: false` → SMTP lỗi; dùng `POST /auth/resend-verification` sau khi sửa env.
+7. Render free đôi khi bị Gmail từ chối IP datacenter — cân nhắc [Resend](https://resend.com), SendGrid, hoặc Mailtrap cho production.
+
 **Tài khoản cũ:** đăng nhập lần đầu không có mã verify đang chờ → tự gán `emailVerifiedAt` (không khóa user cũ).
 
 ## API auth mới

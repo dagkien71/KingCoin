@@ -64,9 +64,23 @@ export default function Signup() {
     }
 
     if (result) {
-      toast.success(
-        "Đăng ký thành công! Kiểm tra email để lấy mã xác nhận."
-      );
+      const sent =
+        typeof result === "object" &&
+        result !== null &&
+        "verificationEmailSent" in result
+          ? Boolean(
+              (result as { verificationEmailSent?: boolean }).verificationEmailSent
+            )
+          : true;
+      if (sent) {
+        toast.success(
+          "Đăng ký thành công! Kiểm tra email (cả hộp thư spam) để lấy mã 6 số."
+        );
+      } else {
+        toast.warn(
+          "Đăng ký thành công nhưng server chưa gửi được email. Vào trang xác nhận và bấm «Gửi lại mã», hoặc kiểm tra SMTP trên Render."
+        );
+      }
       router.push(
         `/register/verify?email=${encodeURIComponent(formData.email?.trim() ?? "")}`
       );
