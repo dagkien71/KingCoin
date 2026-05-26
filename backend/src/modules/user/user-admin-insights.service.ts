@@ -61,7 +61,11 @@ export class UserAdminInsightsService {
     const balances = await this.ledgerService.getBalances(userId);
     const stats = await this.computeStats(userId, balances.quoteKc);
 
-    const accountTags = resolveUserAccountTags(user.email, user.username);
+    const accountTags = resolveUserAccountTags(
+      user.email,
+      user.username,
+      (user as User & { accountTags?: string[] }).accountTags ?? [],
+    );
     return {
       user: { ...user, accountTags },
       stats,
@@ -72,7 +76,14 @@ export class UserAdminInsightsService {
 
   async findUserOrThrow(userId: string): Promise<User> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user || isLiquidityBotEmail(user.email, user.username)) {
+    if (
+      !user ||
+      isLiquidityBotEmail(
+        user.email,
+        user.username,
+        (user as User & { accountTags?: string[] }).accountTags ?? [],
+      )
+    ) {
       throw new NotFoundException(`User ${userId} not found`);
     }
     return user;

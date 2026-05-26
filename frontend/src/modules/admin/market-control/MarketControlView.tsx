@@ -33,7 +33,11 @@ export function MarketControlView() {
         <p className="mt-2 max-w-2xl text-sm text-kc-muted">{ADMIN_TAGLINE}</p>
         <p className="mt-2 text-xs text-kc-muted">
           Bàn nhanh theo % ở cột phải; preset PP1/PP2 và tùy chỉnh bên dưới. Dữ
-          liệu làm mới mỗi 5 giây.
+          liệu làm mới mỗi 5 giây. Quản lý từng bot MM:{" "}
+          <a href="/admin/mm-bots" className="text-violet-300 hover:underline">
+            /admin/mm-bots
+          </a>
+          .
         </p>
       </header>
 

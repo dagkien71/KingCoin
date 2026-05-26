@@ -4,6 +4,7 @@ import { TokenCryptoService } from '@modules/token-crypto/token.service';
 import { MmControlService } from '@modules/market-maker/mm-control.service';
 import { pathBookRefreshMinPct } from '@modules/market-maker/orderbook-path.util';
 import { MarketFlowService } from '@modules/market-maker/market-flow.service';
+import { MmBotRegistryService } from '@modules/market-maker/mm-bot-registry.service';
 import { mmLiquidityEmails } from '@modules/market-maker/liquidity-bots.util';
 import {
   isQuoteToken,
@@ -37,11 +38,60 @@ export class MarketMakerService implements OnModuleInit {
     private readonly mmControl: MmControlService,
     private readonly tokenCryptoService: TokenCryptoService,
     private readonly marketFlow: MarketFlowService,
+    private readonly mmBotRegistry: MmBotRegistryService,
   ) {}
 
   /** Gọi từ admin — refresh sổ lệnh mọi token MM. */
   async triggerRefresh(): Promise<void> {
     await this.refreshLiquidity();
+  }
+
+  /** Refresh một bot MM (admin). */
+  async triggerRefreshForBot(email: string): Promise<void> {
+    if (!this.mmControl.isMmEnabled()) return;
+    const user = await this.prisma.user.findFirst({ where: { email } });
+    if (!user || !this.mmBotRegistry.isBotEnabled(email, 'mm')) return;
+
+    const enabledUsers = await this.resolveMmUsers();
+    const mmIndex = enabledUsers.findIndex((u) => u.id === user.id);
+    if (mmIndex < 0) return;
+    const mmTotal = enabledUsers.length;
+
+    const tokenNames = new Set(await resolveMmTargetTokenNames(this.prisma));
+    for (const id of this.mmControl.getOverrideTokenIds()) {
+      const t = await this.prisma.tokenCrypto.findUnique({
+        where: { id },
+        select: { name: true, tokenKind: true },
+      });
+      if (t?.name && !isQuoteToken(t)) tokenNames.add(t.name);
+    }
+
+    for (const tokenName of tokenNames) {
+      const token = await this.prisma.tokenCrypto.findFirst({
+        where: { name: tokenName },
+      });
+      if (!token?.id || isQuoteToken(token)) continue;
+      if (this.mmControl.isTokenPaused(token.id)) continue;
+      const params = this.mmControl.resolveParams(token.id);
+      try {
+        await this.mmBotRegistry.cancelPendingOrdersForUser(user.id, token.id);
+        await this.refreshLiquidityForToken(
+          user,
+          token,
+          params,
+          mmIndex,
+          mmTotal,
+        );
+        this.mmBotRegistry.recordRefresh(user.id, true);
+      } catch (e) {
+        this.mmBotRegistry.recordRefresh(
+          user.id,
+          false,
+          (e as Error).message,
+        );
+        throw e;
+      }
+    }
   }
 
   /** Refresh MM chỉ một token (theo id). */
@@ -63,14 +113,25 @@ export class MarketMakerService implements OnModuleInit {
       return;
     }
     const params = this.mmControl.resolveParams(token.id);
-    await this.cancelPendingOrdersForToken(token.id);
+    await this.pruneDisabledBotOrders(token.id);
     const n = mmUsers.length;
     for (let i = 0; i < n; i++) {
-      await this.refreshLiquidityForToken(mmUsers[i], token, params, i, n);
+      const user = mmUsers[i];
+      try {
+        await this.mmBotRegistry.cancelPendingOrdersForUser(user.id, token.id);
+        await this.refreshLiquidityForToken(user, token, params, i, n);
+        this.mmBotRegistry.recordRefresh(user.id, true);
+      } catch (e) {
+        this.mmBotRegistry.recordRefresh(
+          user.id,
+          false,
+          (e as Error).message,
+        );
+      }
     }
   }
 
-  private async resolveMmUsers(): Promise<User[]> {
+  private async resolveAllMmUsers(): Promise<User[]> {
     const emails = mmLiquidityEmails();
     const rows = await this.prisma.user.findMany({
       where: { email: { in: emails } },
@@ -79,6 +140,20 @@ export class MarketMakerService implements OnModuleInit {
     return emails
       .map((e) => byEmail.get(e))
       .filter((u): u is User => !!u);
+  }
+
+  private async resolveMmUsers(): Promise<User[]> {
+    const all = await this.resolveAllMmUsers();
+    return all.filter((u) => this.mmBotRegistry.isBotEnabled(u.email, 'mm'));
+  }
+
+  private async pruneDisabledBotOrders(tokenId: string): Promise<void> {
+    const all = await this.resolveAllMmUsers();
+    for (const user of all) {
+      if (!this.mmBotRegistry.isBotEnabled(user.email, 'mm')) {
+        await this.mmBotRegistry.cancelPendingOrdersForUser(user.id, tokenId);
+      }
+    }
   }
 
   private multiMidStep(): number {
@@ -215,16 +290,30 @@ export class MarketMakerService implements OnModuleInit {
         }
         anyToken = true;
         const params = this.mmControl.resolveParams(token.id);
-        await this.cancelPendingOrdersForToken(token.id);
+        await this.pruneDisabledBotOrders(token.id);
         const n = mmUsers.length;
         for (let i = 0; i < n; i++) {
-          await this.refreshLiquidityForToken(
-            mmUsers[i],
-            token,
-            params,
-            i,
-            n,
-          );
+          const user = mmUsers[i];
+          try {
+            await this.mmBotRegistry.cancelPendingOrdersForUser(
+              user.id,
+              token.id,
+            );
+            await this.refreshLiquidityForToken(
+              user,
+              token,
+              params,
+              i,
+              n,
+            );
+            this.mmBotRegistry.recordRefresh(user.id, true);
+          } catch (e) {
+            this.mmBotRegistry.recordRefresh(
+              user.id,
+              false,
+              (e as Error).message,
+            );
+          }
         }
       }
 

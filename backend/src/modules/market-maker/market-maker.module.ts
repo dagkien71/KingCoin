@@ -5,6 +5,8 @@ import { TokenCryptoModule } from '@modules/token-crypto/token.module';
 import { Module, forwardRef } from '@nestjs/common';
 import { BotInventoryModule } from './bot-inventory.module';
 import { permissions } from './market-maker.permissions';
+import { MmBotsAdminController } from './mm-bots-admin.controller';
+import { MmBotRegistryService } from './mm-bot-registry.service';
 import { MarketControlAdminController } from './market-control-admin.controller';
 import { MarketFlowService } from './market-flow.service';
 import { MarketMakerService } from './market-maker.service';
@@ -20,8 +22,9 @@ import { OrderbookPathService } from './orderbook-path.service';
     RealtimeModule,
     BotInventoryModule,
   ],
-  controllers: [MarketControlAdminController],
+  controllers: [MarketControlAdminController, MmBotsAdminController],
   providers: [
+    MmBotRegistryService,
     MmControlService,
     MarketMakerService,
     MarketFlowService,
@@ -29,6 +32,7 @@ import { OrderbookPathService } from './orderbook-path.service';
     OrderbookPathService,
   ],
   exports: [
+    MmBotRegistryService,
     MmInstantFillService,
     MmControlService,
     MarketMakerService,

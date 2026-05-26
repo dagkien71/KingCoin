@@ -84,13 +84,21 @@ export class UserAdminController {
 
     const result = await this.userService.findAll(mergedWhere, orderBy);
     const traders = result.data.filter((u) =>
-      isTraderAccountEmail(u.email, u.username),
+      isTraderAccountEmail(
+        u.email,
+        u.username,
+        (u as User & { accountTags?: string[] }).accountTags ?? [],
+      ),
     );
     return {
       ...result,
       data: traders.map((u) => ({
         ...u,
-        accountTags: resolveUserAccountTags(u.email, u.username),
+        accountTags: resolveUserAccountTags(
+          u.email,
+          u.username,
+          (u as User & { accountTags?: string[] }).accountTags ?? [],
+        ),
       })),
       meta: {
         ...result.meta,

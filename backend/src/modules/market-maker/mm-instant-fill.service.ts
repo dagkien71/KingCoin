@@ -6,6 +6,7 @@ import {
   liquidityBotEmails,
   mmLiquidityEmails,
 } from '@modules/market-maker/liquidity-bots.util';
+import { MmBotRegistryService } from '@modules/market-maker/mm-bot-registry.service';
 import { PrismaService } from '@providers/prisma';
 
 /**
@@ -23,6 +24,7 @@ export class MmInstantFillService {
     private readonly orderService: OrderService,
     private readonly prisma: PrismaService,
     private readonly tokenCryptoService: TokenCryptoService,
+    private readonly mmBotRegistry: MmBotRegistryService,
   ) {}
 
   private isEnabled(): boolean {
@@ -101,7 +103,11 @@ export class MmInstantFillService {
     const mmUsers = await this.prisma.user.findMany({
       where: { email: { in: mmEmails } },
     });
-    const mmUser = mmUsers.find((u) => u.id !== userId);
+    const mmUser = mmUsers.find(
+      (u) =>
+        u.id !== userId &&
+        this.mmBotRegistry.isBotEnabled(u.email, 'mm'),
+    );
     if (!mmUser) {
       return;
     }

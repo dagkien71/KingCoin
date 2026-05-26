@@ -2,6 +2,7 @@ import {
   flowLiquidityEmails,
   mmLiquidityEmails,
 } from '@modules/market-maker/liquidity-bots.util';
+import { MmBotRegistryService } from '@modules/market-maker/mm-bot-registry.service';
 import { MmControlService } from '@modules/market-maker/mm-control.service';
 import {
   isQuoteToken,
@@ -31,6 +32,7 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly orderService: OrderService,
     private readonly mmControl: MmControlService,
+    private readonly mmBotRegistry: MmBotRegistryService,
   ) {}
 
   private flowIntervalMs(): number {
@@ -253,9 +255,11 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
     const emails = mmLiquidityEmails();
     const rows = await this.prisma.user.findMany({
       where: { email: { in: emails } },
-      select: { id: true },
+      select: { id: true, email: true },
     });
-    return rows.map((r) => r.id);
+    return rows
+      .filter((r) => this.mmBotRegistry.isBotEnabled(r.email, 'mm'))
+      .map((r) => r.id);
   }
 
   private async resolveFlowUserForTick() {
@@ -263,7 +267,10 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
     const rows = await this.prisma.user.findMany({
       where: { email: { in: emails } },
     });
-    if (rows.length === 0) return null;
-    return rows[this.tick % rows.length];
+    const enabled = rows.filter((u) =>
+      this.mmBotRegistry.isBotEnabled(u.email, 'flow'),
+    );
+    if (enabled.length === 0) return null;
+    return enabled[this.tick % enabled.length];
   }
 }

@@ -1,6 +1,8 @@
 const bcrypt = require("bcrypt");
 const { creditBotInventory } = require("./credit-bot-inventory");
 
+const ACCOUNT_TAG_LIQUIDITY_BOT = "liquidity_bot";
+
 /**
  * @param {import('@prisma/client').PrismaClient} prisma
  */
@@ -10,6 +12,13 @@ async function ensureLiquidityBotUser(
 ) {
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
+    const tags = Array.isArray(existing.accountTags) ? existing.accountTags : [];
+    if (!tags.includes(ACCOUNT_TAG_LIQUIDITY_BOT)) {
+      await prisma.user.update({
+        where: { email },
+        data: { accountTags: [...tags, ACCOUNT_TAG_LIQUIDITY_BOT] },
+      });
+    }
     const r = await creditBotInventory(prisma, { email, kcTarget });
     return { created: false, email, inventory: r };
   }
@@ -30,6 +39,7 @@ async function ensureLiquidityBotUser(
       email,
       password: hash,
       username,
+      accountTags: [ACCOUNT_TAG_LIQUIDITY_BOT],
       walletAddress: `0xBOT${Math.random().toString(16).slice(2, 38)}`,
       socialLinks: [],
       balance: {

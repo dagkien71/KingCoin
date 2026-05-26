@@ -7,6 +7,7 @@ const bcrypt = require("bcrypt");
 const { creditBotInventory } = require("./lib/credit-bot-inventory");
 
 const prisma = new PrismaClient();
+const ACCOUNT_TAG_LIQUIDITY_BOT = "liquidity_bot";
 
 const EMAIL = process.env.MARKET_FLOW_EMAIL ?? "flow@kingcoin.local";
 const KC_BALANCE = Number(process.env.MARKET_FLOW_KC_BALANCE ?? "500000000");
@@ -15,6 +16,13 @@ const QUOTE_TOKEN_NAME = process.env.QUOTE_TOKEN_NAME ?? "KingCoin";
 async function main() {
   const existing = await prisma.user.findUnique({ where: { email: EMAIL } });
   if (existing) {
+    const tags = Array.isArray(existing.accountTags) ? existing.accountTags : [];
+    if (!tags.includes(ACCOUNT_TAG_LIQUIDITY_BOT)) {
+      await prisma.user.update({
+        where: { email: EMAIL },
+        data: { accountTags: [...tags, ACCOUNT_TAG_LIQUIDITY_BOT] },
+      });
+    }
     const r = await creditBotInventory(prisma, { email: EMAIL, kcTarget: KC_BALANCE });
     console.log(
       `Flow user đã tồn tại: ${EMAIL} — đã đồng bộ ví (KC + ${r.baseCredited ?? 0} token base)`,
@@ -40,6 +48,7 @@ async function main() {
       email: EMAIL,
       password: hash,
       username: "flowtrader",
+      accountTags: [ACCOUNT_TAG_LIQUIDITY_BOT],
       walletAddress: `0xFL${Math.random().toString(16).slice(2, 40)}`,
       socialLinks: [],
       balance: {

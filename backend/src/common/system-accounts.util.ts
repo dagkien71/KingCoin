@@ -11,7 +11,9 @@ export type UserAccountTag = typeof ACCOUNT_TAG_LIQUIDITY_BOT;
 export function isLiquidityBotEmail(
   email: string | null | undefined,
   username?: string | null,
+  accountTags?: string[] | null,
 ): boolean {
+  if (accountTags?.includes(ACCOUNT_TAG_LIQUIDITY_BOT)) return true;
   if (isLiquidityBotUsername(username)) return true;
   if (!email) return false;
   const normalized = email.trim().toLowerCase();
@@ -21,8 +23,9 @@ export function isLiquidityBotEmail(
 export function resolveUserAccountTags(
   email: string | null | undefined,
   username?: string | null,
+  accountTags?: string[] | null,
 ): UserAccountTag[] {
-  if (isLiquidityBotEmail(email, username)) {
+  if (isLiquidityBotEmail(email, username, accountTags)) {
     return [ACCOUNT_TAG_LIQUIDITY_BOT];
   }
   return [];
@@ -37,6 +40,7 @@ export function liquidityBotEmailsForFilter(): string[] {
 export function isTraderAccountEmail(
   email: string | null | undefined,
   username?: string | null,
+  accountTags?: string[] | null,
 ): boolean {
-  return !isLiquidityBotEmail(email, username);
+  return !isLiquidityBotEmail(email, username, accountTags);
 }

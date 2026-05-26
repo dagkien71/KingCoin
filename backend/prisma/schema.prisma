@@ -12,6 +12,8 @@ model User {
   email             String        @unique
   phone             String?
   username          String?
+  /** Tag hệ thống (vd `liquidity_bot` cho MM/flow) */
+  accountTags       String[]      @default([])
   password          String
   walletAddress     String?       @unique
   /** Mã ví chuyển KC giữa tài khoản (vd KC-A1B2C3D4) */
