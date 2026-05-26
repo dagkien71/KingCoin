@@ -48,6 +48,8 @@ import { generateWalletCode } from '@common/wallet-code.util';
 import { PrismaService } from '@providers/prisma';
 import * as bcrypt from 'bcrypt';
 
+const authLog = new Logger('AuthService');
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -60,8 +62,6 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {}
-
-  private readonly logger = new Logger(AuthService.name);
 
   private verificationRequired(): boolean {
     return this.config.get<boolean>('mail.verificationRequired') === true;
@@ -322,7 +322,7 @@ export class AuthService {
     const sent = await this.mail.send({ to, template, vars });
     if (!sent) {
       const code = vars.code != null ? String(vars.code) : '';
-      this.logger.warn(
+      authLog.warn(
         `[auth] Không gửi được mail (${template}) → ${to}` +
           (code ? ` — mã (chỉ log server): ${code}` : '') +
           `. SMTP configured=${this.mail.isConfigured()}` +
