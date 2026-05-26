@@ -274,21 +274,14 @@ function FuturesTerminalInner({
         </section>
 
         {/* Mở vị thế — nằm trong layout, cuộn cùng trang */}
-        <aside
-          className={clsx(
-            "order-2 w-full shrink-0 lg:order-3 lg:col-start-3 lg:row-start-1 lg:self-start"
-          )}
-        >
+        <aside className={clsx(TRADE_ORDER_ASIDE_CLASS, "w-full shrink-0")}>
           {cryptoData && liveToken ? (
             <div
               className={clsx(
+                TRADE_PANEL_HEIGHT_CLASS,
                 "flex w-full flex-col overflow-hidden rounded-xl border border-kc-border bg-kc-elevated shadow-kc",
-                "ring-1 ring-white/[0.04]"
+                "ring-1 ring-white/[0.04] md:min-h-0 md:h-full md:max-h-none xl:max-h-[620px]"
               )}
-              style={{
-                height: ORDER_BOOK_PANEL_HEIGHT_PX,
-                maxHeight: ORDER_BOOK_PANEL_HEIGHT_PX,
-              }}
             >
               <div className="flex shrink-0 items-center justify-between gap-2 border-b border-kc-border bg-kc-surface/40 px-3 py-2">
                 <div>
@@ -312,7 +305,12 @@ function FuturesTerminalInner({
               />
             </div>
           ) : (
-            <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-kc-border bg-kc-surface/30 p-6 text-center text-sm text-kc-muted">
+            <div
+              className={clsx(
+                TRADE_PANEL_HEIGHT_CLASS,
+                "flex items-center justify-center rounded-xl border border-dashed border-kc-border bg-kc-surface/30 p-6 text-center text-sm text-kc-muted"
+              )}
+            >
               {tokenLoading ? (
                 <Skeleton className="mx-auto h-8 w-32" />
               ) : (
