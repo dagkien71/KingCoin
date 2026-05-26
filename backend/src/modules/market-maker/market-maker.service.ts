@@ -6,6 +6,7 @@ import { pathBookRefreshMinPct } from '@modules/market-maker/orderbook-path.util
 import { MarketFlowService } from '@modules/market-maker/market-flow.service';
 import { MmBotRegistryService } from '@modules/market-maker/mm-bot-registry.service';
 import { mmLiquidityEmails } from '@modules/market-maker/liquidity-bots.util';
+import { mmLevelQuantity } from '@modules/market-maker/mm-params.util';
 import {
   isQuoteToken,
   resolveMmTargetTokenNames,
@@ -426,9 +427,7 @@ export class MarketMakerService implements OnModuleInit {
       }
       if (buyPrice >= sellPrice) continue;
 
-      const levelQty = Number(
-        (qtyBase * (0.88 + Math.random() * 0.24)).toFixed(4),
-      );
+      const levelQty = mmLevelQuantity(qtyBase);
 
       await this.orderService.create({
         tokenId: token.id,

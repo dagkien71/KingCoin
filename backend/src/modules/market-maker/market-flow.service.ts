@@ -8,6 +8,7 @@ import {
   isQuoteToken,
   resolveFlowBaseTokenNames,
 } from '@modules/market-maker/liquidity-target-tokens.util';
+import { flowQtyFromEnv } from '@modules/market-maker/mm-params.util';
 import { OrderService } from '@modules/order/order.service';
 import { PrismaService } from '@providers/prisma';
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
@@ -41,8 +42,7 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
   }
 
   private flowQty(): number {
-    const raw = Number(process.env.MARKET_FLOW_QTY ?? '8');
-    return Math.max(0.0001, Number.isFinite(raw) ? raw : 8);
+    return flowQtyFromEnv();
   }
 
   private quotePair(token: TokenCrypto): string {

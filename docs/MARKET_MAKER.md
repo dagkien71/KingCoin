@@ -52,7 +52,7 @@ Trong `backend/.env` (tuỳ chọn):
 # MARKET_MAKER_EMAIL=marketmaker@kingcoin.local
 # MARKET_MAKER_LEVELS=6
 # MARKET_MAKER_SPREAD_STEP=0.0025
-# MARKET_MAKER_QTY=80
+# MARKET_MAKER_QTY=80   # dev; production mặc định 350 nếu không set
 # Dao động quanh giá DB (± tỷ lệ), mặc định 0.006 = ±0.6%
 # MARKET_MAKER_OSCILLATE_PCT=0.006
 # Nhiễu ngẫu nhiên mỗi bậc mua/bán, mặc định 0.0005 ≈ 0.05%
@@ -97,7 +97,7 @@ Biến tuỳ chọn trong `backend/.env`:
 # Chu kỳ khớp (ms), mặc định 1500
 # MARKET_FLOW_INTERVAL_MS=1500
 # Khối lượng mỗi lượt (token base), mặc định 8
-# MARKET_FLOW_QTY=8
+# MARKET_FLOW_QTY=8    # dev; production mặc định 48 nếu không set
 # Token base theo field name trong DB (nhiều token: dấu phẩy)
 # MARKET_FLOW_BASE_TOKEN_NAMES=Demo KingCoin
 ```
@@ -120,8 +120,8 @@ Env (xem `docs/env.production.liquidity.example`):
 | `MARKET_MAKER_BOT_COUNT` | `12` (mặc định prod nếu không set) |
 | `MARKET_FLOW_BOT_COUNT` | `4` |
 | `MARKET_MAKER_LEVELS` | `10` |
-| `MARKET_MAKER_QTY` | `120` |
-| `MARKET_FLOW_QTY` | `16` |
+| `MARKET_MAKER_QTY` | `350` (mỗi bậc mua/bán, × số bậc × số bot) |
+| `MARKET_FLOW_QTY` | `48` |
 | `MARKET_MAKER_INTERVAL_MS` | `800` |
 | `MARKET_FLOW_INTERVAL_MS` | `700` |
 

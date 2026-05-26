@@ -133,6 +133,18 @@ export function MmBotsView() {
               {data.diagnostics.marketMakerBotCountRaw ?? "(mặc định prod=12)"}
             </li>
             <li>
+              MARKET_MAKER_QTY:{" "}
+              {data.diagnostics.marketMakerQtyRaw ?? "(mặc định prod=350)"}
+            </li>
+            <li>
+              MARKET_MAKER_LEVELS:{" "}
+              {data.diagnostics.marketMakerLevelsRaw ?? "(mặc định prod=10)"}
+            </li>
+            <li>
+              MARKET_FLOW_QTY:{" "}
+              {data.diagnostics.marketFlowQtyRaw ?? "(mặc định prod=48)"}
+            </li>
+            <li>
               Cấu hình MM: {data.diagnostics.configuredMmEmails.length} email —{" "}
               {data.diagnostics.configuredMmEmails.slice(0, 3).join(", ")}
               {data.diagnostics.configuredMmEmails.length > 3 ? "…" : ""}

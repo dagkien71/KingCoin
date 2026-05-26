@@ -24,6 +24,9 @@ export type MmEnvDiagnostics = {
   marketFlowEnabledRaw: string | null;
   marketMakerBotCountRaw: string | null;
   marketFlowBotCountRaw: string | null;
+  marketMakerQtyRaw: string | null;
+  marketMakerLevelsRaw: string | null;
+  marketFlowQtyRaw: string | null;
   configuredMmEmails: string[];
   configuredFlowEmails: string[];
 };
@@ -37,6 +40,9 @@ export function buildMmEnvDiagnostics(
     marketFlowEnabledRaw: process.env.MARKET_FLOW_ENABLED ?? null,
     marketMakerBotCountRaw: process.env.MARKET_MAKER_BOT_COUNT ?? null,
     marketFlowBotCountRaw: process.env.MARKET_FLOW_BOT_COUNT ?? null,
+    marketMakerQtyRaw: process.env.MARKET_MAKER_QTY ?? null,
+    marketMakerLevelsRaw: process.env.MARKET_MAKER_LEVELS ?? null,
+    marketFlowQtyRaw: process.env.MARKET_FLOW_QTY ?? null,
     configuredMmEmails: configured.mm,
     configuredFlowEmails: configured.flow,
   };

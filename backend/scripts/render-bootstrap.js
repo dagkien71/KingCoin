@@ -75,6 +75,15 @@ async function main() {
       if (!process.env.MARKET_FLOW_BOT_COUNT?.trim()) {
         process.env.MARKET_FLOW_BOT_COUNT = "4";
       }
+      if (!process.env.MARKET_MAKER_QTY?.trim()) {
+        process.env.MARKET_MAKER_QTY = "350";
+      }
+      if (!process.env.MARKET_FLOW_QTY?.trim()) {
+        process.env.MARKET_FLOW_QTY = "48";
+      }
+      if (!process.env.MARKET_MAKER_LEVELS?.trim()) {
+        process.env.MARKET_MAKER_LEVELS = "10";
+      }
     }
 
     if (tokenCount === 0) {

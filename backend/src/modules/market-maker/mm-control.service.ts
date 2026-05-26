@@ -19,6 +19,10 @@ import {
   envMmEnabledFromProcess,
   readEnvFlag,
 } from '@modules/market-maker/mm-env.util';
+import {
+  mmLevelsFromEnv,
+  mmQtyFromEnv,
+} from '@modules/market-maker/mm-params.util';
 import { mmLiquidityEmails } from '@modules/market-maker/liquidity-bots.util';
 import {
   anchorPathParamsToSpot,
@@ -311,16 +315,14 @@ export class MmControlService implements OnModuleInit, OnModuleDestroy {
         1,
         tok?.levels ??
           this.globalOverride.levels ??
-          (Number(process.env.MARKET_MAKER_LEVELS ?? '6') || 6),
+          mmLevelsFromEnv(),
       ),
     );
     const spreadStep =
       tok?.spreadStep ??
       this.globalOverride.spreadStep ??
       Number(process.env.MARKET_MAKER_SPREAD_STEP ?? '0.0025');
-    const qty =
-      this.globalOverride.qty ??
-      Number(process.env.MARKET_MAKER_QTY ?? '80');
+    const qty = this.globalOverride.qty ?? mmQtyFromEnv();
     const oscillatePct = Math.min(
       0.05,
       Math.max(

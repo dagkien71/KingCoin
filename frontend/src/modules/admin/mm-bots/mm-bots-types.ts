@@ -23,6 +23,9 @@ export type MmEnvDiagnostics = {
   marketFlowEnabledRaw: string | null;
   marketMakerBotCountRaw: string | null;
   marketFlowBotCountRaw: string | null;
+  marketMakerQtyRaw: string | null;
+  marketMakerLevelsRaw: string | null;
+  marketFlowQtyRaw: string | null;
   configuredMmEmails: string[];
   configuredFlowEmails: string[];
 };
