@@ -1,6 +1,7 @@
 "use client";
 
 import DbTokenPriceChart from "@/components/charts/DbTokenPriceChart";
+import { CHART_LOG_FETCH_LIMIT } from "@/constants/chart-layout";
 import {
   TRADE_BOOK_SECTION_CLASS,
   TRADE_CHART_SECTION_CLASS,
@@ -203,7 +204,9 @@ function TradeTerminal({
   const chartSpotPrice =
     chartPatch?.price ?? liveCrypto?.price ?? cryptoData?.price;
   const logPath =
-    cryptoData?.id != null ? `/crypto-logs/${cryptoData.id}` : "";
+    cryptoData?.id != null
+      ? `/crypto-logs/${cryptoData.id}?limit=${CHART_LOG_FETCH_LIMIT}`
+      : "";
   const {
     data: logCryptoData,
     refetch: refetchLogData,

@@ -7,6 +7,9 @@ export const CHART_CHROME_HEIGHT_PX = 72;
 /** Số nến hiển thị mặc định (trade — recent-bars). */
 export const CHART_INITIAL_VISIBLE_BARS = 64;
 
+/** Số điểm log tối đa khi fetch REST (tránh payload ~MB). */
+export const CHART_LOG_FETCH_LIMIT = 400;
+
 /** Token detail — ít nến hơn để nến đọc rõ (~ảnh mẫu 20–28 nến). */
 export const CHART_DETAIL_INITIAL_VISIBLE_BARS = 28;
 

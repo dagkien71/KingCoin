@@ -56,7 +56,7 @@ export class TokenCryptoLogService {
   }
 
   async getLogsByToken(tokenId: string, options?: { limit?: number }) {
-    const limit = options?.limit ?? 2500;
+    const limit = Math.min(1200, Math.max(50, options?.limit ?? 400));
     const logs = await this.logRepository.findMany({
       where: { tokenId },
       orderBy: { timestamp: 'desc' },

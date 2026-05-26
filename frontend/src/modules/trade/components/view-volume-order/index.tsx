@@ -6,7 +6,7 @@ import {
 } from "@/constants/order-book";
 import useLiveFetch from "@/hooks/useLiveFetch";
 import { QUOTE_SYMBOL, withQuoteUnit } from "@/constants/quote";
-import { IOrder } from "@/types/order.type";
+import type { OrderbookDepth, OrderbookDepthLevel } from "@/types/orderbook.type";
 import { ITokenCrypto } from "@/types/token.type";
 import { formatFixedPrice, formatTotalSupply } from "@/utils/format-number";
 import { TokenLogo } from "@/components/token/TokenLogo";
@@ -14,79 +14,54 @@ import clsx from "clsx";
 import { useMemo, useState } from "react";
 import { FaSyncAlt } from "react-icons/fa";
 
-function normalizeOrders(raw: IOrder[] | { data?: IOrder[] } | null | undefined): IOrder[] {
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw;
-  if (Array.isArray(raw.data)) return raw.data;
-  return [];
-}
-
-function sortBookSide(orders: IOrder[] | undefined, side: "buy" | "sell") {
-  const list = [...(orders ?? [])];
-  list.sort((a, b) =>
-    side === "buy"
-      ? Number(b.price) - Number(a.price)
-      : Number(a.price) - Number(b.price)
-  );
-  return list;
-}
-
-/** Giữ N mức giá tốt nhất; mức xa hơn bị loại khi có lệnh mới. */
-function trimBookSide(
-  orders: IOrder[] | undefined,
-  side: "buy" | "sell",
-  maxLevels: number
-) {
-  return sortBookSide(orders, side).slice(0, maxLevels);
+function normalizeDepth(raw: unknown): OrderbookDepth | null {
+  if (!raw || typeof raw !== "object") return null;
+  if ("bids" in raw && Array.isArray((raw as OrderbookDepth).bids)) {
+    return raw as OrderbookDepth;
+  }
+  const wrapped = raw as { data?: OrderbookDepth };
+  if (wrapped.data && Array.isArray(wrapped.data.bids)) return wrapped.data;
+  return null;
 }
 
 const rowStyle = { height: ORDER_BOOK_ROW_HEIGHT_PX, minHeight: ORDER_BOOK_ROW_HEIGHT_PX };
 
 const ViewVolumeOrder = ({ token }: { token: ITokenCrypto }) => {
   const max = ORDER_BOOK_LEVELS_PER_SIDE;
-  const bookQuery = (side: "buy" | "sell") =>
-    token?.id
-      ? `/orders/all?tokenId=${token.id}&type=${side}&status=pending&orderBy=price:${side === "buy" ? "desc" : "asc"}`
-      : "";
+  const bookPath = token?.id
+    ? `/orders/orderbook?tokenId=${token.id}&levels=${max}`
+    : "";
 
-  const { data: ordersBuy, refetch: refetchBuy } = useLiveFetch<IOrder[]>(
-    bookQuery("buy"),
-    { stream: "orderbook" }
-  );
-  const { data: ordersSell, refetch: refetchSell } = useLiveFetch<IOrder[]>(
-    bookQuery("sell"),
-    { stream: "orderbook" }
-  );
+  const { data: bookRaw, refetch } = useLiveFetch<OrderbookDepth>(bookPath, {
+    stream: "orderbook",
+  });
 
   const [bookRefreshSpin, setBookRefreshSpin] = useState(false);
 
   const refreshBook = async () => {
     setBookRefreshSpin(true);
     try {
-      await Promise.all([refetchBuy(), refetchSell()]);
+      await refetch();
     } finally {
       setTimeout(() => setBookRefreshSpin(false), 400);
     }
   };
 
-  const buyRows = useMemo(
-    () => trimBookSide(normalizeOrders(ordersBuy ?? undefined), "buy", max),
-    [ordersBuy, max]
-  );
-  const sellRows = useMemo(
-    () => trimBookSide(normalizeOrders(ordersSell ?? undefined), "sell", max),
-    [ordersSell, max]
-  );
+  const book = useMemo(() => normalizeDepth(bookRaw ?? undefined), [bookRaw]);
 
+  const buyRows = book?.bids ?? [];
   /** Bán: giá thấp nhất (gần giữa) sát đường giữa — đảo thứ tự hiển thị. */
-  const sellDisplayRows = useMemo(() => [...sellRows].reverse(), [sellRows]);
+  const sellDisplayRows = useMemo(
+    () => [...(book?.asks ?? [])].reverse(),
+    [book?.asks]
+  );
 
-  const totalOrders = buyRows.length + sellRows.length;
+  const totalOrders = buyRows.length + sellDisplayRows.length;
   const buyPercentage = Math.round(
     totalOrders > 0 ? (buyRows.length / totalOrders) * 100 : 50
   );
   const sellPercentage = Math.round(
-    totalOrders > 0 ? (sellRows.length / totalOrders) * 100 : 50
+    totalOrders > 0 ? (sellDisplayRows.length / totalOrders) * 100 : 50
   );
 
   const tick =
@@ -95,7 +70,7 @@ const ViewVolumeOrder = ({ token }: { token: ITokenCrypto }) => {
       : 0.0001;
 
   const renderRows = (
-    rows: IOrder[],
+    rows: OrderbookDepthLevel[],
     side: "buy" | "sell",
     keyPrefix: string
   ) => {
@@ -109,9 +84,9 @@ const ViewVolumeOrder = ({ token }: { token: ITokenCrypto }) => {
     return (
       <table className="relative w-full table-fixed text-xs">
         <tbody>
-          {rows.map((order, i) => (
+          {rows.map((row, i) => (
             <tr
-              key={`${keyPrefix}-${order.id ?? i}`}
+              key={`${keyPrefix}-${row.price}-${i}`}
               className="relative"
               style={rowStyle}
             >
@@ -122,17 +97,17 @@ const ViewVolumeOrder = ({ token }: { token: ITokenCrypto }) => {
                 )}
               >
                 {withQuoteUnit(
-                  formatFixedPrice(ORDER_BOOK_PRICE_DECIMALS, order?.price)
+                  formatFixedPrice(ORDER_BOOK_PRICE_DECIMALS, row.price)
                 )}
               </td>
               <td className="num relative z-[1] w-1/3 py-0 text-right align-middle">
-                {formatTotalSupply(order?.quantity)}
+                {formatTotalSupply(row.quantity)}
               </td>
               <td className="num relative z-[1] w-1/3 py-0 text-right align-middle">
                 {withQuoteUnit(
                   formatFixedPrice(
                     ORDER_BOOK_PRICE_DECIMALS,
-                    order?.price * order?.quantity
+                    row.price * row.quantity
                   )
                 )}
               </td>
@@ -205,7 +180,6 @@ const ViewVolumeOrder = ({ token }: { token: ITokenCrypto }) => {
         </table>
       </div>
 
-      {/* Bán (trên) + giá giữa + Mua (dưới) — chia đôi chiều cao, luôn thấy cả hai */}
       <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto_minmax(0,1fr)] overflow-hidden">
         <div className="flex min-h-0 flex-col overflow-hidden border-b border-kc-border/50">
           <div className="shrink-0 px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-kc-down">

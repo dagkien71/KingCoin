@@ -359,6 +359,49 @@ export class OrderService {
   }
 
   /**
+   * Top N mức giá pending mỗi bên — chỉ price/qty (UI sổ lệnh, không trả full Order).
+   */
+  async getOrderbookDepth(
+    tokenId: string,
+    levels = 10,
+  ): Promise<{
+    tokenId: string;
+    at: number;
+    bids: { price: number; quantity: number }[];
+    asks: { price: number; quantity: number }[];
+  }> {
+    const cap = Math.min(50, Math.max(1, Math.floor(levels)));
+    const pending = { status: OrderStatus.pending, quantity: { gt: 0 } };
+
+    const [bidsRaw, asksRaw] = await Promise.all([
+      this.orderRepository.findMany({
+        where: { tokenId, type: 'buy', ...pending },
+        orderBy: { price: 'desc' },
+        take: cap,
+        select: { price: true, quantity: true },
+      }),
+      this.orderRepository.findMany({
+        where: { tokenId, type: 'sell', ...pending },
+        orderBy: { price: 'asc' },
+        take: cap,
+        select: { price: true, quantity: true },
+      }),
+    ]);
+
+    const mapRow = (o: { price: unknown; quantity: unknown }) => ({
+      price: Number(o.price),
+      quantity: Number(o.quantity),
+    });
+
+    return {
+      tokenId,
+      at: Date.now(),
+      bids: bidsRaw.map(mapRow).filter((r) => r.price > 0 && r.quantity > 0),
+      asks: asksRaw.map(mapRow).filter((r) => r.price > 0 && r.quantity > 0),
+    };
+  }
+
+  /**
    * Giá thị trường cho lệnh market: mua = best ask, bán = best bid, không có thì last.
    */
   async getMarketPrice(

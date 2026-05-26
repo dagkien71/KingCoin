@@ -61,6 +61,24 @@ export class OrderController {
     return this.orderService.getMarketPrice(tokenId, side);
   }
 
+  @Get('orderbook')
+  @SkipAuth()
+  @ApiQuery({ name: 'tokenId', required: true, type: 'string' })
+  @ApiQuery({
+    name: 'levels',
+    required: false,
+    type: 'number',
+    description: 'Số mức giá tối đa mỗi bên (1–50, mặc định 10)',
+  })
+  async orderbookDepth(
+    @Query('tokenId') tokenId: string,
+    @Query('levels') levels?: string,
+  ) {
+    const parsed = levels != null ? Number.parseInt(levels, 10) : NaN;
+    const n = Number.isFinite(parsed) ? parsed : 10;
+    return this.orderService.getOrderbookDepth(tokenId, n);
+  }
+
   @Get('trades/recent')
   @SkipAuth()
   @ApiQuery({ name: 'tokenId', required: true, type: 'string' })

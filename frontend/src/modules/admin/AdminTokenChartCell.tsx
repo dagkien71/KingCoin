@@ -14,6 +14,7 @@ import {
   ADMIN_CHART_HEADER_MIN_HEIGHT_PX,
   ADMIN_CHART_PLOT_HEIGHT_PX,
 } from "@/constants/admin-charts";
+import { CHART_LOG_FETCH_LIMIT } from "@/constants/chart-layout";
 import { formatTokenPrice } from "@/utils/format-number";
 import Link from "next/link";
 import { useEffect, useMemo } from "react";
@@ -37,7 +38,9 @@ export function AdminTokenChartCell({
   );
   const chartSpotPrice = chartPatch?.price ?? live.price;
 
-  const logPath = token.id ? `/crypto-logs/${token.id}` : "";
+  const logPath = token.id
+    ? `/crypto-logs/${token.id}?limit=${CHART_LOG_FETCH_LIMIT}`
+    : "";
   const { data: logs, loading, refetch } = useFetchApi<ITokenCryptoLog[]>(
     logPath,
     { refreshInterval: 12_000, silentOnPoll: true }

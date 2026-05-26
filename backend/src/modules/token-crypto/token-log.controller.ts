@@ -16,8 +16,8 @@ export class TokenCryptoLogController {
   ) {
     const parsed = limit != null ? Number.parseInt(limit, 10) : NaN;
     const capped = Number.isFinite(parsed)
-      ? Math.min(5000, Math.max(100, parsed))
-      : 2500;
+      ? Math.min(1200, Math.max(50, parsed))
+      : 400;
     return this.logService.getLogsByToken(tokenId, { limit: capped });
   }
 

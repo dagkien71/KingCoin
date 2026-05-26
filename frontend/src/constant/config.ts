@@ -19,3 +19,13 @@ export const WS_NAMESPACE = "/realtime";
 export const LIVE_FALLBACK_MS = Number(
   process.env.NEXT_PUBLIC_LIVE_FALLBACK_MS ?? "4000"
 );
+
+/** Debounce refetch REST khi WS orderbook event dồn (MM refresh). */
+export const ORDERBOOK_LIVE_DEBOUNCE_MS = Number(
+  process.env.NEXT_PUBLIC_ORDERBOOK_LIVE_DEBOUNCE_MS ?? "450"
+);
+
+/** Debounce refetch chart logs khi trade event dồn. */
+export const CHART_LOG_LIVE_DEBOUNCE_MS = Number(
+  process.env.NEXT_PUBLIC_CHART_LOG_LIVE_DEBOUNCE_MS ?? "900"
+);

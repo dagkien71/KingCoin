@@ -1,7 +1,7 @@
 "use client";
 
 import DbTokenPriceChart from "@/components/charts/DbTokenPriceChart";
-import { CHART_DETAIL_INITIAL_VISIBLE_BARS } from "@/constants/chart-layout";
+import { CHART_DETAIL_INITIAL_VISIBLE_BARS, CHART_LOG_FETCH_LIMIT } from "@/constants/chart-layout";
 import { DEFAULT_CHART_TIMEFRAME_DETAIL_ID } from "@/constants/chart-timeframe";
 import { MarketLiveProvider, useLiveTicker, useSmoothedPrice } from "@/context/market-live-context";
 import useLiveFetch from "@/hooks/useLiveFetch";
@@ -10,7 +10,9 @@ import type { ITokenCrypto, ITokenCryptoLog } from "@/types/token.type";
 import { useMemo } from "react";
 
 function TokenDetailChartInner({ token }: { token: ITokenCrypto }) {
-  const logPath = token.id ? `/crypto-logs/${token.id}` : "";
+  const logPath = token.id
+    ? `/crypto-logs/${token.id}?limit=${CHART_LOG_FETCH_LIMIT}`
+    : "";
   const patch = useLiveTicker(token.id);
   const chartPatch = useSmoothedPrice(token.id, "chart");
   const live = useMemo(

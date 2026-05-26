@@ -1,6 +1,11 @@
 "use client";
 
-import { API_URL, LIVE_FALLBACK_MS } from "@/constant/config";
+import {
+  API_URL,
+  CHART_LOG_LIVE_DEBOUNCE_MS,
+  LIVE_FALLBACK_MS,
+  ORDERBOOK_LIVE_DEBOUNCE_MS,
+} from "@/constant/config";
 import { PRICE_FLASH_MS } from "@/constants/live-display";
 import { allSmoothTauMs } from "@/lib/live/smooth-profiles";
 import { PriceSmootherEngine } from "@/lib/live/price-smoother";
@@ -94,11 +99,28 @@ export function MarketLiveProvider({
   const uiFlashRef = useRef<Record<string, TickerFlash | undefined>>({});
   const engineRef = useRef<PriceSmootherEngine | null>(null);
   const bumpRef = useRef<(key: LiveStreamKey) => void>(() => {});
+  const orderbookDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+  const logsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const bump = useCallback((key: LiveStreamKey) => {
     setRevisions((prev) => ({ ...prev, [key]: prev[key] + 1 }));
   }, []);
   bumpRef.current = bump;
+
+  const bumpDebounced = useCallback(
+    (key: LiveStreamKey, delayMs: number) => {
+      const ref =
+        key === "orderbook" ? orderbookDebounceRef : logsDebounceRef;
+      if (ref.current) clearTimeout(ref.current);
+      ref.current = setTimeout(() => {
+        ref.current = null;
+        bumpRef.current(key);
+      }, delayMs);
+    },
+    []
+  );
 
   const clearFlashLater = useCallback((tokenIds: string[]) => {
     for (const id of tokenIds) {
@@ -225,13 +247,13 @@ export function MarketLiveProvider({
 
     const onOrderbook = (payload: { tokenId?: string }) => {
       if (!matchesToken(payload)) return;
-      bump("orderbook");
+      bumpDebounced("orderbook", ORDERBOOK_LIVE_DEBOUNCE_MS);
     };
 
     const onTrade = (payload: { tokenId?: string }) => {
       if (!matchesToken(payload)) return;
       bump("trades");
-      bump("logs");
+      bumpDebounced("logs", CHART_LOG_LIVE_DEBOUNCE_MS);
     };
 
     const onMarkets = (payload: TickerPatch) => {
@@ -290,6 +312,14 @@ export function MarketLiveProvider({
 
     return () => {
       clearInterval(fallback);
+      if (orderbookDebounceRef.current) {
+        clearTimeout(orderbookDebounceRef.current);
+        orderbookDebounceRef.current = null;
+      }
+      if (logsDebounceRef.current) {
+        clearTimeout(logsDebounceRef.current);
+        logsDebounceRef.current = null;
+      }
       for (const t of Object.values(flashTimersRef.current)) {
         clearTimeout(t);
       }
@@ -308,7 +338,7 @@ export function MarketLiveProvider({
         unsubscribeChannel(`trades:${tokenId}`);
       }
     };
-  }, [tokenId, bump, ingestTargetStable, ingestFromTokenList]);
+  }, [tokenId, bump, bumpDebounced, ingestTargetStable, ingestFromTokenList]);
 
   const tickers = smoothedByProfile.ui;
 
