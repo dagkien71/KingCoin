@@ -3,8 +3,10 @@
 import { Button } from "@/components/ui/button";
 import useAuth from "@/hooks/useAuth";
 import useFetchApi from "@/hooks/useFetchApi";
-import { unwrapPaginatedData } from "@/lib/unwrap-paginated";
-import { isTraderUser } from "@/lib/system-accounts";
+import {
+  getPaginatedMeta,
+  unwrapPaginatedData,
+} from "@/lib/unwrap-paginated";
 import { ADMIN_TAGLINE } from "@/modules/admin/constants";
 import { AdminDataTable } from "@/modules/admin/AdminDataTable";
 import { AdminStatCard } from "@/modules/admin/AdminStatCard";
@@ -33,7 +35,14 @@ export function AdminOverview() {
   const { user } = useAuth();
   const { data: users } = useFetchApi<{ data: UserRow[] } | UserRow[]>(
     "/admin/users",
-    { defaultParams: { perPage: 100 } }
+    {
+      defaultParams: {
+        perPage: 50,
+        scope: "traders",
+        orderBy: "createdAt:desc",
+        page: 1,
+      },
+    }
   );
   const { data: tokens } = useFetchApi<
     { data: ITokenCrypto[] } | ITokenCrypto[]
@@ -44,8 +53,9 @@ export function AdminOverview() {
     refreshInterval: 10_000,
   });
 
-  const allUsers = unwrapPaginatedData(users);
-  const userRows = allUsers.filter(isTraderUser);
+  const userRows = unwrapPaginatedData(users);
+  const userMeta = getPaginatedMeta(users);
+  const traderTotal = userMeta?.total ?? userRows.length;
   const tokenRows = unwrapPaginatedData(tokens);
   const altCount =
     dashboard?.tokens?.filter((t) => !isStablecoinToken(t)).length ?? 0;
@@ -86,9 +96,9 @@ export function AdminOverview() {
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <AdminStatCard
-          label="Trader"
-          value={userRows.length}
-          hint={`${allUsers.length - userRows.length} bot MM không tính`}
+          label="Tổng user"
+          value={traderTotal}
+          hint="Không gồm bot MM/flow"
         />
         <AdminStatCard label="Token" value={tokenRows.length} />
         <AdminStatCard

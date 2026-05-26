@@ -23,6 +23,10 @@ import { User } from '@prisma/client';
 import { AuthService } from './auth.service';
 import { SignUpDto } from './dto/register';
 import {
+  ConfirmEmailChangeDto,
+  RequestEmailChangeDto,
+} from './dto/change-email.dto';
+import {
   ForgotPasswordDto,
   ResendVerificationDto,
   ResetPasswordDto,
@@ -76,6 +80,46 @@ export class AuthController {
   @Post('reset-password')
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
+  }
+
+  @ApiBody({ type: RequestEmailChangeDto })
+  @Post('email-change/request')
+  @ApiBearerAuth()
+  @UseGuards(AccessGuard)
+  async requestEmailChange(
+    @Body() dto: RequestEmailChangeDto,
+    @CaslUser() userProxy?: UserProxy<User>,
+  ) {
+    const user = await userProxy.get();
+    return this.authService.requestEmailChange(user.id, dto);
+  }
+
+  @ApiBody({ type: ConfirmEmailChangeDto })
+  @Post('email-change/confirm')
+  @ApiBearerAuth()
+  @UseGuards(AccessGuard)
+  async confirmEmailChange(
+    @Body() dto: ConfirmEmailChangeDto,
+    @CaslUser() userProxy?: UserProxy<User>,
+  ) {
+    const user = await userProxy.get();
+    return this.authService.confirmEmailChange(user.id, dto);
+  }
+
+  @Post('email-change/resend')
+  @ApiBearerAuth()
+  @UseGuards(AccessGuard)
+  async resendEmailChange(@CaslUser() userProxy?: UserProxy<User>) {
+    const user = await userProxy.get();
+    return this.authService.resendEmailChange(user.id);
+  }
+
+  @Post('email-change/cancel')
+  @ApiBearerAuth()
+  @UseGuards(AccessGuard)
+  async cancelEmailChange(@CaslUser() userProxy?: UserProxy<User>) {
+    const user = await userProxy.get();
+    return this.authService.cancelEmailChange(user.id);
   }
 
   @ApiBody({ type: RefreshTokenDto })

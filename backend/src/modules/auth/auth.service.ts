@@ -9,6 +9,8 @@ import { ConfigService } from '@nestjs/config';
 import { SignUpDto } from './dto/register';
 import { UserRepository } from '@modules/user/user.repository';
 import {
+  EMAIL_CHANGE_NONE_PENDING,
+  EMAIL_CHANGE_SAME,
   INVALID_CREDENTIALS,
   INVALID_VERIFICATION_CODE,
   NOT_FOUND,
@@ -28,6 +30,10 @@ import { NotificationService } from '@modules/notification/notification.service'
 import { ReferralService } from '@modules/referral/referral.service';
 import { MailService } from '@modules/mail/mail.service';
 import { AuthTokenRepository } from './auth-token.repository';
+import {
+  ConfirmEmailChangeDto,
+  RequestEmailChangeDto,
+} from './dto/change-email.dto';
 import {
   ForgotPasswordDto,
   ResendVerificationDto,
@@ -302,6 +308,135 @@ export class AuthService {
       ...token,
       user: testUser,
     };
+  }
+
+  private normalizeEmail(email: string): string {
+    return email.trim().toLowerCase();
+  }
+
+  private async assertCurrentPassword(
+    user: User,
+    currentPassword: string,
+  ): Promise<void> {
+    const ok = await this.tokenService.isPasswordCorrect(
+      currentPassword,
+      user.password,
+    );
+    if (!ok) {
+      throw new UnauthorizedException(INVALID_CREDENTIALS);
+    }
+  }
+
+  async requestEmailChange(
+    userId: string,
+    dto: RequestEmailChangeDto,
+  ): Promise<{ pendingEmail: string; sent: true }> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException(NOT_FOUND);
+    }
+
+    await this.assertCurrentPassword(user, dto.currentPassword);
+
+    const newEmail = this.normalizeEmail(dto.newEmail);
+    if (newEmail === this.normalizeEmail(user.email)) {
+      throw new BadRequestException(EMAIL_CHANGE_SAME);
+    }
+
+    const taken = await this.userRepository.findOne({
+      where: { email: newEmail },
+    });
+    if (taken && taken.id !== userId) {
+      throw new ConflictException(USER_CONFLICT);
+    }
+
+    await this.userRepository.update(userId, { pendingEmail: newEmail });
+
+    const code = await this.authTokens.issue(
+      userId,
+      AuthTokenPurpose.email_change,
+    );
+    await this.mail.send({
+      to: newEmail,
+      template: 'email_change_verify',
+      vars: {
+        code,
+        email: newEmail,
+        name: user.username ?? undefined,
+      },
+    });
+
+    return { pendingEmail: newEmail, sent: true };
+  }
+
+  async resendEmailChange(userId: string): Promise<{ sent: true }> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user?.pendingEmail) {
+      throw new BadRequestException(EMAIL_CHANGE_NONE_PENDING);
+    }
+
+    const code = await this.authTokens.issue(
+      userId,
+      AuthTokenPurpose.email_change,
+    );
+    await this.mail.send({
+      to: user.pendingEmail,
+      template: 'email_change_verify',
+      vars: {
+        code,
+        email: user.pendingEmail,
+        name: user.username ?? undefined,
+      },
+    });
+    return { sent: true };
+  }
+
+  async confirmEmailChange(
+    userId: string,
+    dto: ConfirmEmailChangeDto,
+  ): Promise<{ email: string }> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user?.pendingEmail) {
+      throw new BadRequestException(EMAIL_CHANGE_NONE_PENDING);
+    }
+
+    const ok = await this.authTokens.consume(
+      userId,
+      AuthTokenPurpose.email_change,
+      dto.code,
+    );
+    if (!ok) {
+      throw new BadRequestException(INVALID_VERIFICATION_CODE);
+    }
+
+    const newEmail = this.normalizeEmail(user.pendingEmail);
+    const taken = await this.userRepository.findOne({
+      where: { email: newEmail },
+    });
+    if (taken && taken.id !== userId) {
+      throw new ConflictException(USER_CONFLICT);
+    }
+
+    const updated = await this.userRepository.update(userId, {
+      email: newEmail,
+      pendingEmail: null,
+      emailVerifiedAt: new Date(),
+    });
+
+    return { email: updated.email };
+  }
+
+  async cancelEmailChange(userId: string): Promise<{ cancelled: true }> {
+    await this.userRepository.update(userId, { pendingEmail: null });
+    await this.prisma.authToken.updateMany({
+      where: {
+        userId,
+        purpose: AuthTokenPurpose.email_change,
+        usedAt: null,
+      },
+      data: { usedAt: new Date() },
+    });
+    return { cancelled: true };
   }
 
   logout(userId: string, accessToken: string): Promise<void> {

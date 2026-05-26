@@ -7,6 +7,7 @@ const CODE_LENGTH = 6;
 const DEFAULT_TTL_MIN: Record<AuthTokenPurpose, number> = {
   email_verify: 15,
   password_reset: 15,
+  email_change: 15,
 };
 
 @Injectable()

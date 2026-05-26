@@ -32,6 +32,7 @@ import {
   validateUserSocialLinks,
   type UserSocialLinks,
 } from "@/lib/user-social-links";
+import { ChangeEmailModal } from "@/modules/account/components/ChangeEmailModal";
 import { EmailVerificationNotice } from "@/modules/account/components/EmailVerificationNotice";
 
 function isEmailVerified(user: IUser | null | undefined): boolean {
@@ -116,6 +117,7 @@ export function AccountProfileView() {
   const { mutate } = useMutation("POST", "/auth/logout");
   const { mutate: patchMe, loading: saving } = useMutation("PATCH", "/users/me");
 
+  const [editEmail, setEditEmail] = useState(false);
   const [editUsername, setEditUsername] = useState(false);
   const [editIntro, setEditIntro] = useState(false);
   const [editSocial, setEditSocial] = useState(false);
@@ -136,6 +138,12 @@ export function AccountProfileView() {
     setIntroInput(data?.introduction ?? "");
     setSocialInput(parseUserSocialLinks(data?.socialLinks));
   }, [data]);
+
+  useEffect(() => {
+    if (data) {
+      dispatch(setAuthState({ userInfo: data, isLogin: true }));
+    }
+  }, [data, dispatch]);
 
   const handleChangeAvatar = (avt: string) => {
     if (!avt) return;
@@ -269,7 +277,27 @@ export function AccountProfileView() {
         </aside>
 
         <div className="lg:col-span-8">
-          {!emailVerified && data?.email ? (
+          {data?.pendingEmail ? (
+            <div className="mb-6 rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-3">
+              <p className="text-sm font-medium text-violet-100">
+                Đang chờ xác minh email mới
+              </p>
+              <p className="mt-1 text-xs text-violet-100/80">
+                Mã đã gửi tới <strong>{data.pendingEmail}</strong>. Nhập mã để
+                hoàn tất đổi email.
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="mt-3"
+                onClick={() => setEditEmail(true)}
+              >
+                Nhập mã
+              </Button>
+            </div>
+          ) : null}
+          {!emailVerified && data?.email && !data.pendingEmail ? (
             <EmailVerificationNotice
               email={data.email}
               onVerified={() => void refetch()}
@@ -353,7 +381,26 @@ export function AccountProfileView() {
               <CardTitle>Tài khoản</CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
-              <SettingRow label="Email">{data?.email ?? "—"}</SettingRow>
+              <SettingRow
+                label="Email"
+                hint={
+                  data?.pendingEmail
+                    ? `Chờ xác minh: ${data.pendingEmail}`
+                    : undefined
+                }
+                action={
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    type="button"
+                    onClick={() => setEditEmail(true)}
+                  >
+                    Đổi
+                  </Button>
+                }
+              >
+                {data?.email ?? "—"}
+              </SettingRow>
               <SettingRow
                 label="Mã ví chuyển KC"
                 hint="Chia sẻ để nhận KC — quản lý tại Chuyển ví"
@@ -413,6 +460,14 @@ export function AccountProfileView() {
           </Card>
         </div>
       </div>
+
+      <ChangeEmailModal
+        open={editEmail}
+        currentEmail={data?.email ?? ""}
+        pendingEmail={data?.pendingEmail}
+        onClose={() => setEditEmail(false)}
+        onSuccess={() => void refetch()}
+      />
 
       <FieldModal
         open={editUsername}

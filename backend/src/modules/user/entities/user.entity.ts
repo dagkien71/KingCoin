@@ -58,6 +58,8 @@ export default class UserEntity implements User {
 
   readonly emailVerifiedAt!: Date | null;
 
+  readonly pendingEmail!: string | null;
+
   readonly createdAt!: Date;
 
   readonly updatedAt!: Date;

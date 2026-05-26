@@ -21,7 +21,7 @@ const PER_PAGE = 50;
 
 export function AdminUsersList() {
   const [q, setQ] = useState("");
-  const [scope, setScope] = useState<UserScope>("all");
+  const [scope, setScope] = useState<UserScope>("traders");
   const [page, setPage] = useState(1);
 
   const { data: usersRes, loading, error, setQueryParams } = useFetchApi<
@@ -30,7 +30,7 @@ export function AdminUsersList() {
     defaultParams: {
       perPage: PER_PAGE,
       orderBy: "createdAt:desc",
-      scope: "all",
+      scope: "traders",
       page: 1,
     },
   });
@@ -72,10 +72,17 @@ export function AdminUsersList() {
 
   const scopeHint =
     scope === "traders"
-      ? "Chỉ trader — không gồm bot MM/flow."
+      ? "Trader thật — không gồm bot MM/flow."
       : scope === "bots"
         ? "Chỉ tài khoản bot thanh khoản."
-        : "Mọi user trong DB (gồm trader + bot + admin).";
+        : "Mọi bản ghi user trong DB (gồm bot MM).";
+
+  const totalLabel =
+    scope === "traders"
+      ? "Tổng user"
+      : scope === "bots"
+        ? "Tổng bot MM"
+        : "Tổng (mọi bản ghi)";
 
   return (
     <div className="space-y-6">
@@ -87,9 +94,9 @@ export function AdminUsersList() {
       <div className="flex flex-wrap gap-2">
         {(
           [
-            ["all", "Tất cả"],
             ["traders", "Trader"],
             ["bots", "Bot MM"],
+            ["all", "Toàn DB"],
           ] as const
         ).map(([id, label]) => (
           <Button
@@ -105,7 +112,7 @@ export function AdminUsersList() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <AdminStatCard label="Tổng (theo bộ lọc)" value={total} />
+        <AdminStatCard label={totalLabel} value={total} />
         <AdminStatCard label="Trang hiện tại" value={rows.length} />
         <AdminStatCard
           label="Phân trang"

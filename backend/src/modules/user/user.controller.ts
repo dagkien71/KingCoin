@@ -12,7 +12,16 @@ import {
 import UserBaseEntity from '@modules/user/entities/user-base.entity';
 import UserEntity from '@modules/user/entities/user.entity';
 import { UserHook } from '@modules/user/user.hook';
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -62,6 +71,16 @@ export class UserController {
     @CaslUser() userProxy?: UserProxy<User>,
   ): Promise<User> {
     const tokenUser = await userProxy.get();
+    if (
+      dataUpdateUserDto &&
+      typeof dataUpdateUserDto === 'object' &&
+      'email' in dataUpdateUserDto &&
+      dataUpdateUserDto.email !== undefined
+    ) {
+      throw new BadRequestException(
+        '400027: Đổi email qua PATCH không được hỗ trợ — dùng POST /auth/email-change/request.',
+      );
+    }
     return this.userService.update(tokenUser.id, dataUpdateUserDto);
   }
 

@@ -1,5 +1,6 @@
 export type MailTemplateId =
   | 'email_verify'
+  | 'email_change_verify'
   | 'signup_welcome'
   | 'password_reset'
   | 'futures_margin_warning'
@@ -49,6 +50,23 @@ export function renderMailTemplate(
         subject,
         html,
         text: `Mã xác nhận KingCoin: ${code}. Hết hạn sau 15 phút.`,
+      };
+    }
+    case 'email_change_verify': {
+      const code = String(vars.code ?? '');
+      const subject = `[KingCoin] Xác nhận đổi email: ${code}`;
+      const html = layout(
+        'Xác nhận email mới',
+        `<p>Xin chào${vars.name ? ` <strong>${vars.name}</strong>` : ''},</p>
+         <p>Bạn vừa yêu cầu đổi email KingCoin sang <strong>${vars.email}</strong>.</p>
+         <p>Mã xác nhận (15 phút):</p>
+         <p style="font-size:28px;font-weight:700;letter-spacing:6px;color:#d4a012">${code}</p>
+         <p style="font-size:13px;color:#8b919a">Nếu không phải bạn, hãy đổi mật khẩu và liên hệ hỗ trợ.</p>`,
+      );
+      return {
+        subject,
+        html,
+        text: `Mã xác nhận đổi email KingCoin: ${code}. Hết hạn sau 15 phút.`,
       };
     }
     case 'signup_welcome': {

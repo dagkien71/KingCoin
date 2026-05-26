@@ -40,6 +40,8 @@ model User {
   monthlyPnLPercent Float?        @default(0)
   yearPnLPercent    Float?        @default(0)
   emailVerifiedAt   DateTime?
+  /** Email mới chờ xác minh (đổi email). */
+  pendingEmail      String?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @default(now()) @updatedAt
   TokenCrypto       TokenCrypto[]
@@ -58,6 +60,7 @@ model User {
 enum AuthTokenPurpose {
   email_verify
   password_reset
+  email_change
 }
 
 model AuthToken {

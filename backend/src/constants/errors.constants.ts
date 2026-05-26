@@ -40,6 +40,10 @@ export const UNVERIFIED_EMAIL =
   '401004: Email chưa được xác minh. Kiểm tra hộp thư hoặc nhập mã tại trang xác nhận.';
 export const INVALID_VERIFICATION_CODE =
   '400024: Mã xác nhận không hợp lệ hoặc đã hết hạn.';
+export const EMAIL_CHANGE_SAME =
+  '400025: Email mới trùng email hiện tại.';
+export const EMAIL_CHANGE_NONE_PENDING =
+  '400026: Không có yêu cầu đổi email đang chờ xác minh.';
 export const UNVERIFIED_LOCATION = '401005: Location is not verified';
 export const MFA_BACKUP_CODE_USED = '401007: Backup code is already used';
 export const INVALID_FCM_TOKEN = '401008: Invalid FCM token';

@@ -25,6 +25,7 @@ export interface IUser {
   navBaselineWeekKc?: number | null;
   isVerified?: boolean;
   emailVerifiedAt?: string | null;
+  pendingEmail?: string | null;
   birthDate?: string;
   createdAt?: string;
   status?: string;
