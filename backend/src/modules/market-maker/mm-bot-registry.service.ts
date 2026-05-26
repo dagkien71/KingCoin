@@ -125,6 +125,19 @@ export class MmBotRegistryService {
     };
   }
 
+  /** Bật N bot đầu trong pool env; tắt phần còn lại (không xóa user). */
+  applyTargetBotCounts(mmActive: number, flowActive: number): void {
+    const { mm, flow } = this.configuredEmails();
+    const mmN = Math.max(0, Math.min(mm.length, Math.floor(mmActive)));
+    const flowN = Math.max(0, Math.min(flow.length, Math.floor(flowActive)));
+    mm.forEach((email, i) => {
+      this.patchBot(email, { enabled: i < mmN });
+    });
+    flow.forEach((email, i) => {
+      this.patchBot(email, { enabled: i < flowN });
+    });
+  }
+
   private async getQuoteTokenId(): Promise<string | null> {
     const quoteName = process.env.QUOTE_TOKEN_NAME ?? 'KingCoin';
     const quote = await this.prisma.tokenCrypto.findFirst({

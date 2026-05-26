@@ -7,12 +7,13 @@ import { MarketFlowService } from '@modules/market-maker/market-flow.service';
 import { MmBotRegistryService } from '@modules/market-maker/mm-bot-registry.service';
 import { mmLiquidityEmails } from '@modules/market-maker/liquidity-bots.util';
 import { mmLevelQuantity } from '@modules/market-maker/mm-params.util';
+import { PlatformLiquiditySettingsService } from '@modules/market-maker/platform-liquidity-settings.service';
 import {
   isQuoteToken,
   resolveMmTargetTokenNames,
 } from '@modules/market-maker/liquidity-target-tokens.util';
 import { PrismaService } from '@providers/prisma';
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { TokenCrypto, User } from '@prisma/client';
 
@@ -27,7 +28,7 @@ import { TokenCrypto, User } from '@prisma/client';
  * User: node scripts/ensure-market-maker-user.js
  */
 @Injectable()
-export class MarketMakerService implements OnModuleInit {
+export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MarketMakerService.name);
   private refreshInFlight = false;
   private intervalHandle: NodeJS.Timeout | null = null;
@@ -40,6 +41,7 @@ export class MarketMakerService implements OnModuleInit {
     private readonly tokenCryptoService: TokenCryptoService,
     private readonly marketFlow: MarketFlowService,
     private readonly mmBotRegistry: MmBotRegistryService,
+    private readonly platformSettings: PlatformLiquiditySettingsService,
   ) {}
 
   /** Gọi từ admin — refresh sổ lệnh mọi token MM. */
@@ -158,8 +160,7 @@ export class MarketMakerService implements OnModuleInit {
   }
 
   private multiMidStep(): number {
-    const raw = Number(process.env.MARKET_MAKER_MULTI_MID_STEP ?? '0.4');
-    return Number.isFinite(raw) ? raw : 0.4;
+    return this.platformSettings.getEffective().multiMidStep;
   }
 
   /** Hủy mọi lệnh MM đang treo (pending) cho một token — trước khi đổi giá đột ngột. */
@@ -177,10 +178,36 @@ export class MarketMakerService implements OnModuleInit {
     return process.env.QUOTE_DISPLAY_SYMBOL?.trim() || 'KC';
   }
 
-  /** Mặc định mỗi 1s — giảm tải bằng MARKET_MAKER_INTERVAL_MS (ms), tối thiểu 500ms. */
   private refreshIntervalMs(): number {
-    const raw = Number(process.env.MARKET_MAKER_INTERVAL_MS ?? '1000');
-    return Math.max(500, Number.isFinite(raw) ? raw : 1000);
+    return this.platformSettings.getEffective().mmIntervalMs;
+  }
+
+  private startRefreshLoop(): void {
+    if (this.intervalHandle) {
+      clearInterval(this.intervalHandle);
+      this.intervalHandle = null;
+    }
+    if (!this.mmControl.isMmEnabled()) {
+      this.logger.log('MM: tắt — không chạy interval');
+      return;
+    }
+    const intervalMs = this.refreshIntervalMs();
+    this.logger.log(`MM: interval ${intervalMs}ms`);
+    this.intervalHandle = setInterval(() => {
+      void this.refreshLiquidity();
+    }, intervalMs);
+  }
+
+  /** Gọi khi admin đổi cài đặt tốc độ MM. */
+  reconfigureLoop(): void {
+    this.startRefreshLoop();
+  }
+
+  onModuleDestroy(): void {
+    if (this.intervalHandle) {
+      clearInterval(this.intervalHandle);
+      this.intervalHandle = null;
+    }
   }
 
   private priceTick(referencePrice: number): number {
@@ -195,25 +222,19 @@ export class MarketMakerService implements OnModuleInit {
   }
 
   onModuleInit(): void {
-    if (!this.mmControl.isMmEnabled()) {
-      return;
-    }
-
-    const intervalMs = this.refreshIntervalMs();
-    this.logger.log(
-      `MM: enabled (interval ${intervalMs}ms, cron 45s dự phòng)`,
-    );
-
-    setTimeout(() => void this.refreshLiquidity(), 400);
+    this.platformSettings.onIntervalsChanged(() => this.reconfigureLoop());
 
     this.mmControl.registerPathBookRefreshHook((tokenId, target) =>
       this.onPathTargetBookRefresh(tokenId, target),
     );
 
-    // Chạy liên tục để luôn có lệnh treo gần giá hiện tại
-    this.intervalHandle = setInterval(() => {
-      void this.refreshLiquidity();
-    }, intervalMs);
+    if (!this.mmControl.isMmEnabled()) {
+      return;
+    }
+
+    this.logger.log('MM: enabled (cron 45s dự phòng)');
+    setTimeout(() => void this.refreshLiquidity(), 400);
+    this.startRefreshLoop();
   }
 
   /** PP1/PP2: refresh sổ + sweep khi target path lệch đủ so với lần treo sổ trước. */

@@ -9,6 +9,8 @@ import { MmBotsAdminController } from './mm-bots-admin.controller';
 import { MmBotRegistryService } from './mm-bot-registry.service';
 import { MmLiquidityBootstrapService } from './mm-liquidity-bootstrap.service';
 import { MarketControlAdminController } from './market-control-admin.controller';
+import { MarketSettingsAdminController } from './market-settings-admin.controller';
+import { PlatformLiquiditySettingsService } from './platform-liquidity-settings.service';
 import { MarketFlowService } from './market-flow.service';
 import { MarketMakerService } from './market-maker.service';
 import { MmControlService } from './mm-control.service';
@@ -23,8 +25,13 @@ import { OrderbookPathService } from './orderbook-path.service';
     RealtimeModule,
     BotInventoryModule,
   ],
-  controllers: [MarketControlAdminController, MmBotsAdminController],
+  controllers: [
+    MarketControlAdminController,
+    MarketSettingsAdminController,
+    MmBotsAdminController,
+  ],
   providers: [
+    PlatformLiquiditySettingsService,
     MmBotRegistryService,
     MmLiquidityBootstrapService,
     MmControlService,
@@ -34,6 +41,7 @@ import { OrderbookPathService } from './orderbook-path.service';
     OrderbookPathService,
   ],
   exports: [
+    PlatformLiquiditySettingsService,
     MmBotRegistryService,
     MmInstantFillService,
     MmControlService,

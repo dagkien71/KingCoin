@@ -8,7 +8,7 @@ import {
   isQuoteToken,
   resolveFlowBaseTokenNames,
 } from '@modules/market-maker/liquidity-target-tokens.util';
-import { flowQtyFromEnv } from '@modules/market-maker/mm-params.util';
+import { PlatformLiquiditySettingsService } from '@modules/market-maker/platform-liquidity-settings.service';
 import { OrderService } from '@modules/order/order.service';
 import { PrismaService } from '@providers/prisma';
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
@@ -34,15 +34,35 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
     private readonly orderService: OrderService,
     private readonly mmControl: MmControlService,
     private readonly mmBotRegistry: MmBotRegistryService,
+    private readonly platformSettings: PlatformLiquiditySettingsService,
   ) {}
 
   private flowIntervalMs(): number {
-    const raw = Number(process.env.MARKET_FLOW_INTERVAL_MS ?? '1500');
-    return Math.max(300, Number.isFinite(raw) ? raw : 1500);
+    return this.platformSettings.getEffective().flowIntervalMs;
   }
 
   private flowQty(): number {
-    return flowQtyFromEnv();
+    return this.platformSettings.getEffective().flowQty;
+  }
+
+  private startFlowLoop(): void {
+    if (this.intervalHandle) {
+      clearInterval(this.intervalHandle);
+      this.intervalHandle = null;
+    }
+    if (!this.mmControl.isFlowEnabled()) {
+      this.logger.log('Flow: tắt — không chạy interval');
+      return;
+    }
+    const ms = this.flowIntervalMs();
+    this.logger.log(`Market flow (taker): interval ${ms}ms`);
+    this.intervalHandle = setInterval(() => {
+      void this.runTick();
+    }, ms);
+  }
+
+  reconfigureLoop(): void {
+    this.startFlowLoop();
   }
 
   private quotePair(token: TokenCrypto): string {
@@ -52,16 +72,10 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
   }
 
   onModuleInit(): void {
+    this.platformSettings.onIntervalsChanged(() => this.reconfigureLoop());
     if (!this.mmControl.isFlowEnabled()) return;
-
-    const ms = this.flowIntervalMs();
-    this.logger.log(`Market flow (taker): interval ${ms}ms`);
-
     setTimeout(() => void this.runTick(), 600);
-
-    this.intervalHandle = setInterval(() => {
-      void this.runTick();
-    }, ms);
+    this.startFlowLoop();
   }
 
   onModuleDestroy(): void {

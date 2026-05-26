@@ -2,6 +2,7 @@ import {
   HiOutlineChip,
   HiOutlineChartSquareBar,
   HiOutlineClipboardList,
+  HiOutlineCog,
   HiOutlineHome,
   HiOutlineTrendingUp,
   HiOutlineUserGroup,
@@ -30,6 +31,11 @@ export const ADMIN_NAV: AdminNavItem[] = [
     label: "Điều khiển thị trường",
     href: "/admin/market-control",
     icon: HiOutlineTrendingUp,
+  },
+  {
+    label: "Cài đặt MM",
+    href: "/admin/market-settings",
+    icon: HiOutlineCog,
   },
   {
     label: "Bot MM",

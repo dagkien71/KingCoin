@@ -63,6 +63,11 @@ export function MmBotsView() {
           >
             Làm mới
           </Button>
+          <Link href="/admin/market-settings">
+            <Button type="button" variant="ghost" size="sm" className="gap-1.5">
+              Cài đặt MM
+            </Button>
+          </Link>
           <Link href="/admin/market-control">
             <Button type="button" variant="ghost" size="sm" className="gap-1.5">
               <HiOutlineTrendingUp className="h-4 w-4" />

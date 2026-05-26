@@ -457,6 +457,27 @@ model FuturesOrder {
   @@index([userId, createdAt(sort: Desc)])
 }
 
+/** Cài đặt thanh khoản / MM — singleton id `platform-liquidity-default`. */
+model PlatformLiquiditySettings {
+  id               String   @id @map("_id")
+  mmEnabled        Boolean?
+  flowEnabled      Boolean?
+  mmIntervalMs     Int?
+  flowIntervalMs   Int?
+  mmBotCount       Int?
+  flowBotCount     Int?
+  levels           Int?
+  spreadStep       Float?
+  qty              Float?
+  flowQty          Float?
+  oscillatePct     Float?
+  wanderPct        Float?
+  levelJitterPct   Float?
+  multiMidStep     Float?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
 model FuturesConfig {
   id                String  @id @default(auto()) @map("_id") @db.ObjectId
   tokenId           String  @unique
