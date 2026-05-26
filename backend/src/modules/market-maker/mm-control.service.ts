@@ -15,6 +15,7 @@ import {
 import { PrismaService } from '@providers/prisma';
 import { TokenCrypto } from '@prisma/client';
 import { randomUUID } from 'crypto';
+import { mmLiquidityEmails } from '@modules/market-maker/liquidity-bots.util';
 import {
   anchorPathParamsToSpot,
   defaultParamsForModel,
@@ -102,14 +103,16 @@ export class MmControlService implements OnModuleInit, OnModuleDestroy {
 
   /** Hủy mọi lệnh MM pending — gọi trước khi đổi giá đột ngột (±%). */
   async cancelPendingOrdersForToken(tokenId: string): Promise<number> {
-    const mmUser = await this.prisma.user.findFirst({
-      where: { email: this.mmEmail() },
+    const emails = mmLiquidityEmails();
+    const mmUsers = await this.prisma.user.findMany({
+      where: { email: { in: emails } },
+      select: { id: true },
     });
-    if (!mmUser) return 0;
+    if (mmUsers.length === 0) return 0;
 
     const del = await this.prisma.order.deleteMany({
       where: {
-        userId: mmUser.id,
+        userId: { in: mmUsers.map((u) => u.id) },
         tokenId,
         status: 'pending',
       },

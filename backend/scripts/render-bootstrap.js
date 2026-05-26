@@ -68,16 +68,23 @@ async function main() {
       return;
     }
 
+    if (process.env.NODE_ENV === "production") {
+      if (!process.env.MARKET_MAKER_BOT_COUNT?.trim()) {
+        process.env.MARKET_MAKER_BOT_COUNT = "12";
+      }
+      if (!process.env.MARKET_FLOW_BOT_COUNT?.trim()) {
+        process.env.MARKET_FLOW_BOT_COUNT = "4";
+      }
+    }
+
     if (tokenCount === 0) {
       runSafe("reset-seed", () => run("node scripts/reset-seed-10-tokens.js"));
-      runSafe("market-maker", () => run("node scripts/ensure-market-maker-user.js"));
-      runSafe("flow-trader", () => run("node scripts/ensure-flow-trader-user.js"));
+      runSafe("liquidity-bots", () => run("node scripts/ensure-liquidity-bots.js"));
       runSafe("bot-inventory", () => run("node scripts/ensure-bot-inventory.js"));
       runSafe("demo-kc", () => run("node scripts/ensure-demo-user-kc.js"));
     } else {
       runSafe("kingcoin", () => run("node scripts/ensure-kingcoin-token.js"));
-      runSafe("market-maker", () => run("node scripts/ensure-market-maker-user.js"));
-      runSafe("flow-trader", () => run("node scripts/ensure-flow-trader-user.js"));
+      runSafe("liquidity-bots", () => run("node scripts/ensure-liquidity-bots.js"));
       runSafe("bot-inventory", () => run("node scripts/ensure-bot-inventory.js"));
     }
   } finally {

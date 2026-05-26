@@ -101,11 +101,38 @@ Biến tuỳ chọn trong `backend/.env`:
 # MARKET_FLOW_BASE_TOKEN_NAMES=Demo KingCoin
 ```
 
-## Chuẩn bị user MM
+## Nhiều bot MM (production)
+
+Mặc định **production** (`NODE_ENV=production`): **12** bot MM (`mm1@kingcoin.local` … `mm12`) + **4** bot flow (`flow1` … `flow4`), mỗi bot treo full ladder (mid lệch nhau một chút → sổ dày hơn).
+
+```bash
+cd backend
+node scripts/ensure-liquidity-bots.js
+node scripts/ensure-bot-inventory.js
+```
+
+Env (xem `docs/env.production.liquidity.example`):
+
+| Biến | Gợi ý prod |
+|------|------------|
+| `MARKET_MAKER_ENABLED` | `true` |
+| `MARKET_MAKER_BOT_COUNT` | `12` (mặc định prod nếu không set) |
+| `MARKET_FLOW_BOT_COUNT` | `4` |
+| `MARKET_MAKER_LEVELS` | `10` |
+| `MARKET_MAKER_QTY` | `120` |
+| `MARKET_FLOW_QTY` | `16` |
+| `MARKET_MAKER_INTERVAL_MS` | `800` |
+| `MARKET_FLOW_INTERVAL_MS` | `700` |
+
+Hoặc liệt kê email: `MARKET_MAKER_BOT_EMAILS=mm1@...,mm2@...` (không gồm flow).
+
+## Chuẩn bị user MM (một bot / dev)
 
 ```bash
 cd backend
 node scripts/ensure-market-maker-user.js
+# hoặc mọi bot:
+node scripts/ensure-liquidity-bots.js
 
 MM và flow cần **KC** (mua) + **token base** (bán) để lưu hành trên sổ lệnh.
 

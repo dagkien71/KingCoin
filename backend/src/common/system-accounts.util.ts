@@ -1,18 +1,18 @@
-import { liquidityBotEmails } from '@modules/market-maker/liquidity-bots.util';
+import {
+  isLiquidityBotUsername,
+  liquidityBotEmails,
+} from '@modules/market-maker/liquidity-bots.util';
 
 /** Tag API admin — bot thanh khoản (MM + flow). */
 export const ACCOUNT_TAG_LIQUIDITY_BOT = 'liquidity_bot' as const;
 
 export type UserAccountTag = typeof ACCOUNT_TAG_LIQUIDITY_BOT;
 
-const BOT_USERNAMES = new Set(['marketmaker', 'flowtrader']);
-
 export function isLiquidityBotEmail(
   email: string | null | undefined,
   username?: string | null,
 ): boolean {
-  const un = (username ?? '').trim().toLowerCase();
-  if (un && BOT_USERNAMES.has(un)) return true;
+  if (isLiquidityBotUsername(username)) return true;
   if (!email) return false;
   const normalized = email.trim().toLowerCase();
   return liquidityBotEmails().some((e) => e.toLowerCase() === normalized);

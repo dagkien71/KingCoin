@@ -4,6 +4,7 @@ import { TokenCryptoService } from '@modules/token-crypto/token.service';
 import { MmControlService } from '@modules/market-maker/mm-control.service';
 import { pathBookRefreshMinPct } from '@modules/market-maker/orderbook-path.util';
 import { MarketFlowService } from '@modules/market-maker/market-flow.service';
+import { mmLiquidityEmails } from '@modules/market-maker/liquidity-bots.util';
 import {
   isQuoteToken,
   resolveMmTargetTokenNames,
@@ -48,10 +49,8 @@ export class MarketMakerService implements OnModuleInit {
     if (!this.mmControl.isMmEnabled()) {
       return;
     }
-    const mmUser = await this.prisma.user.findFirst({
-      where: { email: this.mmEmail() },
-    });
-    if (!mmUser) {
+    const mmUsers = await this.resolveMmUsers();
+    if (mmUsers.length === 0) {
       return;
     }
     const token = await this.prisma.tokenCrypto.findUnique({
@@ -64,17 +63,27 @@ export class MarketMakerService implements OnModuleInit {
       return;
     }
     const params = this.mmControl.resolveParams(token.id);
-    await this.refreshLiquidityForToken(mmUser, token, params);
+    await this.cancelPendingOrdersForToken(token.id);
+    const n = mmUsers.length;
+    for (let i = 0; i < n; i++) {
+      await this.refreshLiquidityForToken(mmUsers[i], token, params, i, n);
+    }
   }
 
-  private mmEmail(): string {
-    return process.env.MARKET_MAKER_EMAIL ?? 'marketmaker@kingcoin.local';
-  }
-
-  private async resolveMmUser(): Promise<User | null> {
-    return this.prisma.user.findFirst({
-      where: { email: this.mmEmail() },
+  private async resolveMmUsers(): Promise<User[]> {
+    const emails = mmLiquidityEmails();
+    const rows = await this.prisma.user.findMany({
+      where: { email: { in: emails } },
     });
+    const byEmail = new Map(rows.map((u) => [u.email, u]));
+    return emails
+      .map((e) => byEmail.get(e))
+      .filter((u): u is User => !!u);
+  }
+
+  private multiMidStep(): number {
+    const raw = Number(process.env.MARKET_MAKER_MULTI_MID_STEP ?? '0.4');
+    return Number.isFinite(raw) ? raw : 0.4;
   }
 
   /** Hủy mọi lệnh MM đang treo (pending) cho một token — trước khi đổi giá đột ngột. */
@@ -169,16 +178,11 @@ export class MarketMakerService implements OnModuleInit {
     }
     this.refreshInFlight = true;
 
-    const mmEmail =
-      process.env.MARKET_MAKER_EMAIL ?? 'marketmaker@kingcoin.local';
-
     try {
-      const mmUser = await this.prisma.user.findFirst({
-        where: { email: mmEmail },
-      });
-      if (!mmUser) {
+      const mmUsers = await this.resolveMmUsers();
+      if (mmUsers.length === 0) {
         this.logger.warn(
-          `Market maker: không tìm thấy user ${mmEmail} — chạy node scripts/ensure-market-maker-user.js`,
+          `Market maker: không có user MM — chạy node scripts/ensure-liquidity-bots.js (emails: ${mmLiquidityEmails().join(', ')})`,
         );
         return;
       }
@@ -211,7 +215,17 @@ export class MarketMakerService implements OnModuleInit {
         }
         anyToken = true;
         const params = this.mmControl.resolveParams(token.id);
-        await this.refreshLiquidityForToken(mmUser, token, params);
+        await this.cancelPendingOrdersForToken(token.id);
+        const n = mmUsers.length;
+        for (let i = 0; i < n; i++) {
+          await this.refreshLiquidityForToken(
+            mmUsers[i],
+            token,
+            params,
+            i,
+            n,
+          );
+        }
       }
 
       if (!anyToken) {
@@ -237,6 +251,8 @@ export class MarketMakerService implements OnModuleInit {
       levelJitterPct: number;
       wanderPct: number;
     },
+    mmIndex = 0,
+    mmTotal = 1,
   ): Promise<void> {
     const {
       levels,
@@ -293,7 +309,12 @@ export class MarketMakerService implements OnModuleInit {
       mid = this.mmControl.finalizeMid(token.id, mid, baseMid);
     }
 
-    await this.cancelPendingOrdersForToken(token.id);
+    if (mmTotal > 1) {
+      const center = (mmTotal - 1) / 2;
+      const shiftPct =
+        (mmIndex - center) * this.multiMidStep() * spreadStep;
+      mid = mid * (1 + shiftPct);
+    }
 
     const qtyBase = qty;
     for (let i = 1; i <= levels; i++) {
@@ -372,7 +393,7 @@ export class MarketMakerService implements OnModuleInit {
     }
 
     this.logger.log(
-      `MM: ${token.name} — ${levels} bậc × 2 phía quanh mid=${mid} (DB ${baseMid}, ${modeLabel}) (${pair}), qty≈${qty}`,
+      `MM: ${mmUser.email} — ${token.name} — ${levels} bậc × 2 phía quanh mid=${mid} (DB ${baseMid}, ${modeLabel}) (${pair}), qty≈${qty}`,
     );
   }
 }

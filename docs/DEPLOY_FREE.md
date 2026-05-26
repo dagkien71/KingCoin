@@ -58,7 +58,15 @@ Stack gợi ý **0 đồng** cho demo / MVP, phù hợp monorepo Next.js + NestJ
 
    | Biến | Mục đích |
    |------|----------|
-   | `MARKET_MAKER_ENABLED` | `true` nếu muốn MM trên prod (mặc định prod = tắt) |
+   | `MARKET_MAKER_ENABLED` | `true` — bắt buộc nếu muốn thanh khoản trên prod |
+   | `MARKET_MAKER_BOT_COUNT` | `12` (mặc định prod khi không set) — số bot treo sổ |
+   | `MARKET_FLOW_BOT_COUNT` | `4` — bot khớp taker |
+   | `MARKET_MAKER_LEVELS` | `10` — bậc giá mỗi bot |
+   | `MARKET_MAKER_QTY` | `120` — khối lượng mỗi bậc |
+   | `MARKET_FLOW_QTY` | `16` |
+
+   Chi tiết: [MARKET_MAKER.md](./MARKET_MAKER.md), mẫu env: [env.production.liquidity.example](./env.production.liquidity.example). Sau deploy, bootstrap tạo `mm1`…`mm12` + `flow1`…`flow4` nếu chưa có.
+
    | `INITIAL_KC_BALANCE` | KC khi đăng ký, vd `2000` |
    | `CLD_CLOUD_NAME`, `CLD_API_KEY`, `CLD_API_SECRET` | Upload ảnh Cloudinary (free tier) |
    | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | Web Push |

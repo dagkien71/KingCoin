@@ -2,7 +2,10 @@ import type { OrderService } from '@modules/order/order.service';
 import { TokenCryptoService } from '@modules/token-crypto/token.service';
 import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { Order, OrderStatus, Prisma } from '@prisma/client';
-import { liquidityBotEmails } from '@modules/market-maker/liquidity-bots.util';
+import {
+  liquidityBotEmails,
+  mmLiquidityEmails,
+} from '@modules/market-maker/liquidity-bots.util';
 import { PrismaService } from '@providers/prisma';
 
 /**
@@ -94,12 +97,12 @@ export class MmInstantFillService {
       return;
     }
 
-    const mmEmail =
-      process.env.MARKET_MAKER_EMAIL ?? 'marketmaker@kingcoin.local';
-    const mmUser = await this.prisma.user.findFirst({
-      where: { email: mmEmail },
+    const mmEmails = mmLiquidityEmails();
+    const mmUsers = await this.prisma.user.findMany({
+      where: { email: { in: mmEmails } },
     });
-    if (!mmUser || mmUser.id === userId) {
+    const mmUser = mmUsers.find((u) => u.id !== userId);
+    if (!mmUser) {
       return;
     }
 

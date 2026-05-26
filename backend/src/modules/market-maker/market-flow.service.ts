@@ -1,3 +1,7 @@
+import {
+  flowLiquidityEmails,
+  mmLiquidityEmails,
+} from '@modules/market-maker/liquidity-bots.util';
 import { MmControlService } from '@modules/market-maker/mm-control.service';
 import {
   isQuoteToken,
@@ -76,18 +80,14 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
   ): Promise<number> {
     if (!this.mmControl.isFlowEnabled() || maxFills < 1) return 0;
 
-    const mmEmail =
-      process.env.MARKET_MAKER_EMAIL ?? 'marketmaker@kingcoin.local';
-    const flowEmail = process.env.MARKET_FLOW_EMAIL ?? 'flow@kingcoin.local';
     const qtyFlow = this.flowQty();
+    const mmIds = await this.resolveMmUserIds();
+    const flowUser = await this.resolveFlowUserForTick();
+    const token = await this.prisma.tokenCrypto.findUnique({
+      where: { id: tokenId },
+    });
 
-    const [mmUser, flowUser, token] = await Promise.all([
-      this.prisma.user.findFirst({ where: { email: mmEmail } }),
-      this.prisma.user.findFirst({ where: { email: flowEmail } }),
-      this.prisma.tokenCrypto.findUnique({ where: { id: tokenId } }),
-    ]);
-
-    if (!mmUser || !flowUser || !token?.id) return 0;
+    if (mmIds.length === 0 || !flowUser || !token?.id) return 0;
     if (this.mmControl.shouldProtectSpot(tokenId)) return 0;
 
     const pair = this.quotePair(token);
@@ -97,7 +97,7 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
       if (direction === 'up') {
         const bestSell = await this.prisma.order.findFirst({
           where: {
-            userId: mmUser.id,
+            userId: { in: mmIds },
             tokenId,
             type: 'sell',
             status: 'pending',
@@ -120,7 +120,7 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
       } else {
         const bestBuy = await this.prisma.order.findFirst({
           where: {
-            userId: mmUser.id,
+            userId: { in: mmIds },
             tokenId,
             type: 'buy',
             status: 'pending',
@@ -150,24 +150,21 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
     if (!this.mmControl.isFlowEnabled() || this.runInFlight) return;
     this.runInFlight = true;
 
-    const mmEmail =
-      process.env.MARKET_MAKER_EMAIL ?? 'marketmaker@kingcoin.local';
-    const flowEmail = process.env.MARKET_FLOW_EMAIL ?? 'flow@kingcoin.local';
     const qtyFlow = this.flowQty();
 
     try {
-      const [mmUser, flowUser] = await Promise.all([
-        this.prisma.user.findFirst({ where: { email: mmEmail } }),
-        this.prisma.user.findFirst({ where: { email: flowEmail } }),
-      ]);
+      const mmIds = await this.resolveMmUserIds();
+      const flowUser = await this.resolveFlowUserForTick();
 
-      if (!mmUser) {
-        this.logger.debug(`Flow: không có MM ${mmEmail}`);
+      if (mmIds.length === 0) {
+        this.logger.debug(
+          `Flow: không có MM — ${mmLiquidityEmails().join(', ')}`,
+        );
         return;
       }
       if (!flowUser) {
         this.logger.warn(
-          `Flow: không có user ${flowEmail} — chạy node scripts/ensure-flow-trader-user.js`,
+          `Flow: không có user taker — chạy node scripts/ensure-liquidity-bots.js`,
         );
         return;
       }
@@ -192,7 +189,7 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
         if (buyTurn) {
           const bestSell = await this.prisma.order.findFirst({
             where: {
-              userId: mmUser.id,
+              userId: { in: mmIds },
               tokenId: token.id,
               type: 'sell',
               status: 'pending',
@@ -219,7 +216,7 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
         } else {
           const bestBuy = await this.prisma.order.findFirst({
             where: {
-              userId: mmUser.id,
+              userId: { in: mmIds },
               tokenId: token.id,
               type: 'buy',
               status: 'pending',
@@ -250,5 +247,23 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
     } finally {
       this.runInFlight = false;
     }
+  }
+
+  private async resolveMmUserIds(): Promise<string[]> {
+    const emails = mmLiquidityEmails();
+    const rows = await this.prisma.user.findMany({
+      where: { email: { in: emails } },
+      select: { id: true },
+    });
+    return rows.map((r) => r.id);
+  }
+
+  private async resolveFlowUserForTick() {
+    const emails = flowLiquidityEmails();
+    const rows = await this.prisma.user.findMany({
+      where: { email: { in: emails } },
+    });
+    if (rows.length === 0) return null;
+    return rows[this.tick % rows.length];
   }
 }
