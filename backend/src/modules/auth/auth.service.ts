@@ -61,6 +61,8 @@ export class AuthService {
     private readonly config: ConfigService,
   ) {}
 
+  private readonly logger = new Logger(AuthService.name);
+
   private verificationRequired(): boolean {
     return this.config.get<boolean>('mail.verificationRequired') === true;
   }
