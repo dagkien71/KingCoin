@@ -106,6 +106,10 @@ export default class UserBaseEntity extends PartialType(UserEntity) {
   @Expose()
   declare readonly updatedAt: Date;
 
+  @ApiProperty({ type: Date, nullable: true })
+  @Expose()
+  declare readonly emailVerifiedAt: Date | null;
+
   @ApiProperty({ type: Boolean })
   @Expose()
   declare readonly isVerified: boolean;

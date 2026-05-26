@@ -32,6 +32,13 @@ import {
   validateUserSocialLinks,
   type UserSocialLinks,
 } from "@/lib/user-social-links";
+import { EmailVerificationNotice } from "@/modules/account/components/EmailVerificationNotice";
+
+function isEmailVerified(user: IUser | null | undefined): boolean {
+  if (!user) return false;
+  if (user.emailVerifiedAt) return true;
+  return Boolean(user.isVerified);
+}
 
 function FieldModal({
   open,
@@ -155,6 +162,7 @@ export function AccountProfileView() {
   const displayName =
     data?.username?.trim() || data?.email?.split("@")[0] || "Trader";
   const isAdmin = data?.role === ERoles.ADMIN;
+  const emailVerified = isEmailVerified(data);
   const memberSince = data?.createdAt
     ? new Date(data.createdAt).toLocaleDateString("vi-VN", {
         day: "2-digit",
@@ -208,12 +216,12 @@ export function AccountProfileView() {
                   <span
                     className={cn(
                       "rounded-md px-2 py-0.5 text-[11px] font-medium",
-                      data?.isVerified
+                      emailVerified
                         ? "bg-kc-up/15 text-kc-up"
                         : "bg-kc-surface text-kc-muted"
                     )}
                   >
-                    {data?.isVerified ? "Đã xác minh" : "Chưa xác minh"}
+                    {emailVerified ? "Email đã xác minh" : "Email chưa xác minh"}
                   </span>
                   <span className="rounded-md bg-kc-surface px-2 py-0.5 text-[11px] text-kc-muted">
                     {isAdmin ? "Admin" : "Trader"}
@@ -261,6 +269,12 @@ export function AccountProfileView() {
         </aside>
 
         <div className="lg:col-span-8">
+          {!emailVerified && data?.email ? (
+            <EmailVerificationNotice
+              email={data.email}
+              onVerified={() => void refetch()}
+            />
+          ) : null}
           <Card>
             <CardHeader>
               <CardTitle>Hồ sơ công khai</CardTitle>

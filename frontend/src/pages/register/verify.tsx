@@ -46,7 +46,7 @@ export default function VerifyEmailPage() {
       return;
     }
     toast.success("Xác nhận email thành công!");
-    router.push("/login");
+    router.push("/account");
   };
 
   const onResend = async () => {

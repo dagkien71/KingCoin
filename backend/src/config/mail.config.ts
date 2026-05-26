@@ -13,7 +13,6 @@ export default registerAs('mail', () => ({
     process.env.APP_PUBLIC_URL?.trim() ||
     process.env.FRONTEND_URL?.trim() ||
     'http://localhost:3000',
-  /** Khi false: không bắt xác minh email để đăng nhập (dev) */
-  verificationRequired:
-    process.env.EMAIL_VERIFICATION_REQUIRED !== 'false',
+  /** Chỉ khi `EMAIL_VERIFICATION_REQUIRED=true`: chặn login nếu chưa verify */
+  verificationRequired: process.env.EMAIL_VERIFICATION_REQUIRED === 'true',
 }));

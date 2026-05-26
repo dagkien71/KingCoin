@@ -54,7 +54,7 @@ export class AuthService {
   ) {}
 
   private verificationRequired(): boolean {
-    return this.config.get<boolean>('mail.verificationRequired') !== false;
+    return this.config.get<boolean>('mail.verificationRequired') === true;
   }
 
   private async hasPendingEmailVerify(userId: string): Promise<boolean> {
@@ -114,32 +114,13 @@ export class AuthService {
     );
     const full = await this.userRepository.findOne({ where: { id: created.id } });
     const user = full ?? created;
-    const code = await this.authTokens.issue(
-      user.id,
-      AuthTokenPurpose.email_verify,
-    );
-    const verificationEmailSent = await this.mail.send({
-      to: user.email,
-      template: 'email_verify',
-      vars: {
-        code,
-        email: user.email,
-        name: user.username ?? undefined,
-      },
-    });
-    if (!verificationEmailSent) {
-      this.logger.error(
-        `Đăng ký ${user.email} — không gửi được email xác minh (kiểm tra SMTP trên Render log)`,
-      );
-    }
-
     if (initialKc > 0) {
       await this.notifications.notify({
         userId: user.id,
         type: NotificationType.SIGNUP_BONUS,
         priority: NotificationPriority.low,
         title: 'Chào mừng KingCoin',
-        body: `Bạn nhận ${initialKc.toLocaleString('vi-VN')} KC khi xác nhận email và đăng nhập.`,
+        body: `Bạn nhận ${initialKc.toLocaleString('vi-VN')} KC khi đăng nhập lần đầu.`,
         dedupeKey: `SIGNUP_BONUS:${user.id}`,
         payload: { deeplink: '/wallet', amountKc: initialKc },
       });
@@ -148,7 +129,7 @@ export class AuthService {
       id: user.id,
       email: user.email,
       username: user.username,
-      verificationEmailSent,
+      verificationEmailSent: false,
     };
   }
 
@@ -298,17 +279,12 @@ export class AuthService {
       throw new UnauthorizedException(INVALID_CREDENTIALS);
     }
 
-    if (!testUser.emailVerifiedAt) {
-      const pending = await this.hasPendingEmailVerify(testUser.id);
-      if (pending && this.verificationRequired()) {
-        throw new UnauthorizedException(UNVERIFIED_EMAIL);
-      }
-      if (!pending) {
-        await this.userRepository.update(testUser.id, {
-          emailVerifiedAt: new Date(),
-        });
-        testUser.emailVerifiedAt = new Date();
-      }
+    if (
+      !testUser.emailVerifiedAt &&
+      this.verificationRequired() &&
+      (await this.hasPendingEmailVerify(testUser.id))
+    ) {
+      throw new UnauthorizedException(UNVERIFIED_EMAIL);
     }
 
     if (this.tokenService.isLegacyPlainPassword(testUser.password)) {

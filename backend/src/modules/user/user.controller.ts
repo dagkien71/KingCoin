@@ -43,7 +43,11 @@ export class UserController {
   @UseAbility(Actions.read, UserEntity)
   async me(@CaslUser() userProxy?: UserProxy<User>): Promise<User> {
     const tokenUser = await userProxy.get();
-    return this.portfolioPnl.syncUserNavPnL(tokenUser.id);
+    const row = await this.portfolioPnl.syncUserNavPnL(tokenUser.id);
+    return {
+      ...row,
+      isVerified: row.emailVerifiedAt != null,
+    } as User;
   }
 
   @Patch('me')

@@ -96,7 +96,7 @@ export function AdminUsersList() {
             key={id}
             type="button"
             size="sm"
-            variant={scope === id ? "default" : "secondary"}
+            variant={scope === id ? "primary" : "secondary"}
             onClick={() => applyScope(id)}
           >
             {label}
