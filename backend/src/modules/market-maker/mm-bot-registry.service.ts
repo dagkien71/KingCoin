@@ -125,6 +125,39 @@ export class MmBotRegistryService {
     };
   }
 
+  private async getQuoteTokenId(): Promise<string | null> {
+    const quoteName = process.env.QUOTE_TOKEN_NAME ?? 'KingCoin';
+    const quote = await this.prisma.tokenCrypto.findFirst({
+      where: { name: quoteName },
+      select: { id: true },
+    });
+    return quote?.id ?? null;
+  }
+
+  private sumKcAndCountBase(
+    balance:
+      | {
+          stableCoin?: number;
+          tokens?: { tokenId: string; amount: number }[];
+        }
+      | null
+      | undefined,
+    quoteId: string | null,
+  ): { kcBalance: number; baseTokenKinds: number } {
+    if (!balance) return { kcBalance: 0, baseTokenKinds: 0 };
+    let kcBalance = balance.stableCoin ?? 0;
+    let baseTokenKinds = 0;
+    for (const t of balance.tokens ?? []) {
+      if (!t.tokenId || (t.amount ?? 0) <= 1e-12) continue;
+      if (quoteId && t.tokenId === quoteId) {
+        kcBalance += Number(t.amount ?? 0);
+      } else {
+        baseTokenKinds += 1;
+      }
+    }
+    return { kcBalance, baseTokenKinds };
+  }
+
   async getAdminDashboard(): Promise<{
     globalMmEnabled: boolean;
     globalFlowEnabled: boolean;
@@ -135,35 +168,41 @@ export class MmBotRegistryService {
     bots: MmBotAdminRow[];
   }> {
     const { mm, flow } = this.configuredEmails();
-    const allEmails = [...new Set([...mm, ...flow])];
-    const users = await this.prisma.user.findMany({
-      where: { email: { in: allEmails } },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        balance: {
-          select: {
-            tokens: {
-              select: {
-                amount: true,
-                token: { select: { symbol: true, tokenKind: true } },
+    const quoteId = await this.getQuoteTokenId();
+
+    const users =
+      mm.length + flow.length === 0
+        ? []
+        : await this.prisma.user.findMany({
+            where: { email: { in: [...new Set([...mm, ...flow])] } },
+            select: {
+              id: true,
+              email: true,
+              username: true,
+              balance: {
+                select: {
+                  stableCoin: true,
+                  tokens: {
+                    select: { tokenId: true, amount: true },
+                  },
+                },
               },
             },
-          },
-        },
-      },
-    });
+          });
     const byEmail = new Map(users.map((u) => [u.email.toLowerCase(), u]));
 
-    const pendingGroups = await this.prisma.order.groupBy({
-      by: ['userId'],
-      where: {
-        userId: { in: users.map((u) => u.id) },
-        status: 'pending',
-      },
-      _count: { _all: true },
-    });
+    const userIds = users.map((u) => u.id);
+    const pendingGroups =
+      userIds.length === 0
+        ? []
+        : await this.prisma.order.groupBy({
+            by: ['userId'],
+            where: {
+              userId: { in: userIds },
+              status: 'pending',
+            },
+            _count: { _all: true },
+          });
     const pendingByUser = new Map(
       pendingGroups.map((g) => [g.userId, g._count._all]),
     );
@@ -178,19 +217,10 @@ export class MmBotRegistryService {
       const enabled = ov.enabled !== false;
       const running = configured && enabled && this.isBotEnabled(email, kind);
       const stats = user ? this.getStats(user.id) : null;
-      let kcBalance = 0;
-      let baseTokenKinds = 0;
-      if (user?.balance?.tokens) {
-        for (const t of user.balance.tokens) {
-          const sym = (t.token?.symbol ?? '').toUpperCase();
-          const kindTok = t.token?.tokenKind;
-          if (sym === 'KC' || kindTok === 'stablecoin') {
-            kcBalance += Number(t.amount ?? 0);
-          } else {
-            baseTokenKinds += 1;
-          }
-        }
-      }
+      const { kcBalance, baseTokenKinds } = this.sumKcAndCountBase(
+        user?.balance,
+        quoteId,
+      );
       return {
         userId: user?.id ?? '',
         email,
