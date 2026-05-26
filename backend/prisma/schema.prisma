@@ -60,7 +60,6 @@ model User {
 enum AuthTokenPurpose {
   email_verify
   password_reset
-  email_change
 }
 
 model AuthToken {

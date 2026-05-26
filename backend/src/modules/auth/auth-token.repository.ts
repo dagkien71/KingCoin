@@ -7,7 +7,6 @@ const CODE_LENGTH = 6;
 const DEFAULT_TTL_MIN: Record<AuthTokenPurpose, number> = {
   email_verify: 15,
   password_reset: 15,
-  email_change: 15,
 };
 
 @Injectable()
@@ -25,10 +24,11 @@ export class AuthTokenRepository {
   async issue(
     userId: string,
     purpose: AuthTokenPurpose,
-    ttlMinutes = DEFAULT_TTL_MIN[purpose],
+    ttlMinutes = DEFAULT_TTL_MIN[purpose] ?? 15,
   ): Promise<string> {
     const code = this.generateCode();
-    const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
+    const ttl = Number.isFinite(ttlMinutes) ? ttlMinutes : 15;
+    const expiresAt = new Date(Date.now() + ttl * 60_000);
     await this.prisma.authToken.updateMany({
       where: { userId, purpose, usedAt: null },
       data: { usedAt: new Date() },

@@ -372,7 +372,7 @@ export class AuthService {
 
     const code = await this.authTokens.issue(
       userId,
-      AuthTokenPurpose.email_change,
+      AuthTokenPurpose.email_verify,
     );
     const sent = await this.deliverMail(newEmail, 'email_change_verify', {
       code,
@@ -416,7 +416,7 @@ export class AuthService {
 
     const ok = await this.authTokens.consume(
       userId,
-      AuthTokenPurpose.email_change,
+      AuthTokenPurpose.email_verify,
       dto.code,
     );
     if (!ok) {
@@ -445,7 +445,7 @@ export class AuthService {
     await this.prisma.authToken.updateMany({
       where: {
         userId,
-        purpose: AuthTokenPurpose.email_change,
+        purpose: AuthTokenPurpose.email_verify,
         usedAt: null,
       },
       data: { usedAt: new Date() },
