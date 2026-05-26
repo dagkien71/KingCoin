@@ -17,6 +17,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PlatformLiquiditySettings } from '@prisma/client';
 import { PrismaService } from '@providers/prisma';
 import { PatchPlatformLiquiditySettingsDto } from './dto/patch-platform-liquidity-settings.dto';
+import { NORMAL_STEADY_PRESET } from './liquidity-presets.util';
 
 export const PLATFORM_LIQUIDITY_SETTINGS_ID = 'platform-liquidity-default';
 
@@ -210,7 +211,14 @@ export class PlatformLiquiditySettingsService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     await this.loadFromDb();
-    await this.applyToRuntime({ notifyIntervals: false });
+    if (process.env.MM_FORCE_NORMAL_STEADY_PRESET === 'true') {
+      this.logger.log(
+        'MM_FORCE_NORMAL_STEADY_PRESET — áp preset bình thường ±0.1%',
+      );
+      await this.patch(NORMAL_STEADY_PRESET);
+    } else {
+      await this.applyToRuntime({ notifyIntervals: false });
+    }
     this.logger.log('Đã nạp cài đặt thanh khoản từ DB (nếu có)');
   }
 
@@ -252,6 +260,10 @@ export class PlatformLiquiditySettingsService implements OnModuleInit {
     this.dbRow = null;
     await this.applyToRuntime({ notifyIntervals: true });
     return this.getAdminView();
+  }
+
+  async applyNormalSteadyPreset(): Promise<LiquiditySettingsResponse> {
+    return this.patch(NORMAL_STEADY_PRESET);
   }
 
   async applyToRuntime(opts?: { notifyIntervals?: boolean }): Promise<void> {

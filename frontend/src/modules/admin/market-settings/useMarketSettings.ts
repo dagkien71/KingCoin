@@ -19,6 +19,10 @@ export function useMarketSettings() {
     "POST",
     "/admin/market-settings/reset-env"
   );
+  const applyPreset = useMutation<MarketSettingsResponse>(
+    "POST",
+    "/admin/market-settings/presets/normal-steady"
+  );
 
   const save = async (body: MarketSettingsPatch) => {
     const result = await patch.mutate(body);
@@ -36,6 +40,14 @@ export function useMarketSettings() {
     return true;
   };
 
+  const applyNormalSteady = async () => {
+    const result = await applyPreset.mutate({});
+    if (isMutationFailure(result)) return false;
+    toast.success("Đã áp preset bình thường — sổ nhanh, giá ±~0.1%.");
+    void refetch();
+    return true;
+  };
+
   return {
     data,
     loading,
@@ -43,7 +55,9 @@ export function useMarketSettings() {
     refetch,
     saving: patch.loading,
     resetting: reset.loading,
+    applyingPreset: applyPreset.loading,
     save,
     resetToEnv,
+    applyNormalSteady,
   };
 }

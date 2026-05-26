@@ -28,4 +28,9 @@ export class MarketSettingsAdminController {
   resetToEnv() {
     return this.platformSettings.resetToEnv();
   }
+
+  @Post('presets/normal-steady')
+  applyNormalSteady() {
+    return this.platformSettings.applyNormalSteadyPreset();
+  }
 }

@@ -13,6 +13,7 @@ import {
   clampMarketSettings,
   validateMarketSettings,
 } from "@/modules/admin/market-settings/market-settings-limits";
+import { NORMAL_STEADY_PRESET } from "@/modules/admin/market-settings/market-settings-presets";
 import { useMarketSettings } from "@/modules/admin/market-settings/useMarketSettings";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -110,8 +111,18 @@ function NumField({
 }
 
 export function MarketSettingsView() {
-  const { data, loading, error, saving, resetting, save, resetToEnv, refetch } =
-    useMarketSettings();
+  const {
+    data,
+    loading,
+    error,
+    saving,
+    resetting,
+    applyingPreset,
+    save,
+    resetToEnv,
+    applyNormalSteady,
+    refetch,
+  } = useMarketSettings();
   const [form, setForm] = useState<EffectiveLiquiditySettings | null>(null);
   /** Tránh poll 5s ghi đè ô đang gõ */
   const [dirty, setDirty] = useState(false);
@@ -145,6 +156,14 @@ export function MarketSettingsView() {
   const handleResetEnv = async () => {
     const ok = await resetToEnv();
     if (ok) setDirty(false);
+  };
+
+  const handleApplyNormalSteady = async () => {
+    const ok = await applyNormalSteady();
+    if (ok) {
+      setDirty(false);
+      setForm(clampMarketSettings(NORMAL_STEADY_PRESET));
+    }
   };
 
   const handleRefresh = () => {
@@ -185,6 +204,16 @@ export function MarketSettingsView() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={applyingPreset || saving}
+            onClick={() => void handleApplyNormalSteady()}
+            title="Sổ 500ms, flow vừa, giá dao ±~0.1%"
+          >
+            {applyingPreset ? "Đang áp…" : "Preset ±0.1%"}
+          </Button>
           <Button
             type="button"
             variant="secondary"
