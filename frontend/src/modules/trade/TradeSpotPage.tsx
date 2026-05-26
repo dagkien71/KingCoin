@@ -1,7 +1,14 @@
 "use client";
 
 import DbTokenPriceChart from "@/components/charts/DbTokenPriceChart";
-import { ORDER_BOOK_PANEL_HEIGHT_PX } from "@/constants/order-book";
+import {
+  TRADE_BOOK_SECTION_CLASS,
+  TRADE_CHART_SECTION_CLASS,
+  TRADE_MY_ORDERS_SECTION_CLASS,
+  TRADE_ORDER_ASIDE_CLASS,
+  TRADE_PANEL_HEIGHT_CLASS,
+  TRADE_TERMINAL_GRID_CLASS,
+} from "@/constants/trade-layout";
 import { Skeleton } from "@/components/ui/skeleton";
 import useAuth from "@/hooks/useAuth";
 import useGlobalTradingNotify from "@/hooks/useGlobalTradingNotify";
@@ -141,8 +148,8 @@ function PairToolbar({
         </div>
       )}
 
-      <div className="flex min-w-0 flex-1 items-start gap-3">
-        <div className="min-w-0">
+      <div className="flex min-w-0 flex-1 flex-wrap items-start gap-2 md:gap-3">
+        <div className="min-w-0 flex-1">
           <h1 className="text-lg font-bold tracking-tight text-kc-fg sm:text-xl">
             <span className="num">{symbol}</span>
             <span className="text-kc-fg">/{QUOTE_SYMBOL}</span>
@@ -294,18 +301,16 @@ function TradeTerminal({
         />
       </div>
 
-      <div className="flex flex-1 flex-col gap-3 p-3 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(240px,280px)_minmax(260px,300px)] lg:items-stretch lg:gap-3 lg:p-3">
+      <div className={TRADE_TERMINAL_GRID_CLASS}>
         {/* Biểu đồ — cột 1 */}
         <section
           data-tour="trade-chart"
           className={clsx(
-            "order-1 flex min-w-0 flex-col overflow-hidden rounded-xl border border-kc-border bg-kc-elevated shadow-kc",
+            TRADE_CHART_SECTION_CLASS,
+            TRADE_PANEL_HEIGHT_CLASS,
+            "flex min-w-0 flex-col overflow-hidden rounded-xl border border-kc-border bg-kc-elevated shadow-kc",
             "ring-1 ring-white/[0.04]"
           )}
-          style={{
-            height: ORDER_BOOK_PANEL_HEIGHT_PX,
-            maxHeight: ORDER_BOOK_PANEL_HEIGHT_PX,
-          }}
         >
           <div className="flex w-full shrink-0 flex-wrap items-center gap-2 border-b border-kc-border bg-kc-surface/40 px-3 py-2.5 sm:px-4">
             {(["Chart", "Summary"] as const).map((tab) => (
@@ -325,7 +330,7 @@ function TradeTerminal({
             ))}
             <Link
               href="/token/list"
-              className="ml-auto text-xs font-medium text-kc-muted hover:text-kc-fg lg:hidden"
+              className="ml-auto text-xs font-medium text-kc-muted hover:text-kc-fg md:hidden"
             >
               ← Thị trường
             </Link>
@@ -339,13 +344,11 @@ function TradeTerminal({
         <section
           data-tour="trade-orderbook"
           className={clsx(
-            "order-3 flex w-full shrink-0 flex-col overflow-hidden rounded-xl border border-kc-border bg-kc-elevated shadow-kc lg:order-2",
-            "ring-1 ring-white/[0.04]"
+            TRADE_BOOK_SECTION_CLASS,
+            TRADE_PANEL_HEIGHT_CLASS,
+            "flex w-full shrink-0 flex-col overflow-hidden rounded-xl border border-kc-border bg-kc-elevated shadow-kc",
+            "ring-1 ring-white/[0.04] md:min-h-0 md:h-full md:max-h-none xl:max-h-[620px]"
           )}
-          style={{
-            height: ORDER_BOOK_PANEL_HEIGHT_PX,
-            maxHeight: ORDER_BOOK_PANEL_HEIGHT_PX,
-          }}
         >
           <div className="shrink-0 border-b border-kc-border bg-kc-surface/40 px-3 py-2.5">
             <div className="flex items-center justify-between gap-2">
@@ -378,22 +381,15 @@ function TradeTerminal({
         </section>
 
         {/* Đặt lệnh — cố định chiều cao, không sticky */}
-        <aside
-          className={clsx(
-            "order-2 w-full shrink-0 lg:order-3 lg:col-start-3 lg:row-start-1 lg:self-start"
-          )}
-        >
+        <aside className={clsx(TRADE_ORDER_ASIDE_CLASS, "w-full shrink-0")}>
           {cryptoData ? (
             <div
               data-tour="trade-order"
               className={clsx(
+                TRADE_PANEL_HEIGHT_CLASS,
                 "flex w-full flex-col overflow-hidden rounded-xl border border-kc-border bg-kc-elevated shadow-kc",
-                "ring-1 ring-white/[0.04]"
+                "ring-1 ring-white/[0.04] md:min-h-0 md:h-full md:max-h-none xl:max-h-[620px]"
               )}
-              style={{
-                height: ORDER_BOOK_PANEL_HEIGHT_PX,
-                maxHeight: ORDER_BOOK_PANEL_HEIGHT_PX,
-              }}
             >
               <div className="flex shrink-0 items-center justify-between gap-2 border-b border-kc-border bg-kc-surface/40 px-3 py-2">
                 <div>
@@ -416,11 +412,10 @@ function TradeTerminal({
             </div>
           ) : (
             <div
-              className="flex items-center justify-center rounded-xl border border-dashed border-kc-border bg-kc-surface/30 p-6 text-center text-sm text-kc-muted"
-              style={{
-                height: ORDER_BOOK_PANEL_HEIGHT_PX,
-                maxHeight: ORDER_BOOK_PANEL_HEIGHT_PX,
-              }}
+              className={clsx(
+                TRADE_PANEL_HEIGHT_CLASS,
+                "flex items-center justify-center rounded-xl border border-dashed border-kc-border bg-kc-surface/30 p-6 text-center text-sm text-kc-muted"
+              )}
             >
               Đang tải bảng lệnh…
             </div>
@@ -452,7 +447,8 @@ function TradeTerminal({
         <section
           data-tour="trade-my-orders"
           className={clsx(
-            "order-4 overflow-hidden rounded-xl border border-kc-border bg-kc-elevated shadow-kc lg:col-span-3",
+            TRADE_MY_ORDERS_SECTION_CLASS,
+            "overflow-hidden rounded-xl border border-kc-border bg-kc-elevated shadow-kc",
             "ring-1 ring-white/[0.04]"
           )}
         >

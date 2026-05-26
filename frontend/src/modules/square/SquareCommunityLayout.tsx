@@ -49,14 +49,14 @@ export function SquareCommunityLayout({
   lockMainHeight = false,
 }: Props) {
   return (
-    <main className="min-h-screen bg-kc-bg px-4 py-6 sm:px-6 lg:py-8">
+    <main className="min-h-screen bg-kc-bg px-4 py-6 sm:px-6 md:py-8">
       <div
         className={cn(
-          "mx-auto flex flex-col gap-6 lg:flex-row lg:items-start",
+          "mx-auto flex flex-col gap-6 md:flex-row md:items-start",
           wideMain ? "max-w-6xl" : "max-w-5xl"
         )}
       >
-        <aside className="w-full shrink-0 lg:sticky lg:top-24 lg:w-72 xl:w-80">
+        <aside className="w-full shrink-0 md:sticky md:top-24 md:w-64 lg:w-72 xl:w-80">
           <div className="space-y-4">
             <div className="rounded-2xl border border-kc-border bg-kc-surface/90 p-4 shadow-kc-glow sm:p-5">
               <div className="flex items-center gap-2 text-kc-accent">
@@ -76,8 +76,8 @@ export function SquareCommunityLayout({
             <nav
               className={cn(
                 "rounded-2xl border border-kc-border p-2",
-                "max-lg:sticky max-lg:top-16 max-lg:z-30 max-lg:bg-kc-bg max-lg:shadow-[0_4px_20px_rgba(0,0,0,0.35)]",
-                "lg:bg-kc-surface/80"
+                "max-md:sticky max-md:top-16 max-md:z-30 max-md:bg-kc-bg max-md:shadow-[0_4px_20px_rgba(0,0,0,0.35)]",
+                "md:bg-kc-surface/80"
               )}
               aria-label="Điều hướng cộng đồng"
             >

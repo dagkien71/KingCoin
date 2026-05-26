@@ -86,11 +86,11 @@ export default function Header() {
       className={cn(
         "fixed left-0 right-0 top-0 z-50 border-b border-kc-border",
         "bg-kc-bg shadow-[0_4px_24px_rgba(0,0,0,0.45)]",
-        "lg:bg-kc-bg/90 lg:backdrop-blur-lg lg:shadow-none"
+        "md:bg-kc-bg/90 md:backdrop-blur-lg md:shadow-none"
       )}
     >
-      <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6">
-        <div className="flex min-w-0 flex-1 items-center gap-8 lg:gap-10">
+      <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between gap-2 px-4 sm:gap-4 sm:px-6">
+        <div className="flex min-w-0 flex-1 items-center gap-4 md:gap-6 lg:gap-10">
           <Link href="/" className="group flex shrink-0 items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-kc-accent text-kc-bg font-bold text-sm shadow-kc-glow">
               K
@@ -101,14 +101,14 @@ export default function Header() {
             </span>
           </Link>
 
-          <nav className="hidden lg:flex items-center gap-1">
+          <nav className="hidden md:flex min-w-0 max-w-[min(100%,48vw)] items-center gap-0.5 overflow-x-auto lg:max-w-none lg:gap-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {NAV.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
                 data-tour={item.tourId}
                 className={cn(
-                  "rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                  "shrink-0 rounded-lg px-2 py-2 text-xs font-medium transition-colors md:px-2.5 lg:px-3 lg:text-sm",
                   isNavActive(router.pathname, item.href)
                     ? "bg-white/[0.06] text-kc-fg"
                     : "text-kc-muted hover:text-kc-fg hover:bg-white/[0.04]"
@@ -122,7 +122,7 @@ export default function Header() {
 
         <div className="flex items-center gap-3 sm:gap-4">
           <div
-            className="hidden w-[360px] shrink-0 md:block"
+            className="hidden w-[200px] shrink-0 md:block lg:w-[280px] xl:w-[360px]"
             data-tour="header-search"
           >
             <SearchForm />
@@ -141,7 +141,7 @@ export default function Header() {
               disabled={tour.isRunning}
             >
               <HiOutlineQuestionMarkCircle className="h-4 w-4" />
-              <span className="hidden lg:inline">Hướng dẫn</span>
+              <span className="hidden xl:inline">Hướng dẫn</span>
             </Button>
           ) : null}
 
@@ -171,7 +171,7 @@ export default function Header() {
           ) : null}
           <button
             type="button"
-            className="flex h-10 w-10 items-center justify-center rounded-lg border border-kc-border text-kc-fg lg:hidden"
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-kc-border text-kc-fg md:hidden"
             onClick={() => setOpen(true)}
             aria-label="Mở menu"
           >
@@ -201,7 +201,7 @@ export default function Header() {
                 <HiX className="h-5 w-5" />
               </button>
             </div>
-            <div className="border-b border-kc-border p-4 md:hidden" data-tour="header-search">
+            <div className="border-b border-kc-border p-4" data-tour="header-search">
               <SearchForm />
             </div>
             <nav className="flex flex-col gap-1 p-3">

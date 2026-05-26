@@ -1,7 +1,14 @@
 "use client";
 
 import DbTokenPriceChart from "@/components/charts/DbTokenPriceChart";
-import { ORDER_BOOK_PANEL_HEIGHT_PX } from "@/constants/order-book";
+import {
+  TRADE_BOOK_SECTION_CLASS,
+  TRADE_CHART_SECTION_CLASS,
+  TRADE_MY_ORDERS_SECTION_CLASS,
+  TRADE_ORDER_ASIDE_CLASS,
+  TRADE_PANEL_HEIGHT_CLASS,
+  TRADE_TERMINAL_GRID_CLASS,
+} from "@/constants/trade-layout";
 import { Skeleton } from "@/components/ui/skeleton";
 import PriceAlertPanel from "@/components/notifications/PriceAlertPanel";
 import useAuth from "@/hooks/useAuth";
@@ -178,7 +185,7 @@ function FuturesTerminalInner({
           markPrice={markPrice}
           onRefresh={refreshAll}
         />
-        <div className="border-t border-kc-border/60 px-3 pb-2 sm:hidden">
+        <div className="border-t border-kc-border/60 px-3 pb-2 md:hidden">
           <FuturesPairSelect
             currentTokenId={cryptoData?.id}
             className="w-full rounded-lg border border-kc-border bg-kc-surface px-2 py-2 text-sm"
@@ -186,17 +193,15 @@ function FuturesTerminalInner({
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-3 p-3 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(240px,280px)_minmax(260px,300px)] lg:items-stretch lg:gap-3 lg:p-3">
+      <div className={TRADE_TERMINAL_GRID_CLASS}>
         {/* Biểu đồ */}
         <section
           className={clsx(
-            "order-1 flex min-w-0 flex-col overflow-hidden rounded-xl border border-kc-border bg-kc-elevated shadow-kc",
+            TRADE_CHART_SECTION_CLASS,
+            TRADE_PANEL_HEIGHT_CLASS,
+            "flex min-w-0 flex-col overflow-hidden rounded-xl border border-kc-border bg-kc-elevated shadow-kc",
             "ring-1 ring-white/[0.04]"
           )}
-          style={{
-            height: ORDER_BOOK_PANEL_HEIGHT_PX,
-            maxHeight: ORDER_BOOK_PANEL_HEIGHT_PX,
-          }}
         >
           <div className="flex w-full shrink-0 flex-wrap items-center gap-2 border-b border-kc-border bg-kc-surface/40 px-3 py-2.5 sm:px-4">
             {(["Chart", "Summary"] as const).map((tab) => (
@@ -216,7 +221,7 @@ function FuturesTerminalInner({
             ))}
             <Link
               href="/futures"
-              className="ml-auto text-xs font-medium text-kc-muted hover:text-kc-fg lg:hidden"
+              className="ml-auto text-xs font-medium text-kc-muted hover:text-kc-fg md:hidden"
             >
               ← Danh sách
             </Link>
@@ -229,13 +234,11 @@ function FuturesTerminalInner({
         {/* Sổ lệnh spot (mark reference) */}
         <section
           className={clsx(
-            "order-3 flex w-full shrink-0 flex-col overflow-hidden rounded-xl border border-kc-border bg-kc-elevated shadow-kc lg:order-2",
-            "ring-1 ring-white/[0.04]"
+            TRADE_BOOK_SECTION_CLASS,
+            TRADE_PANEL_HEIGHT_CLASS,
+            "flex w-full shrink-0 flex-col overflow-hidden rounded-xl border border-kc-border bg-kc-elevated shadow-kc",
+            "ring-1 ring-white/[0.04] md:min-h-0 md:h-full md:max-h-none xl:max-h-[620px]"
           )}
-          style={{
-            height: ORDER_BOOK_PANEL_HEIGHT_PX,
-            maxHeight: ORDER_BOOK_PANEL_HEIGHT_PX,
-          }}
         >
           <div className="shrink-0 border-b border-kc-border bg-kc-surface/40 px-3 py-2.5">
             <div className="flex items-center justify-between gap-2">
@@ -343,7 +346,8 @@ function FuturesTerminalInner({
         {/* Vị thế của tôi */}
         <section
           className={clsx(
-            "order-4 overflow-hidden rounded-xl border border-kc-border bg-kc-elevated shadow-kc lg:col-span-3",
+            TRADE_MY_ORDERS_SECTION_CLASS,
+            "overflow-hidden rounded-xl border border-kc-border bg-kc-elevated shadow-kc",
             "ring-1 ring-white/[0.04]"
           )}
         >

@@ -90,9 +90,9 @@ export default function AdminShell({ children }: Props) {
         </div>
       </header>
 
-      <div className="relative z-10 mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:flex-row lg:py-8">
-        <aside className="lg:w-56 lg:shrink-0">
-          <nav className="flex gap-1 overflow-x-auto rounded-xl border border-violet-500/20 bg-[#100d18]/80 p-1 lg:flex-col lg:overflow-visible lg:p-2">
+      <div className="relative z-10 mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 md:flex-row md:py-8">
+        <aside className="md:w-52 md:shrink-0 lg:w-56">
+          <nav className="flex gap-1 overflow-x-auto rounded-xl border border-violet-500/20 bg-[#100d18]/80 p-1 md:flex-col md:overflow-visible md:p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {ADMIN_NAV.map((item) => {
               const active = isAdminNavActive(router.pathname, item);
               const Icon = item.icon;
@@ -114,7 +114,7 @@ export default function AdminShell({ children }: Props) {
             })}
           </nav>
 
-          <div className="mt-4 hidden rounded-xl border border-violet-500/15 bg-violet-500/[0.04] p-4 lg:block">
+          <div className="mt-4 hidden rounded-xl border border-violet-500/15 bg-violet-500/[0.04] p-4 md:block">
             <p className="text-xs font-medium uppercase tracking-wider text-violet-400/80">
               Control room
             </p>

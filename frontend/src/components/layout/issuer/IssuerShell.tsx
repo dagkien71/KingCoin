@@ -87,9 +87,9 @@ export default function IssuerShell({ children }: Props) {
         </div>
       </header>
 
-      <div className="relative z-10 mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:flex-row lg:py-8">
-        <aside className="lg:w-56 lg:shrink-0">
-          <nav className="flex gap-1 overflow-x-auto rounded-xl border border-emerald-500/15 bg-[#0d141f]/80 p-1 lg:flex-col lg:overflow-visible lg:p-2">
+      <div className="relative z-10 mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 md:flex-row md:py-8">
+        <aside className="md:w-52 md:shrink-0 lg:w-56">
+          <nav className="flex gap-1 overflow-x-auto rounded-xl border border-emerald-500/15 bg-[#0d141f]/80 p-1 md:flex-col md:overflow-visible md:p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {ISSUER_NAV.map((item) => {
               const active = isIssuerNavActive(router.pathname, item);
               const Icon = item.icon;
