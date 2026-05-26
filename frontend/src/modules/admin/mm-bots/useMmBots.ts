@@ -23,6 +23,9 @@ export function useMmBots() {
   );
 
   const [busyEmail, setBusyEmail] = useState<string | null>(null);
+  const [bootstrapping, setBootstrapping] = useState(false);
+
+  const { mutate: postBootstrap } = useMutation("POST", "/admin/mm-bots/bootstrap");
 
   const run = useCallback(
     async (email: string, fn: () => Promise<unknown>) => {
@@ -60,6 +63,26 @@ export function useMmBots() {
     [postAction, run]
   );
 
+  const bootstrapBots = useCallback(async () => {
+    setBootstrapping(true);
+    try {
+      const res = (await postBootstrap({})) as {
+        created?: number;
+        mm?: number;
+        flow?: number;
+      };
+      toast.success(
+        `Đã đồng bộ bot: ${res?.mm ?? 0} MM + ${res?.flow ?? 0} flow` +
+          (res?.created ? ` (${res.created} tài khoản mới)` : "")
+      );
+      await refetch();
+    } catch (e) {
+      toast.error((e as Error)?.message ?? "Bootstrap bot thất bại");
+    } finally {
+      setBootstrapping(false);
+    }
+  }, [postBootstrap, refetch]);
+
   const refreshBot = useCallback(
     (email: string) =>
       run(email, async () => {
@@ -85,6 +108,8 @@ export function useMmBots() {
     unconfiguredMm,
     unconfiguredFlow,
     busyEmail,
+    bootstrapping,
+    bootstrapBots,
     mmBots,
     flowBots,
     runningMm,

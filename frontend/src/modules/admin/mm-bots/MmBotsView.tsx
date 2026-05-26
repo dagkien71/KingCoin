@@ -33,6 +33,8 @@ export function MmBotsView() {
     setEnabled,
     cancelOrders,
     refreshBot,
+    bootstrapping,
+    bootstrapBots,
   } = useMmBots();
 
   return (
@@ -162,10 +164,9 @@ export function MmBotsView() {
 
       {data && unconfiguredMm + unconfiguredFlow > 0 ? (
         <p className="rounded-lg border border-violet-500/25 bg-violet-500/10 px-4 py-3 text-sm text-violet-100/90">
-          {unconfiguredMm + unconfiguredFlow} bot chưa có user trong DB — sau
-          deploy Render, bootstrap chạy{" "}
-          <code className="text-xs">ensure-liquidity-bots.js</code>. Xem log
-          deploy hoặc redeploy backend.
+          {unconfiguredMm + unconfiguredFlow} bot chưa có user trong DB — bấm{" "}
+          <strong>Tạo/sync bot trong DB</strong> (không cần Shell Render). Mỗi
+          lần deploy backend, script bootstrap trên server cũng chạy tự động.
         </p>
       ) : null}
 

@@ -172,7 +172,7 @@ Mặc định email `marketmaker@kingcoin.local`, mật khẩu seed `mm-dev-chan
 2. **Render**: sau khi sửa env, bấm **Manual Deploy** (env chỉ áp vào process mới).
 3. **`MARKET_MAKER_ENABLED=true`** trên service **backend** (không phải Vercel). Giá trị không có dấu ngoặc thừa.
 4. **Đăng nhập admin** — `GET /admin/mm-bots` trả 401 nếu không có JWT admin.
-5. **Bootstrap**: log deploy có `[bootstrap] liquidity-bots` / `ensure-liquidity-bots.js` — tạo `mm1@…mm12@`, `flow1@…`.
+5. **Bootstrap**: log deploy có `[bootstrap] liquidity-bots` / `ensure-liquidity-bots.js` — tạo `mm1@…mm12@`, `flow1@…`. **Không có Render Shell:** vào `/admin/mm-bots` → **Tạo/sync bot trong DB** hoặc `POST /api/v1/admin/mm-bots/bootstrap` (JWT admin).
 6. **Tắt MM trong RAM**: nếu đã tắt tại Điều khiển thị trường, bật lại hoặc restart API (override mất khi restart).
 
 Trang `/admin/mm-bots` (sau deploy mới) có khối **Runtime server** và banner lỗi API nếu gọi sai URL.

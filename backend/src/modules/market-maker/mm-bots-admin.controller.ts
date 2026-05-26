@@ -1,6 +1,7 @@
 import { AccessGuard } from '@modules/casl';
 import { PatchMmBotDto } from '@modules/market-maker/dto/patch-mm-bot.dto';
 import { MarketMakerService } from '@modules/market-maker/market-maker.service';
+import { MmLiquidityBootstrapService } from '@modules/market-maker/mm-liquidity-bootstrap.service';
 import { MmBotRegistryService } from '@modules/market-maker/mm-bot-registry.service';
 import {
   BadRequestException,
@@ -28,6 +29,7 @@ import {
 export class MmBotsAdminController {
   constructor(
     private readonly registry: MmBotRegistryService,
+    private readonly liquidityBootstrap: MmLiquidityBootstrapService,
     private readonly marketMaker: MarketMakerService,
     private readonly prisma: PrismaService,
   ) {}
@@ -35,6 +37,24 @@ export class MmBotsAdminController {
   @Get()
   getDashboard() {
     return this.registry.getAdminDashboard();
+  }
+
+  /** Tạo/sync bot MM+flow trong DB — thay cho `node scripts/ensure-liquidity-bots.js` trên Render Shell. */
+  @Post('bootstrap')
+  async bootstrapLiquidityBots() {
+    const result = await this.liquidityBootstrap.ensureAllLiquidityBots();
+    const dashboard = await this.registry.getAdminDashboard();
+    const created =
+      result.mm.filter((r) => r.created).length +
+      result.flow.filter((r) => r.created).length;
+    return {
+      ok: true,
+      created,
+      mm: result.mm.length,
+      flow: result.flow.length,
+      results: result,
+      dashboard,
+    };
   }
 
   @Patch(':email')
