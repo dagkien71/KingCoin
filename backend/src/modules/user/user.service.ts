@@ -31,8 +31,13 @@ export class UserService {
   findAll(
     where: Prisma.UserWhereInput,
     orderBy: Prisma.UserOrderByWithRelationInput,
+    pagination?: { page?: number; perPage?: number },
   ): Promise<PaginatorTypes.PaginatedResult<User>> {
-    return this.userRepository.findAll(where, orderBy);
+    return this.userRepository.findAll(where, orderBy, pagination);
+  }
+
+  countUsers(where: Prisma.UserWhereInput): Promise<number> {
+    return this.userRepository.count(where);
   }
 
   /**

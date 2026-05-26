@@ -2,6 +2,7 @@ import {
   isLiquidityBotUsername,
   liquidityBotEmails,
 } from '@modules/market-maker/liquidity-bots.util';
+import { Prisma } from '@prisma/client';
 
 /** Tag API admin — bot thanh khoản (MM + flow). */
 export const ACCOUNT_TAG_LIQUIDITY_BOT = 'liquidity_bot' as const;
@@ -34,6 +35,59 @@ export function resolveUserAccountTags(
 /** Email loại trừ khỏi danh sách / thống kê user admin. */
 export function liquidityBotEmailsForFilter(): string[] {
   return liquidityBotEmails();
+}
+
+/** Username bot (mm1, flow2, …) — lọc Prisma `notIn`. */
+export function liquidityBotUsernamesForFilter(): string[] {
+  const names = ['marketmaker', 'flowtrader', 'flow'];
+  for (let i = 1; i <= 32; i++) {
+    names.push(`mm${i}`, `flow${i}`);
+  }
+  return names;
+}
+
+/** `where` Prisma: chỉ user trader (không MM/flow). */
+export function traderUsersWhere(
+  extra?: Prisma.UserWhereInput,
+): Prisma.UserWhereInput {
+  const botEmails = liquidityBotEmailsForFilter();
+  const botUsernames = liquidityBotUsernamesForFilter();
+  return {
+    AND: [
+      ...(extra ? [extra] : []),
+      { email: { notIn: botEmails } },
+      { NOT: { accountTags: { has: ACCOUNT_TAG_LIQUIDITY_BOT } } },
+      {
+        OR: [
+          { username: null },
+          {
+            username: {
+              notIn: botUsernames,
+              mode: 'insensitive',
+            },
+          },
+        ],
+      },
+    ],
+  };
+}
+
+/** Chỉ bot thanh khoản. */
+export function liquidityBotUsersWhere(
+  extra?: Prisma.UserWhereInput,
+): Prisma.UserWhereInput {
+  const botEmails = liquidityBotEmailsForFilter();
+  return {
+    AND: [
+      ...(extra ? [extra] : []),
+      {
+        OR: [
+          { email: { in: botEmails } },
+          { accountTags: { has: ACCOUNT_TAG_LIQUIDITY_BOT } },
+        ],
+      },
+    ],
+  };
 }
 
 /** User thật (trader) — loại bot khỏi thống kê admin. */

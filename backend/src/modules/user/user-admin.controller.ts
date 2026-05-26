@@ -30,10 +30,11 @@ import { OrderByPipe, WherePipe } from '@nodeteam/nestjs-pipes';
 import { PaginatorTypes } from '@nodeteam/nestjs-prisma-pagination';
 import { Prisma, Roles, User } from '@prisma/client';
 import {
-  isTraderAccountEmail,
-  liquidityBotEmailsForFilter,
+  liquidityBotUsersWhere,
   resolveUserAccountTags,
+  traderUsersWhere,
 } from '../../common/system-accounts.util';
+import { parseUserListPagination } from './user-pagination.util';
 import { CreateUserDto } from './dto/create-user.dto';
 import { PatchUserAdminDto } from './dto/patch-user-admin.dto';
 import { UserService } from './user.service';
@@ -54,6 +55,14 @@ export class UserAdminController {
   @Get()
   @ApiQuery({ name: 'where', required: false, type: 'string' })
   @ApiQuery({ name: 'orderBy', required: false, type: 'string' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'perPage', required: false, type: Number })
+  @ApiQuery({
+    name: 'scope',
+    required: false,
+    enum: ['traders', 'bots', 'all'],
+    description: 'traders (mặc định) | bots | all',
+  })
   @ApiOkBaseResponse({ dto: UserBaseEntity, isArray: true })
   @UseGuards(AccessGuard(Roles.admin))
   @Serialize(UserBaseEntity)
@@ -62,37 +71,32 @@ export class UserAdminController {
     @Query('where', WherePipe) where?: Prisma.UserWhereInput,
     @Query('orderBy', OrderByPipe)
     orderBy?: Prisma.UserOrderByWithRelationInput,
+    @Query('page') page?: string,
+    @Query('perPage') perPage?: string,
+    @Query('scope') scope?: string,
   ): Promise<PaginatorTypes.PaginatedResult<User>> {
-    const botEmails = liquidityBotEmailsForFilter();
-    const mergedWhere: Prisma.UserWhereInput = {
-      AND: [
-        ...(where ? [where] : []),
-        { email: { notIn: botEmails } },
-        {
-          OR: [
-            { username: null },
-            {
-              username: {
-                notIn: ['marketmaker', 'flowtrader'],
-                mode: 'insensitive',
-              },
-            },
-          ],
-        },
-      ],
-    };
+    const pg = parseUserListPagination(page, perPage);
+    const scopeNorm = (scope ?? 'traders').toLowerCase();
+    const mergedWhere: Prisma.UserWhereInput =
+      scopeNorm === 'all'
+        ? { ...(where ?? {}) }
+        : scopeNorm === 'bots'
+          ? liquidityBotUsersWhere(where)
+          : traderUsersWhere(where);
 
-    const result = await this.userService.findAll(mergedWhere, orderBy);
-    const traders = result.data.filter((u) =>
-      isTraderAccountEmail(
-        u.email,
-        u.username,
-        (u as User & { accountTags?: string[] }).accountTags ?? [],
-      ),
-    );
+    const order =
+      orderBy ?? ({ createdAt: 'desc' } as Prisma.UserOrderByWithRelationInput);
+
+    const [result, total] = await Promise.all([
+      this.userService.findAll(mergedWhere, order, pg),
+      this.userService.countUsers(mergedWhere),
+    ]);
+
+    const lastPage = Math.max(1, Math.ceil(total / pg.perPage));
+
     return {
       ...result,
-      data: traders.map((u) => ({
+      data: result.data.map((u) => ({
         ...u,
         accountTags: resolveUserAccountTags(
           u.email,
@@ -102,7 +106,12 @@ export class UserAdminController {
       })),
       meta: {
         ...result.meta,
-        total: traders.length,
+        total,
+        lastPage,
+        currentPage: pg.page,
+        perPage: pg.perPage,
+        prev: pg.page > 1 ? pg.page - 1 : null,
+        next: pg.page < lastPage ? pg.page + 1 : null,
       },
     };
   }

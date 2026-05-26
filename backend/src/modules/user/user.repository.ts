@@ -100,11 +100,17 @@ export class UserRepository {
   async findAll(
     where: Prisma.UserWhereInput,
     orderBy: Prisma.UserOrderByWithRelationInput,
+    pagination?: { page?: number; perPage?: number },
   ): Promise<PaginatorTypes.PaginatedResult<User>> {
-    return this.paginate(this.prisma.user, {
-      where,
-      orderBy,
-    });
+    return this.paginate(
+      this.prisma.user,
+      { where, orderBy },
+      pagination,
+    );
+  }
+
+  count(where: Prisma.UserWhereInput): Promise<number> {
+    return this.prisma.user.count({ where });
   }
 
   async update(id: string, data: Prisma.UserUpdateInput): Promise<User> {
