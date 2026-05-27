@@ -9,10 +9,11 @@ import {
   resolveFlowBaseTokenNames,
 } from '@modules/market-maker/liquidity-target-tokens.util';
 import {
-  flowMatchesBothSidesPerTick,
-  flowPassesPerTick,
-  flowSweepMaxFills,
+  flowMatchesBothSidesFromProfile,
+  flowPassesPerTickFromProfile,
+  flowSweepMaxFillsFromProfile,
 } from '@modules/market-maker/flow-activity.util';
+import { setLastFlowDirection } from '@modules/market-maker/flow-direction.util';
 import { PlatformLiquiditySettingsService } from '@modules/market-maker/platform-liquidity-settings.service';
 import { OrderService } from '@modules/order/order.service';
 import { PrismaService } from '@providers/prisma';
@@ -50,12 +51,10 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
     return this.platformSettings.getEffective().flowQty;
   }
 
-  private oscillatePct(): number {
-    return this.platformSettings.getEffective().oscillatePct;
-  }
-
   sweepMaxFills(): number {
-    return flowSweepMaxFills(this.oscillatePct());
+    return flowSweepMaxFillsFromProfile(
+      this.platformSettings.resolveFlowProfile(),
+    );
   }
 
   private startFlowLoop(): void {
@@ -146,6 +145,7 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
           pair,
           user: { connect: { id: flowUser.id } },
         });
+        setLastFlowDirection(tokenId, 'up');
         fills++;
       } else {
         const bestBuy = await this.prisma.order.findFirst({
@@ -169,6 +169,7 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
           pair,
           user: { connect: { id: flowUser.id } },
         });
+        setLastFlowDirection(tokenId, 'down');
         fills++;
       }
     }
@@ -206,6 +207,7 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
         pair,
         user: { connect: { id: flowUserId } },
       });
+      setLastFlowDirection(token.id, 'up');
       this.logger.debug(
         `Flow: mua từ MM sell @${bestSell.price} qty=${q} (${token.name})`,
       );
@@ -233,6 +235,7 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
       pair,
       user: { connect: { id: flowUserId } },
     });
+    setLastFlowDirection(token.id, 'down');
     this.logger.debug(
       `Flow: bán vào MM buy @${bestBuy.price} qty=${q} (${token.name})`,
     );
@@ -244,9 +247,9 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
     this.runInFlight = true;
 
     const qtyFlow = this.flowQty();
-    const osc = this.oscillatePct();
-    const bothSides = flowMatchesBothSidesPerTick(osc);
-    const passes = flowPassesPerTick(osc);
+    const flowProfile = this.platformSettings.resolveFlowProfile();
+    const bothSides = flowMatchesBothSidesFromProfile(flowProfile);
+    const passes = flowPassesPerTickFromProfile(flowProfile);
 
     try {
       const mmIds = await this.resolveMmUserIds();

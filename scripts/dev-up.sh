@@ -86,11 +86,8 @@ node scripts/seed-upcoming-listings.js
 echo "==> Đồng bộ KingCoin (KC) — phát hành 1.000.000 token..."
 node scripts/ensure-kingcoin-token.js
 
-echo "==> User market maker (liquidity bot)..."
-node scripts/ensure-market-maker-user.js
-
-echo "==> User taker mô phỏng (khớp hai chiều với MM)..."
-node scripts/ensure-flow-trader-user.js
+echo "==> Bot thanh khoản (local: 22 MM + 14 flow — mm1@… flow1@…)..."
+node scripts/ensure-liquidity-bots.js
 
 echo "==> Đồng bộ kho token base cho MM + flow..."
 node scripts/ensure-bot-inventory.js

@@ -23,7 +23,9 @@ Trang **`/admin/market-control`** (tài khoản `role=admin`):
 - **Phương pháp 2 (mô hình đường giá):** `GET .../models`, `POST .../tokens/:id/model-run` — xem [MARKET_CONTROL_MODELS.md](./MARKET_CONTROL_MODELS.md) (GBM, OU, ramp, test plan QA).
 - **KingCoin (KC) stablecoin:** không dùng lịch/mô hình trên KC — [STABLECOIN_KC_SPEC.md](./STABLECOIN_KC_SPEC.md).
 
-Cấu hình lưu **trong RAM** process API — restart server trở về `.env`.
+Trang **`/admin/market-settings`** — thanh **cường độ thị trường** (5 mức): tần suất/volume/khớp/giá từ giao dịch, lưu DB, ramp mượt khi đổi mức. Chi tiết: [VOLATILITY_MARKET_INTENSITY.md](./VOLATILITY_MARKET_INTENSITY.md).
+
+Cấu hình market-control lưu **trong RAM** process API — restart server trở về `.env`. Cài đặt thanh khoản (interval, flow, volatility) lưu **MongoDB** (`PlatformLiquiditySettings`).
 
 ## Bật tính năng
 
@@ -117,8 +119,8 @@ Env (xem `docs/env.production.liquidity.example`):
 | Biến | Gợi ý prod |
 |------|------------|
 | `MARKET_MAKER_ENABLED` | `true` |
-| `MARKET_MAKER_BOT_COUNT` | `12` (mặc định prod nếu không set) |
-| `MARKET_FLOW_BOT_COUNT` | `4` |
+| `MARKET_MAKER_BOT_COUNT` | Prod: `12` nếu không set. **Local dev:** `22` (12+10) |
+| `MARKET_FLOW_BOT_COUNT` | Prod: `4`. **Local dev:** `14` (4+10) |
 | `MARKET_MAKER_LEVELS` | `10` |
 | `MARKET_MAKER_QTY` | `350` (mỗi bậc mua/bán, × số bậc × số bot) |
 | `MARKET_FLOW_QTY` | `48` |

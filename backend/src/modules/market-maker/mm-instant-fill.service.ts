@@ -7,6 +7,7 @@ import {
   mmLiquidityEmails,
 } from '@modules/market-maker/liquidity-bots.util';
 import { MmBotRegistryService } from '@modules/market-maker/mm-bot-registry.service';
+import { PlatformLiquiditySettingsService } from '@modules/market-maker/platform-liquidity-settings.service';
 import { PrismaService } from '@providers/prisma';
 
 /**
@@ -25,6 +26,7 @@ export class MmInstantFillService {
     private readonly prisma: PrismaService,
     private readonly tokenCryptoService: TokenCryptoService,
     private readonly mmBotRegistry: MmBotRegistryService,
+    private readonly platformSettings: PlatformLiquiditySettingsService,
   ) {}
 
   private isEnabled(): boolean {
@@ -35,6 +37,9 @@ export class MmInstantFillService {
   }
 
   private tolerancePct(): number {
+    const fromProfile =
+      this.platformSettings.resolvePricingProfile().instantFillTolerancePct;
+    if (fromProfile > 0) return fromProfile;
     const raw = Number(process.env.MM_INSTANT_FILL_TOLERANCE_PCT ?? '0.002');
     return Math.max(1e-6, Number.isFinite(raw) ? raw : 0.002);
   }

@@ -11,6 +11,7 @@ import {
   mmWanderScale,
   mmWavePeriodMs,
 } from '@modules/market-maker/gbm-pace.util';
+import { getLastFlowDirection } from '@modules/market-maker/flow-direction.util';
 import { PlatformLiquiditySettingsService } from '@modules/market-maker/platform-liquidity-settings.service';
 import {
   isQuoteToken,
@@ -225,6 +226,58 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
     return Number((Math.round(price / tick) * tick).toFixed(8));
   }
 
+  private clampMidStep(
+    candidate: number,
+    baseMid: number,
+    maxStepPct: number,
+  ): number {
+    if (baseMid <= 0 || maxStepPct <= 0) return candidate;
+    const maxDelta = baseMid * maxStepPct;
+    const delta = candidate - baseMid;
+    if (Math.abs(delta) <= maxDelta) return candidate;
+    return Number((baseMid + Math.sign(delta) * maxDelta).toFixed(8));
+  }
+
+  private async resolveBookMid(
+    tokenId: string,
+    spot: number,
+  ): Promise<number> {
+    const [bestBuy, bestSell] = await Promise.all([
+      this.prisma.order.findFirst({
+        where: {
+          tokenId,
+          type: 'buy',
+          status: 'pending',
+          quantity: { gt: 0 },
+        },
+        orderBy: { price: 'desc' },
+        select: { price: true },
+      }),
+      this.prisma.order.findFirst({
+        where: {
+          tokenId,
+          type: 'sell',
+          status: 'pending',
+          quantity: { gt: 0 },
+        },
+        orderBy: { price: 'asc' },
+        select: { price: true },
+      }),
+    ]);
+    const bid = bestBuy?.price;
+    const ask = bestSell?.price;
+    if (
+      bid != null &&
+      ask != null &&
+      bid > 0 &&
+      ask > 0 &&
+      bid < ask
+    ) {
+      return Number(((bid + ask) / 2).toFixed(8));
+    }
+    return spot;
+  }
+
   onModuleInit(): void {
     this.platformSettings.onIntervalsChanged(() => this.reconfigureLoop());
 
@@ -400,22 +453,13 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
     let mid: number;
     let modeLabel = 'thường';
 
+    const pricing = this.platformSettings.resolvePricingProfile();
+    const pathActive = this.mmControl.hasActivePathDriver(token.id);
+
     if (pathMid != null) {
       mid = pathMid;
       modeLabel = 'đường giá';
-    } else if (spotAnchor != null && spotAnchor > 0) {
-      const waveMs = mmWavePeriodMs(oscillatePct);
-      const t = Date.now() / waveMs;
-      const drift =
-        oscillatePct * Math.sin(t) +
-        oscillatePct * 0.35 * Math.sin(t * 2.31 + 0.7);
-      mid = spotAnchor * (1 + drift);
-      const wander =
-        (Math.random() * 2 - 1) * wanderPct * mmWanderScale(oscillatePct);
-      mid = mid * (1 + wander);
-      mid = this.mmControl.finalizeMid(token.id, mid, baseMid);
-      modeLabel = 'neo giá';
-    } else {
+    } else if (pathActive) {
       const waveMs = mmWavePeriodMs(oscillatePct);
       const t = Date.now() / waveMs;
       const drift =
@@ -426,6 +470,27 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
         (Math.random() * 2 - 1) * wanderPct * mmWanderScale(oscillatePct);
       mid = mid * (1 + wander) * 0.65 + baseMid * (1 + drift) * 0.35;
       mid = this.mmControl.finalizeMid(token.id, mid, baseMid);
+      modeLabel = 'lịch/mô hình';
+    } else if (spotAnchor != null && spotAnchor > 0) {
+      mid = spotAnchor;
+      mid = this.mmControl.finalizeMid(token.id, mid, baseMid);
+      modeLabel = 'neo giá';
+    } else {
+      mid = await this.resolveBookMid(token.id, baseMid);
+      const flowDir = getLastFlowDirection(token.id);
+      if (pricing.bookSkewPct > 0 && flowDir) {
+        mid =
+          flowDir === 'up'
+            ? mid * (1 + pricing.bookSkewPct)
+            : mid * (1 - pricing.bookSkewPct);
+      }
+      mid = this.clampMidStep(
+        mid,
+        baseMid,
+        pricing.maxMidStepPctPerRefresh,
+      );
+      mid = this.mmControl.finalizeMid(token.id, mid, baseMid);
+      modeLabel = 'khớp lệnh';
     }
 
     if (mmTotal > 1) {
@@ -479,35 +544,18 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
 
     this.realtimeService.broadcastOrderbook(token.id);
 
-    const pathActive = this.mmControl.hasActivePathDriver(token.id);
     const pathWalkActive = this.mmControl.isPathWalkActive(token.id);
     const volumes = fresh?.volumes ?? token.volumes;
-    if (
-      !pathActive &&
-      !pathWalkActive &&
-      !this.mmControl.shouldProtectSpot(token.id)
-    ) {
-      const blend = 0.14;
-      const nextSpot = Number((baseMid * (1 - blend) + mid * blend).toFixed(8));
-      if (Math.abs(nextSpot - baseMid) / baseMid > 1e-7) {
-        this.tokenCryptoService.updatePriceLive(token.id, nextSpot, {
-          tickerPrice: mid,
-          volumes,
-        });
-      } else {
-        this.realtimeService.emitTickerFast(token.id, {
-          price: mid,
-          volumes,
-        });
-      }
-    } else {
-      const tickerPrice =
-        spotAnchor != null && spotAnchor > 0 ? spotAnchor : mid;
-      this.realtimeService.emitTickerFast(token.id, {
-        price: tickerPrice,
-        volumes,
-      });
-    }
+    const tickerPrice =
+      pathActive || pathWalkActive
+        ? spotAnchor != null && spotAnchor > 0
+          ? spotAnchor
+          : mid
+        : baseMid;
+    this.realtimeService.emitTickerFast(token.id, {
+      price: tickerPrice,
+      volumes,
+    });
 
     this.logger.log(
       `MM: ${mmUser.email} — ${token.name} — ${levels} bậc × 2 phía quanh mid=${mid} (DB ${baseMid}, ${modeLabel}) (${pair}), qty≈${qty}`,

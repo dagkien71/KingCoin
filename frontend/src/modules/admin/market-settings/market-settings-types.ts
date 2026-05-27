@@ -29,15 +29,49 @@ export type VolatilityLevelMeta = {
   labelVi: string;
   hintVi: string;
   oscillatePct: number;
+  frequencyHintVi: string;
+  volumeHintVi: string;
+  matchHintVi: string;
+  priceHintVi: string;
+};
+
+export type VolatilityFlowProfile = {
+  passesPerTick: number;
+  sweepMaxFills: number;
+  bothSidesPerTick: boolean;
+};
+
+export type VolatilityPricingProfile = {
+  bookSkewPct: number;
+  maxMidStepPctPerRefresh: number;
+  wanderPct: number;
+  oscillatePct: number;
+  instantFillTolerancePct: number;
+};
+
+export type VolatilityProfileApi = {
+  level: VolatilityLevelId;
+  labelVi: string;
+  hintVi: string;
+  frequencyHintVi: string;
+  volumeHintVi: string;
+  matchHintVi: string;
+  priceHintVi: string;
+  flow: VolatilityFlowProfile;
+  pricing: VolatilityPricingProfile;
 };
 
 export type MarketSettingsResponse = {
   effective: EffectiveLiquiditySettings;
   env: EffectiveLiquiditySettings;
-  db: Partial<EffectiveLiquiditySettings> | null;
+  db: Partial<EffectiveLiquiditySettings> & {
+    volatilityLevel?: VolatilityLevelId | null;
+  } | null;
   sources: Record<keyof EffectiveLiquiditySettings, LiquiditySettingsSource>;
   volatilityLevels?: VolatilityLevelMeta[];
+  volatilityProfiles?: VolatilityProfileApi[];
   currentVolatilityLevel?: VolatilityLevelId;
+  volatilityRamping?: boolean;
 };
 
 export type MarketSettingsPatch = Partial<EffectiveLiquiditySettings>;

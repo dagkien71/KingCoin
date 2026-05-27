@@ -23,12 +23,18 @@ import { PlatformLiquiditySettings } from '@prisma/client';
 import { PrismaService } from '@providers/prisma';
 import { PatchPlatformLiquiditySettingsDto } from './dto/patch-platform-liquidity-settings.dto';
 import { NORMAL_STEADY_PRESET } from './liquidity-presets.util';
+import { VolatilityTransitionService } from './volatility-transition.service';
 import {
   inferVolatilityLevel,
   isVolatilityLevelId,
+  resolveVolatilityProfile,
   VOLATILITY_LEVELS,
   volatilityPresetFor,
+  volatilityProfilesForApi,
+  type VolatilityFlowProfile,
   type VolatilityLevelId,
+  type VolatilityMarketProfile,
+  type VolatilityPricingProfile,
 } from './volatility-presets.util';
 
 export const PLATFORM_LIQUIDITY_SETTINGS_ID = 'platform-liquidity-default';
@@ -52,13 +58,27 @@ export type EffectiveLiquiditySettings = {
   multiMidStep: number;
 };
 
+export type VolatilityProfileApi = {
+  level: VolatilityLevelId;
+  labelVi: string;
+  hintVi: string;
+  frequencyHintVi: string;
+  volumeHintVi: string;
+  matchHintVi: string;
+  priceHintVi: string;
+  flow: VolatilityFlowProfile;
+  pricing: VolatilityPricingProfile;
+};
+
 export type LiquiditySettingsResponse = {
   effective: EffectiveLiquiditySettings;
   env: EffectiveLiquiditySettings;
   db: Partial<PlatformLiquiditySettings> | null;
   sources: Record<keyof EffectiveLiquiditySettings, LiquiditySettingsSource>;
   volatilityLevels: typeof VOLATILITY_LEVELS;
+  volatilityProfiles: VolatilityProfileApi[];
   currentVolatilityLevel: VolatilityLevelId;
+  volatilityRamping: boolean;
 };
 
 function readPositiveNumber(raw: string | undefined, fallback: number): number {
@@ -103,6 +123,7 @@ export class PlatformLiquiditySettingsService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly mmControl: MmControlService,
     private readonly botRegistry: MmBotRegistryService,
+    private readonly volatilityTransition: VolatilityTransitionService,
   ) {}
 
   onIntervalsChanged(listener: () => void): () => void {
@@ -199,7 +220,33 @@ export class PlatformLiquiditySettingsService implements OnModuleInit {
         `spreadStep ${out.spreadStep} vượt giới hạn — runtime dùng ${clamped.spreadStep}`,
       );
     }
-    return clamped;
+    return this.volatilityTransition.applyRamped(clamped);
+  }
+
+  getStoredVolatilityLevel(): VolatilityLevelId | null {
+    const raw = this.dbRow?.volatilityLevel;
+    if (raw && isVolatilityLevelId(raw)) return raw;
+    return null;
+  }
+
+  getCurrentVolatilityLevel(): VolatilityLevelId {
+    const stored = this.getStoredVolatilityLevel();
+    if (stored) return stored;
+    return inferVolatilityLevel(
+      this.getEffective().oscillatePct,
+      this.dbRow?.volatilityLevel,
+    );
+  }
+
+  resolveFlowProfile(): VolatilityFlowProfile {
+    return resolveVolatilityProfile(this.getCurrentVolatilityLevel()).flow;
+  }
+
+  resolvePricingProfile(): VolatilityPricingProfile {
+    if (this.volatilityTransition.isRamping()) {
+      return this.volatilityTransition.getRampedPricing();
+    }
+    return resolveVolatilityProfile(this.getCurrentVolatilityLevel()).pricing;
   }
 
   getAdminView(): LiquiditySettingsResponse {
@@ -215,13 +262,33 @@ export class PlatformLiquiditySettingsService implements OnModuleInit {
         | undefined;
       sources[k] = this.pick(k, dbVal, env[k]).source;
     }
+    const profiles: VolatilityProfileApi[] = volatilityProfilesForApi().map(
+      (p: VolatilityMarketProfile) => ({
+        level: p.level,
+        labelVi: p.labelVi,
+        hintVi: p.hintVi,
+        frequencyHintVi: VOLATILITY_LEVELS.find((l) => l.id === p.level)!
+          .frequencyHintVi,
+        volumeHintVi: VOLATILITY_LEVELS.find((l) => l.id === p.level)!
+          .volumeHintVi,
+        matchHintVi: VOLATILITY_LEVELS.find((l) => l.id === p.level)!
+          .matchHintVi,
+        priceHintVi: VOLATILITY_LEVELS.find((l) => l.id === p.level)!
+          .priceHintVi,
+        flow: p.flow,
+        pricing: p.pricing,
+      }),
+    );
+
     return {
       effective,
       env,
       db: this.dbRow,
       sources,
       volatilityLevels: VOLATILITY_LEVELS,
-      currentVolatilityLevel: inferVolatilityLevel(effective.oscillatePct),
+      volatilityProfiles: profiles,
+      currentVolatilityLevel: this.getCurrentVolatilityLevel(),
+      volatilityRamping: this.volatilityTransition.isRamping(),
     };
   }
 
@@ -298,6 +365,12 @@ export class PlatformLiquiditySettingsService implements OnModuleInit {
         `Slider biến động: đã hủy ${cancelled} mô hình giá (GBM/lịch) — chuyển MM+flow 24/7`,
       );
     }
+    const from = this.getEffective();
+    await this.volatilityTransition.beginVolatilityChange(
+      from,
+      { ...from, ...preset } as EffectiveLiquiditySettings,
+      level,
+    );
     return this.patch(preset);
   }
 

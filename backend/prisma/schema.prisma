@@ -474,6 +474,8 @@ model PlatformLiquiditySettings {
   wanderPct        Float?
   levelJitterPct   Float?
   multiMidStep     Float?
+  /** gentle | moderate | stable | strong | extreme */
+  volatilityLevel  String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 }

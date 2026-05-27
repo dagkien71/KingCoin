@@ -2,9 +2,11 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsIn,
   IsInt,
   IsNumber,
   IsOptional,
+  IsString,
   Max,
   Min,
 } from 'class-validator';
@@ -115,4 +117,12 @@ export class PatchPlatformLiquiditySettingsDto {
   @Min(0)
   @Max(2)
   readonly multiMidStep?: number;
+
+  @ApiPropertyOptional({
+    description: 'Mức cường độ thị trường: gentle | moderate | stable | strong | extreme',
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(['gentle', 'moderate', 'stable', 'strong', 'extreme'])
+  readonly volatilityLevel?: string;
 }

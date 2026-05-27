@@ -53,7 +53,7 @@ async function main() {
   }
 
   console.log(
-    "\nGợi ý production (Render): MARKET_MAKER_ENABLED=true, MARKET_MAKER_BOT_COUNT=12, MARKET_FLOW_BOT_COUNT=4",
+    "\nGợi ý: prod MARKET_MAKER_BOT_COUNT=12, MARKET_FLOW_BOT_COUNT=4 — local mặc định 22 MM + 14 flow (không set env).",
   );
 }
 

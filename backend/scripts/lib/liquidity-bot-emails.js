@@ -19,18 +19,23 @@ function clampInt(raw, fallback, max) {
   return Math.max(1, Math.min(max, Math.floor(n)));
 }
 
+const PROD_MM_BOT_COUNT = 12;
+const PROD_FLOW_BOT_COUNT = 4;
+const LOCAL_MM_BOT_COUNT = 22;
+const LOCAL_FLOW_BOT_COUNT = 14;
+
 function mmBotCountFromEnv() {
   if (!process.env.MARKET_MAKER_BOT_COUNT?.trim()) {
-    if (process.env.NODE_ENV === "production") return 12;
-    return 1;
+    if (process.env.NODE_ENV === "production") return PROD_MM_BOT_COUNT;
+    return LOCAL_MM_BOT_COUNT;
   }
   return clampInt(process.env.MARKET_MAKER_BOT_COUNT, 1, 32);
 }
 
 function flowBotCountFromEnv() {
   if (!process.env.MARKET_FLOW_BOT_COUNT?.trim()) {
-    if (process.env.NODE_ENV === "production") return 4;
-    return 1;
+    if (process.env.NODE_ENV === "production") return PROD_FLOW_BOT_COUNT;
+    return LOCAL_FLOW_BOT_COUNT;
   }
   return clampInt(process.env.MARKET_FLOW_BOT_COUNT, 1, 16);
 }
@@ -54,10 +59,7 @@ function mmLiquidityEmails() {
     const flowSet = new Set(flowLiquidityEmails().map((e) => e.toLowerCase()));
     return bulk.filter((e) => !flowSet.has(e.toLowerCase()));
   }
-  const useMultiMm =
-    !!process.env.MARKET_MAKER_BOT_COUNT?.trim() ||
-    process.env.NODE_ENV === "production";
-  if (useMultiMm && mmBotCountFromEnv() > 1) {
+  if (mmBotCountFromEnv() > 1) {
     return buildDefaultMmEmails(mmBotCountFromEnv());
   }
   const primary =
@@ -68,10 +70,7 @@ function mmLiquidityEmails() {
 function flowLiquidityEmails() {
   const bulk = parseEmailList(process.env.MARKET_FLOW_BOT_EMAILS);
   if (bulk.length > 0) return bulk;
-  const useMultiFlow =
-    !!process.env.MARKET_FLOW_BOT_COUNT?.trim() ||
-    process.env.NODE_ENV === "production";
-  if (useMultiFlow && flowBotCountFromEnv() > 1) {
+  if (flowBotCountFromEnv() > 1) {
     return buildDefaultFlowEmails(flowBotCountFromEnv());
   }
   return [process.env.MARKET_FLOW_EMAIL?.trim() || "flow@kingcoin.local"];

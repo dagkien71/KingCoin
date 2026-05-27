@@ -11,6 +11,7 @@ import { MmLiquidityBootstrapService } from './mm-liquidity-bootstrap.service';
 import { MarketControlAdminController } from './market-control-admin.controller';
 import { MarketSettingsAdminController } from './market-settings-admin.controller';
 import { PlatformLiquiditySettingsService } from './platform-liquidity-settings.service';
+import { VolatilityTransitionService } from './volatility-transition.service';
 import { MarketFlowService } from './market-flow.service';
 import { MarketMakerService } from './market-maker.service';
 import { MmControlService } from './mm-control.service';
@@ -31,6 +32,7 @@ import { OrderbookPathService } from './orderbook-path.service';
     MmBotsAdminController,
   ],
   providers: [
+    VolatilityTransitionService,
     PlatformLiquiditySettingsService,
     MmBotRegistryService,
     MmLiquidityBootstrapService,

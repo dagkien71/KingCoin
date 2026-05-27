@@ -1,5 +1,6 @@
 const bcrypt = require("bcrypt");
 const { creditBotInventory } = require("./credit-bot-inventory");
+const { uniqueWalletCode } = require("./wallet-code");
 
 const ACCOUNT_TAG_LIQUIDITY_BOT = "liquidity_bot";
 
@@ -33,12 +34,14 @@ async function ensureLiquidityBotUser(
 
   const kc = Number(kcTarget ?? process.env.MARKET_MAKER_SEED_BALANCE ?? "500000000");
   const hash = await bcrypt.hash(password, 10);
+  const walletCode = await uniqueWalletCode(prisma);
 
   await prisma.user.create({
     data: {
       email,
       password: hash,
       username,
+      walletCode,
       accountTags: [ACCOUNT_TAG_LIQUIDITY_BOT],
       walletAddress: `0xBOT${Math.random().toString(16).slice(2, 38)}`,
       socialLinks: [],

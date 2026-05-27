@@ -37,10 +37,15 @@ export function useMarketSettings() {
     );
     if (isMutationFailure(result)) return false;
 
+    const labels: Record<VolatilityLevelId, string> = {
+      gentle: "Nhẹ — ít lệnh, khớp chậm",
+      moderate: "Vừa — nhịp tự nhiên",
+      stable: "Ổn định — mặc định",
+      strong: "Mạnh — khớp dày, giá theo volume",
+      extreme: "Cực mạnh — thị trường sôi động",
+    };
     toast.success(
-      level === "strong" || level === "extreme"
-        ? "Đã áp biến động mạnh — MM + khớp liên tục 24/7 (tốc độ kiểu GBM, không lịch 25p)."
-        : "Đã áp mức biến động — lưu DB và chạy MM/flow ngay."
+      `Đã áp ${labels[level]} — lưu DB, chuyển mượt ~45s, giá từ khớp lệnh.`
     );
     void refetch();
     return true;
