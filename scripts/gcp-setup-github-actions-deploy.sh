@@ -45,14 +45,24 @@ if ! gcloud iam service-accounts describe "$SA_EMAIL" --project="$PROJECT_ID" >/
   gcloud iam service-accounts create "$SA_NAME" \
     --project="$PROJECT_ID" \
     --display-name="GitHub Actions deploy Cloud Run"
+  echo "   Đợi IAM propagate (10s)..."
+  sleep 10
 fi
 
 bind_role() {
   local role="$1"
-  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  local n=0
+  until gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:${SA_EMAIL}" \
     --role="$role" \
-    --quiet >/dev/null
+    --quiet >/dev/null 2>&1; do
+    n=$((n + 1))
+    if [[ $n -ge 5 ]]; then
+      echo "Lỗi gắn role $role cho $SA_EMAIL"
+      return 1
+    fi
+    sleep 5
+  done
 }
 
 echo "→ Gắn quyền cho SA..."
@@ -96,6 +106,7 @@ if ! gcloud iam workload-identity-pools providers describe "$PROVIDER_ID" \
     --workload-identity-pool="$POOL_ID" \
     --display-name="GitHub" \
     --attribute-mapping="google.subject=assertion.sub,attribute.actor=assertion.actor,attribute.repository=assertion.repository" \
+    --attribute-condition="assertion.repository=='${GITHUB_REPO}'" \
     --issuer-uri="https://token.actions.githubusercontent.com"
 fi
 
