@@ -46,7 +46,11 @@ export function liquidityBotUsernamesForFilter(): string[] {
   return names;
 }
 
-/** `where` Prisma: chỉ user trader (không MM/flow). */
+/**
+ * `where` Prisma: chỉ user trader (không MM/flow).
+ * Không dùng `NOT { accountTags: { has } }` trên Mongo — Prisma trả 0 row
+ * kể cả user có `accountTags: []` (chỉ `has` chiều dương hoạt động đúng).
+ */
 export function traderUsersWhere(
   extra?: Prisma.UserWhereInput,
 ): Prisma.UserWhereInput {
@@ -56,7 +60,6 @@ export function traderUsersWhere(
     AND: [
       ...(extra ? [extra] : []),
       { email: { notIn: botEmails } },
-      { NOT: { accountTags: { has: ACCOUNT_TAG_LIQUIDITY_BOT } } },
       {
         OR: [
           { username: null },

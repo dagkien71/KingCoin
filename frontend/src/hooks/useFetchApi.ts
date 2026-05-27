@@ -1,5 +1,5 @@
 import { getApiErrorMessage } from "@/lib/api-error";
-import { IResponse } from "@/types/response";
+import { unwrapApiGetBody } from "@/lib/unwrap-api-get";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import useConfigApi from "./useConfigApi";
 
@@ -62,17 +62,10 @@ const useFetchApi = <T>(
       setError(null);
     }
     try {
-      const response = await Api.get<T>(buildUrlWithParams(url, params));
-      const body = response?.data as IResponse<T> | T;
-      const inner =
-        body &&
-        typeof body === "object" &&
-        "data" in body &&
-        (body as IResponse<T>).success !== false
-          ? (body as IResponse<T>).data
-          : (body as T);
+      const response = await Api.get(buildUrlWithParams(url, params));
+      const inner = unwrapApiGetBody<T>(response?.data);
       if (inner === undefined || inner === null) return;
-      setData(inner as T);
+      setData(inner);
     } catch (err: unknown) {
       setError(getApiErrorMessage(err));
     } finally {
