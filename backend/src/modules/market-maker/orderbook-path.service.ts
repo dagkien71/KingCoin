@@ -1,6 +1,11 @@
 import { TokenCryptoLogService } from '@modules/token-crypto/token-log.service';
 import { TokenCryptoService } from '@modules/token-crypto/token.service';
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  OnModuleInit,
+} from '@nestjs/common';
 import { TokenCrypto } from '@prisma/client';
 import { MarketFlowService } from './market-flow.service';
 import { MarketMakerService } from './market-maker.service';
@@ -21,7 +26,7 @@ export type SpotPathResult = {
 };
 
 @Injectable()
-export class OrderbookPathService {
+export class OrderbookPathService implements OnModuleInit {
   private readonly logger = new Logger(OrderbookPathService.name);
   private readonly walksInFlight = new Set<string>();
 
@@ -32,6 +37,12 @@ export class OrderbookPathService {
     private readonly tokenService: TokenCryptoService,
     private readonly tokenLogService: TokenCryptoLogService,
   ) {}
+
+  onModuleInit(): void {
+    this.mmControl.registerTradePriceWalkHook((token, from, to) =>
+      this.walkSpotToTarget(token, from, to, 0).then(() => undefined),
+    );
+  }
 
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -130,13 +141,13 @@ export class OrderbookPathService {
       });
       this.mmControl.setMid(tokenId, targetPrice);
       await this.marketMaker.triggerRefreshForToken(tokenId);
-      const fills = await this.marketFlow.sweepUntilSpotReaches(
+      const { fills, reached } = await this.marketFlow.sweepUntilSpotReaches(
         tokenId,
         dir,
         targetPrice,
         { maxFills: 200 },
       );
-      if (fills <= 0) {
+      if (fills <= 0 || !reached) {
         throw new BadRequestException(
           'Không thể tạo khớp lệnh để di chuyển giá (thiếu thanh khoản MM/flow).',
         );
@@ -206,10 +217,18 @@ export class OrderbookPathService {
         }
 
         // Bắt buộc spot đi qua step (trong biên nhỏ) bằng fills thực.
-        await this.marketFlow.sweepUntilSpotReaches(tokenId, direction, step, {
-          maxFills: 300,
-          epsPct: 0.00002,
-        });
+        const { fills: stepFills, reached } =
+          await this.marketFlow.sweepUntilSpotReaches(
+            tokenId,
+            direction,
+            step,
+            { maxFills: 300, epsPct: 0.00002 },
+          );
+        if (!reached) {
+          throw new BadRequestException(
+            `Spot chưa chạm step=${step} sau ${stepFills} fill bổ sung (thiếu thanh khoản)`,
+          );
+        }
 
         if (!isLast) {
           await this.delay(stepDelay);

@@ -318,6 +318,10 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
     else if (schedule?.priceAtStart) from = schedule.priceAtStart;
     const direction = target >= from ? 'up' : 'down';
     await this.marketFlow.sweepAlongPath(tokenId, direction);
+    await this.marketFlow.sweepUntilSpotReaches(tokenId, direction, target, {
+      maxFills: 80,
+      epsPct: 0.00005,
+    });
   }
 
   /** Mặc định 45 giây / lần — @Cron phải literal. */

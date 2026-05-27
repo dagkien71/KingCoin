@@ -97,6 +97,9 @@ export class MmControlService implements OnModuleInit, OnModuleDestroy {
   private readonly pathBookRefreshHooks: Array<
     (tokenId: string, target: number, spot: number) => Promise<void>
   > = [];
+  private readonly tradePriceWalkHooks: Array<
+    (token: TokenCrypto, fromPrice: number, targetPrice: number) => Promise<void>
+  > = [];
 
   constructor(
     private readonly prisma: PrismaService,
@@ -190,6 +193,30 @@ export class MmControlService implements OnModuleInit, OnModuleDestroy {
     fn: (tokenId: string, target: number, spot: number) => Promise<void>,
   ): void {
     this.pathBookRefreshHooks.push(fn);
+  }
+
+  registerTradePriceWalkHook(
+    fn: (token: TokenCrypto, fromPrice: number, targetPrice: number) => Promise<void>,
+  ): void {
+    this.tradePriceWalkHooks.push(fn);
+  }
+
+  /** Di chuyển spot A→B chỉ bằng khớp lệnh (hook từ OrderbookPathService). */
+  async walkSpotByTrades(
+    token: TokenCrypto,
+    fromPrice: number,
+    targetPrice: number,
+  ): Promise<void> {
+    if (this.tradePriceWalkHooks.length === 0) {
+      this.logger.warn(
+        `walkSpotByTrades: chưa đăng ký hook — bỏ qua ${token.id}`,
+      );
+      return;
+    }
+    for (const fn of this.tradePriceWalkHooks) {
+      await fn(token, fromPrice, targetPrice);
+      return;
+    }
   }
 
   private async notifyPathBookRefresh(
@@ -669,25 +696,7 @@ export class MmControlService implements OnModuleInit, OnModuleDestroy {
     if (!token) return;
 
     const spot = token.price && token.price > 0 ? token.price : safeTarget;
-    const span = Math.max(1, driver.endAt - driver.startAt);
-    const elapsed = Math.min(span, Math.max(0, Date.now() - driver.startAt));
-    const progress = elapsed / span;
-    const blend =
-      progress >= 0.98
-        ? 1
-        : Math.min(0.92, 0.38 + progress * 0.54);
-    const nextSpot = floorSpotPrice(
-      Number((spot * (1 - blend) + safeTarget * blend).toFixed(8)),
-    );
-    if (Math.abs(nextSpot - spot) / spot < 1e-6) {
-      await this.notifyPathBookRefresh(tokenId, safeTarget, spot);
-      return;
-    }
-
-    await this.tokenService.updatePriceLive(tokenId, nextSpot, {
-      volumes: token.volumes,
-    });
-    await this.notifyPathBookRefresh(tokenId, safeTarget, nextSpot);
+    await this.notifyPathBookRefresh(tokenId, safeTarget, spot);
   }
 
   private resolveFinalModelPrice(run: PriceModelRun, token: TokenCrypto): number {
@@ -782,7 +791,8 @@ export class MmControlService implements OnModuleInit, OnModuleDestroy {
     }
 
     const hold = finalTarget > 0 ? finalTarget : currentSpot;
-    await this.setSpotPrice(token, hold, 0, { skipAnchor: false });
+    await this.walkSpotByTrades(token, currentSpot, hold);
+    await this.commitSpotAnchor(tokenId, hold);
     this.logger.log(
       `Mô hình ${run.modelId} kết thúc ${tokenId} — giữ giá ≈ ${hold}`,
     );
@@ -818,7 +828,8 @@ export class MmControlService implements OnModuleInit, OnModuleDestroy {
     }
 
     const hold = finalTarget > 0 ? finalTarget : currentSpot;
-    await this.setSpotPrice(token, hold, 0, { skipAnchor: false });
+    await this.walkSpotByTrades(token, currentSpot, hold);
+    await this.commitSpotAnchor(tokenId, hold);
     this.logger.log(
       `Lịch giá kết thúc ${tokenId} — giữ giá ≈ ${hold}`,
     );

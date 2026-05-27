@@ -14,6 +14,8 @@ import {
   flowSweepMaxFillsFromProfile,
 } from '@modules/market-maker/flow-activity.util';
 import { setLastFlowDirection } from '@modules/market-maker/flow-direction.util';
+import { pricePathDirection } from '@modules/market-maker/orderbook-path.util';
+import { spotReachedTarget } from '@modules/market-maker/trade-price-walk.util';
 import { PlatformLiquiditySettingsService } from '@modules/market-maker/platform-liquidity-settings.service';
 import { OrderService } from '@modules/order/order.service';
 import { PrismaService } from '@providers/prisma';
@@ -178,56 +180,83 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Dùng trade thật để kéo giá tiến dần tới `targetPrice`.
-   * - direction=up: liên tục mua best ask (MM sell) cho tới khi spot >= targetPrice
-   * - direction=down: liên tục bán best bid (MM buy) cho tới khi spot <= targetPrice
-   *
-   * Trả về số fills đã tạo.
+   * Dùng trade thật để kéo giá tiến dần tới `targetPrice` (best bid/ask = market).
    */
   async sweepUntilSpotReaches(
     tokenId: string,
     direction: 'up' | 'down',
     targetPrice: number,
     opts?: { maxFills?: number; epsPct?: number },
-  ): Promise<number> {
+  ): Promise<{ fills: number; reached: boolean }> {
     const maxFills = Math.max(1, Math.min(10_000, opts?.maxFills ?? 200));
     const epsPct = Math.max(1e-9, opts?.epsPct ?? 0.00001);
-    if (!this.mmControl.isFlowEnabled()) return 0;
-    if (targetPrice <= 0) return 0;
+    if (!this.mmControl.isFlowEnabled() || targetPrice <= 0) {
+      return { fills: 0, reached: false };
+    }
 
     const mmIds = await this.resolveMmUserIds();
     const flowUser = await this.resolveFlowUserForTick();
-    if (mmIds.length === 0 || !flowUser) return 0;
-    if (this.mmControl.shouldProtectSpot(tokenId)) return 0;
+    if (mmIds.length === 0 || !flowUser) {
+      return { fills: 0, reached: false };
+    }
+    if (this.mmControl.shouldProtectSpot(tokenId)) {
+      return { fills: 0, reached: false };
+    }
+
+    const token = await this.prisma.tokenCrypto.findUnique({
+      where: { id: tokenId },
+    });
+    if (!token?.id || isQuoteToken(token)) {
+      return { fills: 0, reached: false };
+    }
 
     let fills = 0;
     for (let i = 0; i < maxFills; i++) {
       const row = await this.prisma.tokenCrypto.findUnique({
         where: { id: tokenId },
-        select: { price: true, symbol: true, name: true, tokenKind: true },
+        select: { price: true },
       });
       const spot = Number(row?.price ?? 0);
-      if (spot > 0) {
-        const done =
-          direction === 'up'
-            ? spot >= targetPrice * (1 - epsPct)
-            : spot <= targetPrice * (1 + epsPct);
-        if (done) break;
+      if (spot > 0 && spotReachedTarget(spot, targetPrice, direction, epsPct)) {
+        return { fills, reached: true };
       }
 
-      // mỗi fill đặt lệnh market theo best bid/ask hiện tại (đã có sổ MM)
       const ok = await this.tryTakerFill(
         mmIds,
         flowUser.id,
-        // tokenKind để isQuoteToken skip — nhưng tokenId ở đây luôn base do caller
-        (row as any) ?? ({ id: tokenId } as any),
+        token,
         direction === 'up' ? 'buy' : 'sell',
         this.flowQty(),
       );
       if (!ok) break;
       fills++;
     }
-    return fills;
+
+    const finalRow = await this.prisma.tokenCrypto.findUnique({
+      where: { id: tokenId },
+      select: { price: true },
+    });
+    const finalSpot = Number(finalRow?.price ?? 0);
+    const reached =
+      finalSpot > 0 &&
+      spotReachedTarget(finalSpot, targetPrice, direction, epsPct);
+    return { fills, reached };
+  }
+
+  /** Sweep theo spot hiện tại → target (tự suy hướng). */
+  async sweepTowardPrice(
+    tokenId: string,
+    targetPrice: number,
+    opts?: { maxFills?: number; epsPct?: number },
+  ): Promise<{ fills: number; reached: boolean }> {
+    const row = await this.prisma.tokenCrypto.findUnique({
+      where: { id: tokenId },
+      select: { price: true },
+    });
+    const spot = Number(row?.price ?? 0);
+    const from = spot > 0 ? spot : targetPrice;
+    const dir = pricePathDirection(from, targetPrice);
+    return this.sweepUntilSpotReaches(tokenId, dir, targetPrice, opts);
   }
 
   private async tryTakerFill(
