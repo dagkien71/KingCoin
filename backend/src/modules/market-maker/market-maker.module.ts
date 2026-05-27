@@ -17,6 +17,7 @@ import { MarketMakerService } from './market-maker.service';
 import { MmControlService } from './mm-control.service';
 import { MmInstantFillService } from './mm-instant-fill.service';
 import { OrderbookPathService } from './orderbook-path.service';
+import { UserBotService } from './user-bot.service';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { OrderbookPathService } from './orderbook-path.service';
     MmControlService,
     MarketMakerService,
     MarketFlowService,
+    UserBotService,
     MmInstantFillService,
     OrderbookPathService,
   ],

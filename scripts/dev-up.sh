@@ -89,6 +89,9 @@ node scripts/ensure-kingcoin-token.js
 echo "==> Bot thanh khoản (local: 22 MM + 14 flow — mm1@… flow1@…)..."
 node scripts/ensure-liquidity-bots.js
 
+echo "==> User-bot (taker market) — user-bot@kingcoin.local..."
+node scripts/ensure-user-bot.js
+
 echo "==> Đồng bộ kho token base cho MM + flow..."
 node scripts/ensure-bot-inventory.js
 

@@ -32,5 +32,24 @@ Một thanh **5 mức** (`gentle` → `extreme`) điều khiển **hành vi giao
 - Ramp: `volatility-transition.service.ts`
 - MM: `market-maker.service.ts` (`refreshLiquidityForToken`)
 - Flow: `market-flow.service.ts`
+- User-bot (taker market): `user-bot.service.ts` + script `scripts/ensure-user-bot.js`
+
+## User-bot (giả lập người mua/bán thật)
+
+`user-bot` là một user đặt lệnh theo **giá market** (mua = best ask, bán = best bid) để khớp với lệnh MM đang treo.
+
+Env (backend):
+
+- `USER_BOT_ENABLED` (`true/false`, dev mặc định theo MM)
+- `USER_BOT_INTERVAL_MS` (mặc định `250`)
+- `USER_BOT_QTY` (mặc định `2`)
+- `USER_BOT_EMAIL` (mặc định `user-bot@kingcoin.local`)
+
+Tạo/sync user:
+
+```bash
+cd backend
+node scripts/ensure-user-bot.js
+```
 
 Xem thêm: [MARKET_MAKER.md](./MARKET_MAKER.md)
