@@ -2,7 +2,7 @@ import {
   isLiquidityBotUsername,
   liquidityBotEmails,
 } from '@modules/market-maker/liquidity-bots.util';
-import { Prisma } from '@prisma/client';
+import { Prisma, Roles } from '@prisma/client';
 
 /** Tag API admin — bot thanh khoản (MM + flow). */
 export const ACCOUNT_TAG_LIQUIDITY_BOT = 'liquidity_bot' as const;
@@ -46,10 +46,23 @@ export function liquidityBotUsernamesForFilter(): string[] {
   return names;
 }
 
+/** User thật admin: role `user`, có SĐT, `accountTags` rỗng, không bot. */
+export function isTraderUserRecord(user: {
+  role?: string;
+  phone?: string | null;
+  email?: string | null;
+  username?: string | null;
+  accountTags?: string[] | null;
+}): boolean {
+  if (user.role !== Roles.user) return false;
+  if (!(user.phone ?? '').trim()) return false;
+  if ((user.accountTags ?? []).length > 0) return false;
+  return !isLiquidityBotEmail(user.email, user.username, user.accountTags);
+}
+
 /**
- * `where` Prisma: chỉ user trader (không MM/flow).
- * Không dùng `NOT { accountTags: { has } }` trên Mongo — Prisma trả 0 row
- * kể cả user có `accountTags: []` (chỉ `has` chiều dương hoạt động đúng).
+ * Prisma (bước 1): role user + phone + loại email/username bot.
+ * Bước 2: `findTradersAdmin` + `isTraderUserRecord` (accountTags rỗng).
  */
 export function traderUsersWhere(
   extra?: Prisma.UserWhereInput,
@@ -59,6 +72,9 @@ export function traderUsersWhere(
   return {
     AND: [
       ...(extra ? [extra] : []),
+      { role: Roles.user },
+      { phone: { not: null } },
+      { NOT: { phone: '' } },
       { email: { notIn: botEmails } },
       {
         OR: [
@@ -93,11 +109,12 @@ export function liquidityBotUsersWhere(
   };
 }
 
-/** User thật (trader) — loại bot khỏi thống kê admin. */
+/** Loại bot theo email/username/tag (không kiểm tra phone/role). */
 export function isTraderAccountEmail(
   email: string | null | undefined,
   username?: string | null,
   accountTags?: string[] | null,
 ): boolean {
+  if ((accountTags ?? []).length > 0) return false;
   return !isLiquidityBotEmail(email, username, accountTags);
 }

@@ -61,7 +61,8 @@ export class UserAdminController {
     name: 'scope',
     required: false,
     enum: ['traders', 'bots', 'all'],
-    description: 'traders (mặc định) | bots | all',
+    description:
+      'traders: role user + có phone + accountTags rỗng | bots | all',
   })
   @ApiOkBaseResponse({ dto: UserBaseEntity, isArray: true })
   @UseGuards(AccessGuard(Roles.admin))
@@ -87,12 +88,28 @@ export class UserAdminController {
     const order =
       orderBy ?? ({ createdAt: 'desc' } as Prisma.UserOrderByWithRelationInput);
 
-    const [result, total] = await Promise.all([
-      this.userService.findAll(mergedWhere, order, pg),
-      this.userService.countUsers(mergedWhere),
-    ]);
-
-    const lastPage = Math.max(1, Math.ceil(total / pg.perPage));
+    const result =
+      scopeNorm === 'traders'
+        ? await this.userService.findTradersAdmin(mergedWhere, order, pg)
+        : await (async () => {
+            const [pageResult, total] = await Promise.all([
+              this.userService.findAll(mergedWhere, order, pg),
+              this.userService.countUsers(mergedWhere),
+            ]);
+            const lastPage = Math.max(1, Math.ceil(total / pg.perPage));
+            return {
+              ...pageResult,
+              meta: {
+                ...pageResult.meta,
+                total,
+                lastPage,
+                currentPage: pg.page,
+                perPage: pg.perPage,
+                prev: pg.page > 1 ? pg.page - 1 : null,
+                next: pg.page < lastPage ? pg.page + 1 : null,
+              },
+            };
+          })();
 
     return {
       ...result,
@@ -104,15 +121,7 @@ export class UserAdminController {
           (u as User & { accountTags?: string[] }).accountTags ?? [],
         ),
       })),
-      meta: {
-        ...result.meta,
-        total,
-        lastPage,
-        currentPage: pg.page,
-        perPage: pg.perPage,
-        prev: pg.page > 1 ? pg.page - 1 : null,
-        next: pg.page < lastPage ? pg.page + 1 : null,
-      },
+      meta: result.meta,
     };
   }
 

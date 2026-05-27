@@ -113,6 +113,13 @@ export class UserRepository {
     return this.prisma.user.count({ where });
   }
 
+  findMany(
+    where: Prisma.UserWhereInput,
+    orderBy: Prisma.UserOrderByWithRelationInput,
+  ): Promise<User[]> {
+    return this.prisma.user.findMany({ where, orderBy });
+  }
+
   async update(id: string, data: Prisma.UserUpdateInput): Promise<User> {
     const user = await this.prisma.user.findUnique({
       where: { id },

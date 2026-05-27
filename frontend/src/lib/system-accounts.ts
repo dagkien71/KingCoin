@@ -32,10 +32,15 @@ export function isLiquidityBotUser(user: {
 }
 
 export function isTraderUser(user: {
+  role?: string;
+  phone?: string | null;
   email?: string | null;
   username?: string | null;
   accountTags?: string[] | null;
 }): boolean {
+  if (user.role && user.role !== "user") return false;
+  if (!(user.phone ?? "").trim()) return false;
+  if ((user.accountTags ?? []).length > 0) return false;
   return !isLiquidityBotUser(user);
 }
 

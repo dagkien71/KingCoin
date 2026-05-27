@@ -72,7 +72,7 @@ export function AdminUsersList() {
 
   const scopeHint =
     scope === "traders"
-      ? "Trader thật — không gồm bot MM/flow."
+      ? "User thật: role user, có số điện thoại, không tag bot (accountTags rỗng)."
       : scope === "bots"
         ? "Chỉ tài khoản bot thanh khoản."
         : "Mọi bản ghi user trong DB (gồm bot MM).";

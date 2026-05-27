@@ -1,3 +1,4 @@
+import { isTraderUserRecord } from '@common/system-accounts.util';
 import { UserRepository } from '@modules/user/user.repository';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PaginatorTypes } from '@nodeteam/nestjs-prisma-pagination';
@@ -38,6 +39,32 @@ export class UserService {
 
   countUsers(where: Prisma.UserWhereInput): Promise<number> {
     return this.userRepository.count(where);
+  }
+
+  /** Admin scope=traders: role user + phone + accountTags rỗng (lọc bộ nhớ sau Prisma). */
+  async findTradersAdmin(
+    where: Prisma.UserWhereInput,
+    orderBy: Prisma.UserOrderByWithRelationInput,
+    pagination: { page: number; perPage: number },
+  ): Promise<PaginatorTypes.PaginatedResult<User>> {
+    const candidates = await this.userRepository.findMany(where, orderBy);
+    const traders = candidates.filter(isTraderUserRecord);
+    const total = traders.length;
+    const start = (pagination.page - 1) * pagination.perPage;
+    const data = traders.slice(start, start + pagination.perPage);
+    const lastPage = Math.max(1, Math.ceil(total / pagination.perPage));
+
+    return {
+      data,
+      meta: {
+        total,
+        lastPage,
+        currentPage: pagination.page,
+        perPage: pagination.perPage,
+        prev: pagination.page > 1 ? pagination.page - 1 : null,
+        next: pagination.page < lastPage ? pagination.page + 1 : null,
+      },
+    };
   }
 
   /**
