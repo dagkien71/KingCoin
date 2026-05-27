@@ -1,0 +1,52 @@
+# Deploy backend → Google Cloud Run khi push master (chỉ khi đổi backend/).
+# Thiết lập một lần: docs/DEPLOY_CLOUD_RUN_CI.md
+
+name: Deploy API (Cloud Run)
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-cloud-run.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-cloud-run-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        id: deploy
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          service: kingcoin-api
+          region: asia-southeast1
+          source: ./backend
+          flags: >-
+            --allow-unauthenticated
+            --port=8080
+            --memory=1Gi
+            --cpu=1
+            --timeout=300
+            --min-instances=1
+            --max-instances=3
+
+      - name: Deployment URL
+        run: echo "Deployed → ${{ steps.deploy.outputs.url }}"
