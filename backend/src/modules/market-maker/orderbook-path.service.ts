@@ -55,16 +55,11 @@ export class OrderbookPathService {
       this.mmControl.hasActivePathDriver(token.id) ||
       !shouldWalkPricePath(prev, targetPrice)
     ) {
-      const updated = await this.mmControl.setSpotPrice(
-        fresh ?? token,
-        targetPrice,
-        logVolume,
-      );
-      return {
-        price: updated.price ?? targetPrice,
-        previous: prev,
-        pathMode: 'instant',
-      };
+      // Triệt để: không kéo spot trực tiếp. Đặt target book = targetPrice rồi sweep để tạo fills.
+      await this.walkSpotToTarget(fresh ?? token, prev, targetPrice, logVolume);
+      const finalRow = await this.tokenService.findById(token.id);
+      const final = Number(finalRow?.price ?? targetPrice);
+      return { price: final, previous: prev, pathMode: 'instant' };
     }
 
     return this.walkSpotToTarget(fresh ?? token, prev, targetPrice, logVolume);
@@ -94,16 +89,10 @@ export class OrderbookPathService {
       this.mmControl.hasActivePathDriver(token.id) ||
       !shouldWalkPricePath(prev, next)
     ) {
-      const updated = await this.mmControl.setSpotPrice(
-        fresh ?? token,
-        next,
-        logVolume,
-      );
-      return {
-        price: updated.price ?? next,
-        previous: prev,
-        pathMode: 'instant',
-      };
+      await this.walkSpotToTarget(fresh ?? token, prev, next, logVolume);
+      const finalRow = await this.tokenService.findById(token.id);
+      const final = Number(finalRow?.price ?? next);
+      return { price: final, previous: prev, pathMode: 'instant' };
     }
 
     return this.walkSpotToTarget(fresh ?? token, prev, next, logVolume);
@@ -121,9 +110,9 @@ export class OrderbookPathService {
     const tokenId = token.id;
     if (this.walksInFlight.has(tokenId)) {
       this.logger.warn(`Path walk đang chạy — bỏ qua chồng ${tokenId}`);
-      const updated = await this.mmControl.setSpotPrice(token, targetPrice, logVolume);
+      const row = await this.tokenService.findById(tokenId);
       return {
-        price: updated.price ?? targetPrice,
+        price: Number(row?.price ?? targetPrice),
         previous: fromPrice,
         pathMode: 'instant',
       };
@@ -132,9 +121,36 @@ export class OrderbookPathService {
     const cfg = pathWalkConfigFromEnv();
     const steps = computePricePathSteps(fromPrice, targetPrice, cfg);
     if (steps.length <= 1) {
-      const updated = await this.mmControl.setSpotPrice(token, targetPrice, logVolume);
+      // 1 bước: vẫn phải có fill để tạo volume
+      const dir = pricePathDirection(fromPrice, targetPrice);
+      this.mmControl.patchToken(tokenId, {
+        forceMid: targetPrice,
+        targetPrice,
+        midBiasPct: 0,
+      });
+      this.mmControl.setMid(tokenId, targetPrice);
+      await this.marketMaker.triggerRefreshForToken(tokenId);
+      const fills = await this.marketFlow.sweepUntilSpotReaches(
+        tokenId,
+        dir,
+        targetPrice,
+        { maxFills: 200 },
+      );
+      if (fills <= 0) {
+        throw new BadRequestException(
+          'Không thể tạo khớp lệnh để di chuyển giá (thiếu thanh khoản MM/flow).',
+        );
+      }
+      if (logVolume > 0) {
+        const row = await this.tokenService.findById(tokenId);
+        const spot = Number(row?.price ?? targetPrice);
+        await this.tokenLogService.createLog(tokenId, spot, logVolume);
+        await this.tokenService.syncVolumesFromLogs(tokenId).catch(() => null);
+      }
+      this.mmControl.patchToken(tokenId, { forceMid: null, targetPrice: null });
+      const row = await this.tokenService.findById(tokenId);
       return {
-        price: updated.price ?? targetPrice,
+        price: Number(row?.price ?? targetPrice),
         previous: fromPrice,
         pathMode: 'instant',
       };
@@ -145,6 +161,11 @@ export class OrderbookPathService {
     this.tokenService.cancelPricePersist(tokenId);
     const direction = pricePathDirection(fromPrice, targetPrice);
     const stepDelay = pathStepDelayMs();
+    const minMovePct = Math.max(1e-8, Number(process.env.PATH_WALK_MIN_MOVE_PCT ?? '0.00002'));
+    const maxExtraSweeps = Math.max(
+      0,
+      Math.min(8, Number(process.env.PATH_WALK_MAX_EXTRA_SWEEPS ?? '3')),
+    );
 
     try {
       this.logger.log(
@@ -163,17 +184,32 @@ export class OrderbookPathService {
         this.mmControl.setMid(tokenId, step);
         this.mmControl.setLastPathBookMid(tokenId, step);
 
-        const row = await this.tokenService.findById(tokenId);
-        const volumes = row?.volumes ?? token.volumes;
-        await this.tokenService.updatePriceLive(tokenId, step, { volumes });
+        await this.marketMaker.triggerRefreshForToken(tokenId);
+        let fills = await this.marketFlow.sweepAlongPath(tokenId, direction);
 
-        if (isLast && logVolume > 0) {
-          await this.tokenLogService.createLog(tokenId, step, logVolume);
-          await this.tokenService.syncVolumesFromLogs(tokenId).catch(() => null);
+        // Giá phải xuất phát từ khớp lệnh. Nếu chưa nhích đủ (do sổ mỏng), sweep thêm vài lần.
+        for (let s = 0; s < maxExtraSweeps; s++) {
+          const row = await this.tokenService.findById(tokenId);
+          const spot = Number(row?.price ?? 0);
+          if (spot > 0) {
+            const pct = Math.abs(spot - step) / Math.max(step, 1e-12);
+            if (pct <= minMovePct) break;
+          }
+          fills += await this.marketFlow.sweepAlongPath(tokenId, direction);
         }
 
-        await this.marketMaker.triggerRefreshForToken(tokenId);
-        await this.marketFlow.sweepAlongPath(tokenId, direction);
+        // Triệt để: nếu step không tạo được khớp → không được phép đi tiếp (tránh candle ngắt quãng).
+        if (fills <= 0) {
+          throw new BadRequestException(
+            `Không tạo được khớp lệnh ở step=${step} (thiếu thanh khoản MM/flow)`,
+          );
+        }
+
+        // Bắt buộc spot đi qua step (trong biên nhỏ) bằng fills thực.
+        await this.marketFlow.sweepUntilSpotReaches(tokenId, direction, step, {
+          maxFills: 300,
+          epsPct: 0.00002,
+        });
 
         if (!isLast) {
           await this.delay(stepDelay);
@@ -181,13 +217,19 @@ export class OrderbookPathService {
       }
 
       this.tokenService.cancelPricePersist(tokenId);
-      const finalRow = await this.tokenService.findById(tokenId);
-      const finalToken = finalRow ?? token;
-      await this.mmControl.setSpotPrice(finalToken, targetPrice, logVolume);
-      await this.tokenService.flushPricePersist(tokenId, targetPrice);
+      // Clear forced mid overrides; giữ spot theo last trade (đã persist qua matchOrders).
+      this.mmControl.patchToken(tokenId, { forceMid: null, targetPrice: null });
+      if (logVolume > 0) {
+        const row = await this.tokenService.findById(tokenId);
+        const spot = Number(row?.price ?? targetPrice);
+        await this.tokenLogService.createLog(tokenId, spot, logVolume);
+        await this.tokenService.syncVolumesFromLogs(tokenId).catch(() => null);
+      }
 
+      const finalRow = await this.tokenService.findById(tokenId);
+      const finalSpot = Number(finalRow?.price ?? targetPrice);
       return {
-        price: targetPrice,
+        price: finalSpot,
         previous: fromPrice,
         pathMode: 'walk',
         pathSteps: steps.length,

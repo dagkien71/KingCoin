@@ -45,6 +45,17 @@ Env (backend):
 - `USER_BOT_QTY` (mặc định `2`)
 - `USER_BOT_EMAIL` (mặc định `user-bot@kingcoin.local`)
 
+## Bắt buộc: giá đi qua bằng khớp lệnh (không ngắt quãng)
+
+Các thao tác admin set/nudge giá sử dụng **orderbook path** để đảm bảo giá đi từ A → B
+thông qua **các trade fill thật** (có volume), nến đi qua các điểm trung gian và không
+teleport.
+
+Env tinh chỉnh (backend):
+
+- `PATH_WALK_MIN_MOVE_PCT` (mặc định `0.00002`): ngưỡng “đã chạm step” theo %.
+- `PATH_WALK_MAX_EXTRA_SWEEPS` (mặc định `3`): số sweep bổ sung nếu step chưa tạo đủ fills.
+
 Tạo/sync user:
 
 ```bash

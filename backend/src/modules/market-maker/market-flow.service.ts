@@ -177,6 +177,59 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
     return fills;
   }
 
+  /**
+   * Dùng trade thật để kéo giá tiến dần tới `targetPrice`.
+   * - direction=up: liên tục mua best ask (MM sell) cho tới khi spot >= targetPrice
+   * - direction=down: liên tục bán best bid (MM buy) cho tới khi spot <= targetPrice
+   *
+   * Trả về số fills đã tạo.
+   */
+  async sweepUntilSpotReaches(
+    tokenId: string,
+    direction: 'up' | 'down',
+    targetPrice: number,
+    opts?: { maxFills?: number; epsPct?: number },
+  ): Promise<number> {
+    const maxFills = Math.max(1, Math.min(10_000, opts?.maxFills ?? 200));
+    const epsPct = Math.max(1e-9, opts?.epsPct ?? 0.00001);
+    if (!this.mmControl.isFlowEnabled()) return 0;
+    if (targetPrice <= 0) return 0;
+
+    const mmIds = await this.resolveMmUserIds();
+    const flowUser = await this.resolveFlowUserForTick();
+    if (mmIds.length === 0 || !flowUser) return 0;
+    if (this.mmControl.shouldProtectSpot(tokenId)) return 0;
+
+    let fills = 0;
+    for (let i = 0; i < maxFills; i++) {
+      const row = await this.prisma.tokenCrypto.findUnique({
+        where: { id: tokenId },
+        select: { price: true, symbol: true, name: true, tokenKind: true },
+      });
+      const spot = Number(row?.price ?? 0);
+      if (spot > 0) {
+        const done =
+          direction === 'up'
+            ? spot >= targetPrice * (1 - epsPct)
+            : spot <= targetPrice * (1 + epsPct);
+        if (done) break;
+      }
+
+      // mỗi fill đặt lệnh market theo best bid/ask hiện tại (đã có sổ MM)
+      const ok = await this.tryTakerFill(
+        mmIds,
+        flowUser.id,
+        // tokenKind để isQuoteToken skip — nhưng tokenId ở đây luôn base do caller
+        (row as any) ?? ({ id: tokenId } as any),
+        direction === 'up' ? 'buy' : 'sell',
+        this.flowQty(),
+      );
+      if (!ok) break;
+      fills++;
+    }
+    return fills;
+  }
+
   private async tryTakerFill(
     mmIds: string[],
     flowUserId: string,
