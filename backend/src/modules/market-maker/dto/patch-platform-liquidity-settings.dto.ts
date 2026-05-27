@@ -20,19 +20,19 @@ export class PatchPlatformLiquiditySettingsDto {
   @IsBoolean()
   readonly flowEnabled?: boolean;
 
-  @ApiPropertyOptional({ description: 'Chu kỳ refresh sổ MM (ms), min 500' })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(500)
-  @Max(60_000)
-  readonly mmIntervalMs?: number;
-
-  @ApiPropertyOptional({ description: 'Chu kỳ flow taker (ms), min 300' })
+  @ApiPropertyOptional({ description: 'Chu kỳ refresh sổ MM (ms), min 300' })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(300)
+  @Max(60_000)
+  readonly mmIntervalMs?: number;
+
+  @ApiPropertyOptional({ description: 'Chu kỳ flow taker (ms), min 150' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(150)
   @Max(60_000)
   readonly flowIntervalMs?: number;
 

@@ -173,7 +173,7 @@ export class OrderbookPathService {
         }
 
         await this.marketMaker.triggerRefreshForToken(tokenId);
-        await this.marketFlow.sweepAlongPath(tokenId, direction, 2);
+        await this.marketFlow.sweepAlongPath(tokenId, direction);
 
         if (!isLast) {
           await this.delay(stepDelay);

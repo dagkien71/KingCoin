@@ -78,8 +78,8 @@ function clampLiquiditySettings(
 ): EffectiveLiquiditySettings {
   return {
     ...s,
-    mmIntervalMs: Math.min(60_000, Math.max(500, s.mmIntervalMs)),
-    flowIntervalMs: Math.min(60_000, Math.max(300, s.flowIntervalMs)),
+    mmIntervalMs: Math.min(60_000, Math.max(300, s.mmIntervalMs)),
+    flowIntervalMs: Math.min(60_000, Math.max(150, s.flowIntervalMs)),
     mmBotCount: Math.min(32, Math.max(0, s.mmBotCount)),
     flowBotCount: Math.min(16, Math.max(0, s.flowBotCount)),
     levels: Math.min(12, Math.max(1, s.levels)),
@@ -291,6 +291,12 @@ export class PlatformLiquiditySettingsService implements OnModuleInit {
     const preset = volatilityPresetFor(level);
     if (!preset) {
       throw new BadRequestException(`Không có preset cho mức: ${level}`);
+    }
+    const cancelled = this.mmControl.cancelAllPriceModelRuns();
+    if (cancelled > 0) {
+      this.logger.log(
+        `Slider biến động: đã hủy ${cancelled} mô hình giá (GBM/lịch) — chuyển MM+flow 24/7`,
+      );
     }
     return this.patch(preset);
   }

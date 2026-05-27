@@ -30,11 +30,6 @@ export function useMarketSettings() {
     "/admin/market-settings/presets/volatility/stable"
   );
 
-  const gbmBulkRun = useMutation<{ ok: true; count: number }>(
-    "POST",
-    "/admin/market-control/bulk/model-run"
-  );
-
   const applyVolatility = async (level: VolatilityLevelId) => {
     const result = await applyVolatilityMutation.mutate(
       {},
@@ -42,19 +37,11 @@ export function useMarketSettings() {
     );
     if (isMutationFailure(result)) return false;
 
-    // Với mạnh/cực mạnh: tạo biến động kiểu GBM giống preset market-control.
-    if (level === "strong" || level === "extreme") {
-      const run = await gbmBulkRun.mutate({
-        allAlts: true,
-        modelId: "gbm",
-        presetId: "model-volatile-trend-down",
-        durationMin: 25,
-        restoreOnEnd: false,
-      });
-      if (isMutationFailure(run)) return false;
-    }
-
-    toast.success("Đã áp mức biến động — lưu DB và chạy MM/flow ngay.");
+    toast.success(
+      level === "strong" || level === "extreme"
+        ? "Đã áp biến động mạnh — MM + khớp liên tục 24/7 (tốc độ kiểu GBM, không lịch 25p)."
+        : "Đã áp mức biến động — lưu DB và chạy MM/flow ngay."
+    );
     void refetch();
     return true;
   };
@@ -90,10 +77,7 @@ export function useMarketSettings() {
     refetch,
     saving: patch.loading,
     resetting: reset.loading,
-    applyingPreset:
-      applyPreset.loading ||
-      applyVolatilityMutation.loading ||
-      gbmBulkRun.loading,
+    applyingPreset: applyPreset.loading || applyVolatilityMutation.loading,
     save,
     resetToEnv,
     applyNormalSteady,

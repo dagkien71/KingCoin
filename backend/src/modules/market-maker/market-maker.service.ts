@@ -7,6 +7,10 @@ import { MarketFlowService } from '@modules/market-maker/market-flow.service';
 import { MmBotRegistryService } from '@modules/market-maker/mm-bot-registry.service';
 import { mmLiquidityEmails } from '@modules/market-maker/liquidity-bots.util';
 import { mmLevelQuantity } from '@modules/market-maker/mm-params.util';
+import {
+  mmWanderScale,
+  mmWavePeriodMs,
+} from '@modules/market-maker/gbm-pace.util';
 import { PlatformLiquiditySettingsService } from '@modules/market-maker/platform-liquidity-settings.service';
 import {
   isQuoteToken,
@@ -260,7 +264,7 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
     if (run?.priceAtStart) from = run.priceAtStart;
     else if (schedule?.priceAtStart) from = schedule.priceAtStart;
     const direction = target >= from ? 'up' : 'down';
-    await this.marketFlow.sweepAlongPath(tokenId, direction, 1);
+    await this.marketFlow.sweepAlongPath(tokenId, direction);
   }
 
   /** Mặc định 45 giây / lần — @Cron phải literal. */
@@ -400,22 +404,26 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
       mid = pathMid;
       modeLabel = 'đường giá';
     } else if (spotAnchor != null && spotAnchor > 0) {
-      const t = Date.now() / 120000;
+      const waveMs = mmWavePeriodMs(oscillatePct);
+      const t = Date.now() / waveMs;
       const drift =
         oscillatePct * Math.sin(t) +
         oscillatePct * 0.35 * Math.sin(t * 2.31 + 0.7);
       mid = spotAnchor * (1 + drift);
-      const wander = (Math.random() * 2 - 1) * wanderPct * 0.25;
+      const wander =
+        (Math.random() * 2 - 1) * wanderPct * mmWanderScale(oscillatePct);
       mid = mid * (1 + wander);
       mid = this.mmControl.finalizeMid(token.id, mid, baseMid);
       modeLabel = 'neo giá';
     } else {
-      const t = Date.now() / 120000;
+      const waveMs = mmWavePeriodMs(oscillatePct);
+      const t = Date.now() / waveMs;
       const drift =
         oscillatePct * Math.sin(t) +
         oscillatePct * 0.35 * Math.sin(t * 2.31 + 0.7);
       mid = this.mmControl.getInitialMid(token.id, baseMid, drift);
-      const wander = (Math.random() * 2 - 1) * wanderPct;
+      const wander =
+        (Math.random() * 2 - 1) * wanderPct * mmWanderScale(oscillatePct);
       mid = mid * (1 + wander) * 0.65 + baseMid * (1 + drift) * 0.35;
       mid = this.mmControl.finalizeMid(token.id, mid, baseMid);
     }

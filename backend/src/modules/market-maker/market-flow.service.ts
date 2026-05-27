@@ -8,6 +8,11 @@ import {
   isQuoteToken,
   resolveFlowBaseTokenNames,
 } from '@modules/market-maker/liquidity-target-tokens.util';
+import {
+  flowMatchesBothSidesPerTick,
+  flowPassesPerTick,
+  flowSweepMaxFills,
+} from '@modules/market-maker/flow-activity.util';
 import { PlatformLiquiditySettingsService } from '@modules/market-maker/platform-liquidity-settings.service';
 import { OrderService } from '@modules/order/order.service';
 import { PrismaService } from '@providers/prisma';
@@ -43,6 +48,14 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
 
   private flowQty(): number {
     return this.platformSettings.getEffective().flowQty;
+  }
+
+  private oscillatePct(): number {
+    return this.platformSettings.getEffective().oscillatePct;
+  }
+
+  sweepMaxFills(): number {
+    return flowSweepMaxFills(this.oscillatePct());
   }
 
   private startFlowLoop(): void {
@@ -92,9 +105,10 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
   async sweepAlongPath(
     tokenId: string,
     direction: 'up' | 'down',
-    maxFills = 2,
+    maxFills?: number,
   ): Promise<number> {
-    if (!this.mmControl.isFlowEnabled() || maxFills < 1) return 0;
+    const cap = maxFills ?? this.sweepMaxFills();
+    if (!this.mmControl.isFlowEnabled() || cap < 1) return 0;
 
     const qtyFlow = this.flowQty();
     const mmIds = await this.resolveMmUserIds();
@@ -109,7 +123,7 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
     const pair = this.quotePair(token);
     let fills = 0;
 
-    for (let i = 0; i < maxFills; i++) {
+    for (let i = 0; i < cap; i++) {
       if (direction === 'up') {
         const bestSell = await this.prisma.order.findFirst({
           where: {
@@ -162,11 +176,77 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
     return fills;
   }
 
+  private async tryTakerFill(
+    mmIds: string[],
+    flowUserId: string,
+    token: TokenCrypto,
+    side: 'buy' | 'sell',
+    qtyFlow: number,
+  ): Promise<boolean> {
+    const pair = this.quotePair(token);
+    if (side === 'buy') {
+      const bestSell = await this.prisma.order.findFirst({
+        where: {
+          userId: { in: mmIds },
+          tokenId: token.id,
+          type: 'sell',
+          status: 'pending',
+          quantity: { gt: 0 },
+        },
+        orderBy: { price: 'asc' },
+      });
+      if (!bestSell) return false;
+      const q = Math.min(qtyFlow, bestSell.quantity);
+      if (q <= 0) return false;
+      await this.orderService.create({
+        tokenId: token.id,
+        type: 'buy',
+        price: bestSell.price,
+        quantity: q,
+        pair,
+        user: { connect: { id: flowUserId } },
+      });
+      this.logger.debug(
+        `Flow: mua từ MM sell @${bestSell.price} qty=${q} (${token.name})`,
+      );
+      return true;
+    }
+
+    const bestBuy = await this.prisma.order.findFirst({
+      where: {
+        userId: { in: mmIds },
+        tokenId: token.id,
+        type: 'buy',
+        status: 'pending',
+        quantity: { gt: 0 },
+      },
+      orderBy: { price: 'desc' },
+    });
+    if (!bestBuy) return false;
+    const q = Math.min(qtyFlow, bestBuy.quantity);
+    if (q <= 0) return false;
+    await this.orderService.create({
+      tokenId: token.id,
+      type: 'sell',
+      price: bestBuy.price,
+      quantity: q,
+      pair,
+      user: { connect: { id: flowUserId } },
+    });
+    this.logger.debug(
+      `Flow: bán vào MM buy @${bestBuy.price} qty=${q} (${token.name})`,
+    );
+    return true;
+  }
+
   private async runTick(): Promise<void> {
     if (!this.mmControl.isFlowEnabled() || this.runInFlight) return;
     this.runInFlight = true;
 
     const qtyFlow = this.flowQty();
+    const osc = this.oscillatePct();
+    const bothSides = flowMatchesBothSidesPerTick(osc);
+    const passes = flowPassesPerTick(osc);
 
     try {
       const mmIds = await this.resolveMmUserIds();
@@ -189,73 +269,26 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
       const buyTurn = this.tick % 2 === 1;
 
       const baseNames = await resolveFlowBaseTokenNames(this.prisma);
-      for (const tokenName of baseNames) {
-        const token = await this.prisma.tokenCrypto.findFirst({
-          where: { name: tokenName },
-        });
-        if (!token?.id) continue;
-        if (isQuoteToken(token)) continue;
-
-        if (this.mmControl.shouldProtectSpot(token.id)) {
-          continue;
-        }
-
-        const pair = this.quotePair(token);
-
-        if (buyTurn) {
-          const bestSell = await this.prisma.order.findFirst({
-            where: {
-              userId: { in: mmIds },
-              tokenId: token.id,
-              type: 'sell',
-              status: 'pending',
-              quantity: { gt: 0 },
-            },
-            orderBy: { price: 'asc' },
+      for (let pass = 0; pass < passes; pass++) {
+        for (const tokenName of baseNames) {
+          const token = await this.prisma.tokenCrypto.findFirst({
+            where: { name: tokenName },
           });
-          if (!bestSell) continue;
+          if (!token?.id) continue;
+          if (isQuoteToken(token)) continue;
 
-          const q = Math.min(qtyFlow, bestSell.quantity);
-          if (q <= 0) continue;
+          if (this.mmControl.shouldProtectSpot(token.id)) {
+            continue;
+          }
 
-          await this.orderService.create({
-            tokenId: token.id,
-            type: 'buy',
-            price: bestSell.price,
-            quantity: q,
-            pair,
-            user: { connect: { id: flowUser.id } },
-          });
-          this.logger.debug(
-            `Flow: mua từ MM sell @${bestSell.price} qty=${q} (${token.name})`,
-          );
-        } else {
-          const bestBuy = await this.prisma.order.findFirst({
-            where: {
-              userId: { in: mmIds },
-              tokenId: token.id,
-              type: 'buy',
-              status: 'pending',
-              quantity: { gt: 0 },
-            },
-            orderBy: { price: 'desc' },
-          });
-          if (!bestBuy) continue;
-
-          const q = Math.min(qtyFlow, bestBuy.quantity);
-          if (q <= 0) continue;
-
-          await this.orderService.create({
-            tokenId: token.id,
-            type: 'sell',
-            price: bestBuy.price,
-            quantity: q,
-            pair,
-            user: { connect: { id: flowUser.id } },
-          });
-          this.logger.debug(
-            `Flow: bán vào MM buy @${bestBuy.price} qty=${q} (${token.name})`,
-          );
+          if (bothSides) {
+            await this.tryTakerFill(mmIds, flowUser.id, token, 'buy', qtyFlow);
+            await this.tryTakerFill(mmIds, flowUser.id, token, 'sell', qtyFlow);
+          } else if (buyTurn) {
+            await this.tryTakerFill(mmIds, flowUser.id, token, 'buy', qtyFlow);
+          } else {
+            await this.tryTakerFill(mmIds, flowUser.id, token, 'sell', qtyFlow);
+          }
         }
       }
     } catch (e) {

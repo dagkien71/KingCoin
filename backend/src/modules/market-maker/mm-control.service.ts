@@ -538,6 +538,15 @@ export class MmControlService implements OnModuleInit, OnModuleDestroy {
     return true;
   }
 
+  /** Dừng mọi PriceModelRun (vd. slider biến động 24/7 thay lịch GBM 25p). */
+  cancelAllPriceModelRuns(): number {
+    let n = 0;
+    for (const tokenId of [...this.modelRunsByToken.keys()]) {
+      if (this.cancelPriceModelRun(tokenId)) n += 1;
+    }
+    return n;
+  }
+
   getModelRunView(tokenId: string, now = Date.now()) {
     const run = this.modelRunsByToken.get(tokenId);
     if (!run) return null;
