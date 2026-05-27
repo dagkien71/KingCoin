@@ -1,7 +1,15 @@
 import { AccessGuard } from '@modules/casl';
 import { PlatformLiquiditySettingsService } from '@modules/market-maker/platform-liquidity-settings.service';
 import { PatchPlatformLiquiditySettingsDto } from '@modules/market-maker/dto/patch-platform-liquidity-settings.dto';
-import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Roles } from '@prisma/client';
 
@@ -32,5 +40,10 @@ export class MarketSettingsAdminController {
   @Post('presets/normal-steady')
   applyNormalSteady() {
     return this.platformSettings.applyNormalSteadyPreset();
+  }
+
+  @Post('presets/volatility/:level')
+  applyVolatility(@Param('level') level: string) {
+    return this.platformSettings.applyVolatilityPreset(level);
   }
 }

@@ -15,6 +15,11 @@ import {
 } from "@/modules/admin/market-settings/market-settings-limits";
 import { NORMAL_STEADY_PRESET } from "@/modules/admin/market-settings/market-settings-presets";
 import { useMarketSettings } from "@/modules/admin/market-settings/useMarketSettings";
+import { VolatilitySlider } from "@/modules/admin/market-settings/VolatilitySlider";
+import {
+  inferVolatilityLevel,
+  type VolatilityLevelId,
+} from "@/modules/admin/market-settings/volatility-presets";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
@@ -121,6 +126,7 @@ export function MarketSettingsView() {
     save,
     resetToEnv,
     applyNormalSteady,
+    applyVolatility,
     refetch,
   } = useMarketSettings();
   const [form, setForm] = useState<EffectiveLiquiditySettings | null>(null);
@@ -172,6 +178,16 @@ export function MarketSettingsView() {
   };
 
   const sources = data?.sources;
+  const volatilityLevel: VolatilityLevelId =
+    data?.currentVolatilityLevel ??
+    (form ? inferVolatilityLevel(form.oscillatePct) : "stable");
+
+  const handleVolatilityChange = async (level: VolatilityLevelId) => {
+    const ok = await applyVolatility(level);
+    if (ok) {
+      setDirty(false);
+    }
+  };
 
   if (!form && loading) {
     return <p className="text-sm text-kc-muted">Đang tải cài đặt…</p>;
@@ -243,6 +259,23 @@ export function MarketSettingsView() {
           </Button>
         </div>
       </header>
+
+      <Card className="border-violet-500/25 bg-violet-500/5">
+        <CardHeader>
+          <CardTitle className="text-base">Điều khiển biến động</CardTitle>
+          <p className="text-xs text-kc-muted">
+            Một thanh thay cho chỉnh từng ô oscillate / wander / jitter. Chi tiết
+            nâng cao ở các khối bên dưới.
+          </p>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <VolatilitySlider
+            value={volatilityLevel}
+            disabled={applyingPreset || saving}
+            onChange={(level) => void handleVolatilityChange(level)}
+          />
+        </CardContent>
+      </Card>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <AdminStatCard

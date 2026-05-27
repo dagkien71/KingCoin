@@ -13,11 +13,23 @@ import {
 } from '@modules/market-maker/mm-env.util';
 import { MmControlService } from '@modules/market-maker/mm-control.service';
 import { MmBotRegistryService } from '@modules/market-maker/mm-bot-registry.service';
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  OnModuleInit,
+} from '@nestjs/common';
 import { PlatformLiquiditySettings } from '@prisma/client';
 import { PrismaService } from '@providers/prisma';
 import { PatchPlatformLiquiditySettingsDto } from './dto/patch-platform-liquidity-settings.dto';
 import { NORMAL_STEADY_PRESET } from './liquidity-presets.util';
+import {
+  inferVolatilityLevel,
+  isVolatilityLevelId,
+  VOLATILITY_LEVELS,
+  volatilityPresetFor,
+  type VolatilityLevelId,
+} from './volatility-presets.util';
 
 export const PLATFORM_LIQUIDITY_SETTINGS_ID = 'platform-liquidity-default';
 
@@ -45,6 +57,8 @@ export type LiquiditySettingsResponse = {
   env: EffectiveLiquiditySettings;
   db: Partial<PlatformLiquiditySettings> | null;
   sources: Record<keyof EffectiveLiquiditySettings, LiquiditySettingsSource>;
+  volatilityLevels: typeof VOLATILITY_LEVELS;
+  currentVolatilityLevel: VolatilityLevelId;
 };
 
 function readPositiveNumber(raw: string | undefined, fallback: number): number {
@@ -206,6 +220,8 @@ export class PlatformLiquiditySettingsService implements OnModuleInit {
       env,
       db: this.dbRow,
       sources,
+      volatilityLevels: VOLATILITY_LEVELS,
+      currentVolatilityLevel: inferVolatilityLevel(effective.oscillatePct),
     };
   }
 
@@ -264,6 +280,19 @@ export class PlatformLiquiditySettingsService implements OnModuleInit {
 
   async applyNormalSteadyPreset(): Promise<LiquiditySettingsResponse> {
     return this.patch(NORMAL_STEADY_PRESET);
+  }
+
+  async applyVolatilityPreset(level: string): Promise<LiquiditySettingsResponse> {
+    if (!isVolatilityLevelId(level)) {
+      throw new BadRequestException(
+        `Mức biến động không hợp lệ: ${level}. Dùng: gentle | moderate | stable | strong | extreme`,
+      );
+    }
+    const preset = volatilityPresetFor(level);
+    if (!preset) {
+      throw new BadRequestException(`Không có preset cho mức: ${level}`);
+    }
+    return this.patch(preset);
   }
 
   async applyToRuntime(opts?: { notifyIntervals?: boolean }): Promise<void> {

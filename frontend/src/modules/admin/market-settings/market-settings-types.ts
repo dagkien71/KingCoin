@@ -17,11 +17,27 @@ export type EffectiveLiquiditySettings = {
   multiMidStep: number;
 };
 
+export type VolatilityLevelId =
+  | "gentle"
+  | "moderate"
+  | "stable"
+  | "strong"
+  | "extreme";
+
+export type VolatilityLevelMeta = {
+  id: VolatilityLevelId;
+  labelVi: string;
+  hintVi: string;
+  oscillatePct: number;
+};
+
 export type MarketSettingsResponse = {
   effective: EffectiveLiquiditySettings;
   env: EffectiveLiquiditySettings;
   db: Partial<EffectiveLiquiditySettings> | null;
   sources: Record<keyof EffectiveLiquiditySettings, LiquiditySettingsSource>;
+  volatilityLevels?: VolatilityLevelMeta[];
+  currentVolatilityLevel?: VolatilityLevelId;
 };
 
 export type MarketSettingsPatch = Partial<EffectiveLiquiditySettings>;

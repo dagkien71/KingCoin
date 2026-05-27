@@ -5,6 +5,7 @@ import useMutation, { isMutationFailure } from "@/hooks/useMutation";
 import type {
   MarketSettingsPatch,
   MarketSettingsResponse,
+  VolatilityLevelId,
 } from "@/modules/admin/market-settings/market-settings-types";
 import { toast } from "react-toastify";
 
@@ -23,6 +24,22 @@ export function useMarketSettings() {
     "POST",
     "/admin/market-settings/presets/normal-steady"
   );
+
+  const applyVolatilityMutation = useMutation<MarketSettingsResponse>(
+    "POST",
+    "/admin/market-settings/presets/volatility/stable"
+  );
+
+  const applyVolatility = async (level: VolatilityLevelId) => {
+    const result = await applyVolatilityMutation.mutate(
+      {},
+      `/admin/market-settings/presets/volatility/${level}`
+    );
+    if (isMutationFailure(result)) return false;
+    toast.success("Đã áp mức biến động — lưu DB và chạy MM/flow ngay.");
+    void refetch();
+    return true;
+  };
 
   const save = async (body: MarketSettingsPatch) => {
     const result = await patch.mutate(body);
@@ -55,9 +72,10 @@ export function useMarketSettings() {
     refetch,
     saving: patch.loading,
     resetting: reset.loading,
-    applyingPreset: applyPreset.loading,
+    applyingPreset: applyPreset.loading || applyVolatilityMutation.loading,
     save,
     resetToEnv,
     applyNormalSteady,
+    applyVolatility,
   };
 }
