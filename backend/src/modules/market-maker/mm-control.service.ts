@@ -91,6 +91,7 @@ export class MmControlService implements OnModuleInit, OnModuleDestroy {
   private readonly manualLockUntilByToken = new Map<string, number>();
   private scheduleTickHandle: NodeJS.Timeout | null = null;
   private scheduleTickInFlight = false;
+  private dbSyncHandle: NodeJS.Timeout | null = null;
   /** Admin walk đang chạy — không neo spotAnchor giữa chừng */
   private readonly pathWalkActive = new Set<string>();
   private readonly lastPathBookMidByToken = new Map<string, number>();
@@ -108,6 +109,95 @@ export class MmControlService implements OnModuleInit, OnModuleDestroy {
     private readonly realtimeService: RealtimeService,
     private readonly botCatalog: TokenDedicatedBotsCatalogService,
   ) {}
+
+  /**
+   * Global override cần đồng bộ giữa nhiều instance production.
+   * Dùng PlatformLiquiditySettings (DB) làm nguồn chung.
+   */
+  private static readonly PLATFORM_LIQUIDITY_SETTINGS_ID =
+    'platform-liquidity-default';
+
+  private applyDbGlobalRow(row: {
+    mmEnabled?: boolean | null;
+    flowEnabled?: boolean | null;
+    levels?: number | null;
+    spreadStep?: number | null;
+    qty?: number | null;
+    oscillatePct?: number | null;
+    wanderPct?: number | null;
+    levelJitterPct?: number | null;
+    multiMidStep?: number | null;
+  }): void {
+    const patch: MmGlobalOverride = {};
+    if (row.mmEnabled != null) patch.mmEnabled = row.mmEnabled;
+    if (row.flowEnabled != null) patch.flowEnabled = row.flowEnabled;
+    if (row.levels != null) patch.levels = row.levels;
+    if (row.spreadStep != null) patch.spreadStep = row.spreadStep;
+    if (row.qty != null) patch.qty = row.qty;
+    if (row.oscillatePct != null) patch.oscillatePct = row.oscillatePct;
+    if (row.wanderPct != null) patch.wanderPct = row.wanderPct;
+    if (row.levelJitterPct != null) patch.levelJitterPct = row.levelJitterPct;
+    if (row.multiMidStep != null) patch.multiMidStep = row.multiMidStep;
+    Object.assign(this.globalOverride, patch);
+  }
+
+  private async syncGlobalOverrideFromDb(): Promise<void> {
+    try {
+      const row = await this.prisma.platformLiquiditySettings.findUnique({
+        where: { id: MmControlService.PLATFORM_LIQUIDITY_SETTINGS_ID },
+        select: {
+          mmEnabled: true,
+          flowEnabled: true,
+          levels: true,
+          spreadStep: true,
+          qty: true,
+          oscillatePct: true,
+          wanderPct: true,
+          levelJitterPct: true,
+          multiMidStep: true,
+        },
+      });
+      if (!row) return;
+      this.applyDbGlobalRow(row);
+    } catch (e) {
+      this.logger.warn(
+        `sync global override from DB failed: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  }
+
+  private persistGlobalOverrideToDb(patch: MmGlobalOverride): void {
+    const data: Record<string, unknown> = {};
+    const fields: Array<keyof MmGlobalOverride> = [
+      'mmEnabled',
+      'flowEnabled',
+      'levels',
+      'spreadStep',
+      'qty',
+      'oscillatePct',
+      'wanderPct',
+      'levelJitterPct',
+      'multiMidStep',
+    ];
+    for (const k of fields) {
+      if (patch[k] !== undefined) {
+        data[k] = patch[k] === null ? null : patch[k];
+      }
+    }
+    if (Object.keys(data).length === 0) return;
+
+    void this.prisma.platformLiquiditySettings
+      .upsert({
+        where: { id: MmControlService.PLATFORM_LIQUIDITY_SETTINGS_ID },
+        update: data,
+        create: { id: MmControlService.PLATFORM_LIQUIDITY_SETTINGS_ID, ...data },
+      })
+      .catch((e) => {
+        this.logger.warn(
+          `persist global override to DB failed: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      });
+  }
 
   private mmEmail(): string {
     return process.env.MARKET_MAKER_EMAIL ?? 'marketmaker@kingcoin.local';
@@ -239,6 +329,14 @@ export class MmControlService implements OnModuleInit, OnModuleDestroy {
   }
 
   onModuleInit(): void {
+    // Prod nhiều instance: sync override định kỳ từ DB để tránh “nhảy true/false”.
+    void this.syncGlobalOverrideFromDb();
+    if (process.env.NODE_ENV === 'production') {
+      this.dbSyncHandle = setInterval(
+        () => void this.syncGlobalOverrideFromDb(),
+        3000,
+      );
+    }
     this.scheduleTickHandle = setInterval(() => {
       void this.tickSchedules();
     }, 1000);
@@ -248,6 +346,10 @@ export class MmControlService implements OnModuleInit, OnModuleDestroy {
     if (this.scheduleTickHandle) {
       clearInterval(this.scheduleTickHandle);
       this.scheduleTickHandle = null;
+    }
+    if (this.dbSyncHandle) {
+      clearInterval(this.dbSyncHandle);
+      this.dbSyncHandle = null;
     }
   }
 
@@ -291,6 +393,7 @@ export class MmControlService implements OnModuleInit, OnModuleDestroy {
 
   patchGlobal(patch: MmGlobalOverride): MmGlobalOverride {
     Object.assign(this.globalOverride, patch);
+    this.persistGlobalOverrideToDb(patch);
     return { ...this.globalOverride };
   }
 
