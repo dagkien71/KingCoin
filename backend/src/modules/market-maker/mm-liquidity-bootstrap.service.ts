@@ -1,5 +1,6 @@
 import { ACCOUNT_TAG_LIQUIDITY_BOT } from '@common/system-accounts.util';
 import { BotInventoryService } from '@modules/market-maker/bot-inventory.service';
+import { slotsForToken } from '@modules/market-maker/token-dedicated-bots.util';
 import { TokenDedicatedBotsCatalogService } from '@modules/market-maker/token-dedicated-bots-catalog.service';
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@providers/prisma';
@@ -161,6 +162,42 @@ export class MmLiquidityBootstrapService {
       created,
       inventorySynced: true,
     };
+  }
+
+  /**
+   * Tạo + cấp KC/token cho các dedicated bots của một token cụ thể.
+   * Gọi tự động sau khi token go-live hoặc trong rebalance cycle.
+   */
+  async ensureBotsForToken(
+    tokenId: string,
+    symbol: string,
+  ): Promise<{ created: number; synced: number }> {
+    if (!this.botCatalog.usesDedicatedPool()) return { created: 0, synced: 0 };
+
+    const slots = slotsForToken(symbol);
+    let created = 0;
+    let synced = 0;
+
+    for (const s of slots) {
+      try {
+        const r = await this.ensureBotUser(s.email, s.kind);
+        if (r.created) created++;
+        if (r.inventorySynced) synced++;
+      } catch (err) {
+        this.logger.warn(
+          `ensureBotsForToken ${symbol} slot ${s.slot}: ${(err as Error).message}`,
+        );
+      }
+    }
+
+    if (created > 0 || synced > 0) {
+      await this.botCatalog.reload();
+      this.logger.log(
+        `ensureBotsForToken ${symbol}: ${created} bot mới, ${synced} synced`,
+      );
+    }
+
+    return { created, synced };
   }
 
   /** Tương đương `node scripts/ensure-liquidity-bots.js` — dùng khi không có Render Shell. */

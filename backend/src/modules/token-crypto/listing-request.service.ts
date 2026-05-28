@@ -12,9 +12,11 @@ import { ListingRequestRepository } from './listing-request.repository';
 import { UpcomingListingRepository } from './upcoming-listing.repository';
 import { TokenCryptoRepository } from './token.repository';
 import { TokenCryptoService } from './token.service';
+import { MmLiquidityBootstrapService } from '@modules/market-maker/mm-liquidity-bootstrap.service';
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -41,6 +43,8 @@ type SubmitPayload = {
 
 @Injectable()
 export class ListingRequestService {
+  private readonly logger = new Logger(ListingRequestService.name);
+
   constructor(
     private readonly repo: ListingRequestRepository,
     private readonly upcomingRepo: UpcomingListingRepository,
@@ -49,6 +53,7 @@ export class ListingRequestService {
     private readonly ledgerService: LedgerService,
     private readonly tokenService: TokenCryptoService,
     private readonly notifications: NotificationService,
+    private readonly liquidityBootstrap: MmLiquidityBootstrapService,
   ) {}
 
   private listingFee(): number {
@@ -435,6 +440,15 @@ export class ListingRequestService {
       tokenId: token.id,
     });
     await this.upcomingRepo.deleteById(upcomingId);
+
+    // Tự động tạo dedicated bot users + cấp KC/token cho token mới go-live.
+    this.liquidityBootstrap
+      .ensureBotsForToken(token.id, request.symbol)
+      .catch((err) =>
+        this.logger.warn(
+          `ensureBotsForToken ${request.symbol} failed: ${(err as Error).message}`,
+        ),
+      );
   }
 
   private formatSupply(n: number): string {

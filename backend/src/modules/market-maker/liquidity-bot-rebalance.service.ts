@@ -1,6 +1,7 @@
 import { isLiquidityBotEmail } from '@common/system-accounts.util';
 import { PrismaService } from '@providers/prisma';
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { MmLiquidityBootstrapService } from './mm-liquidity-bootstrap.service';
 import { TokenDedicatedBotsCatalogService } from './token-dedicated-bots-catalog.service';
 
 type BotRow = {
@@ -18,6 +19,7 @@ export class LiquidityBotRebalanceService implements OnModuleInit, OnModuleDestr
   constructor(
     private readonly prisma: PrismaService,
     private readonly botCatalog: TokenDedicatedBotsCatalogService,
+    private readonly liquidityBootstrap: MmLiquidityBootstrapService,
   ) {}
 
   private enabled(): boolean {
@@ -368,8 +370,43 @@ export class LiquidityBotRebalanceService implements OnModuleInit, OnModuleDestr
     return moved;
   }
 
+  /**
+   * Kiểm tra và tạo dedicated bots cho bất kỳ token active nào chưa có bots.
+   * Chạy trước mỗi cycle để tự phục hồi sau khi thêm token mới.
+   */
+  private async ensureMissingBots(): Promise<void> {
+    if (!this.botCatalog.usesDedicatedPool()) return;
+
+    const quoteName = this.quoteName();
+    const tokens = await this.prisma.tokenCrypto.findMany({
+      where: { status: 'active' },
+      select: { id: true, symbol: true, name: true, tokenKind: true },
+    });
+    const baseTokens = tokens.filter(
+      (t) => t.symbol && t.name !== quoteName && t.tokenKind !== 'stablecoin',
+    );
+
+    for (const token of baseTokens) {
+      if (!token.symbol) continue;
+      const groups = this.botCatalog.getTokenGroups();
+      const alreadyInCatalog = groups.some((g) => g.tokenId === token.id);
+      if (alreadyInCatalog) continue;
+
+      // Token có trong DB nhưng chưa có bots — tạo tự động.
+      await this.liquidityBootstrap
+        .ensureBotsForToken(token.id, token.symbol)
+        .catch((err) =>
+          this.logger.warn(
+            `Auto-create bots ${token.symbol}: ${(err as Error).message}`,
+          ),
+        );
+    }
+  }
+
   async rebalanceOnce(): Promise<void> {
     try {
+      await this.ensureMissingBots();
+
       const bots = await this.listLiquidityBots();
       if (bots.length < 2) return;
 

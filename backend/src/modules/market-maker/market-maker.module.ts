@@ -40,7 +40,6 @@ import { LiquidityBotRebalanceService } from './liquidity-bot-rebalance.service'
     VolatilityTransitionService,
     PlatformLiquiditySettingsService,
     MmBotRegistryService,
-    MmLiquidityBootstrapService,
     LiquidityOrdersAdminService,
     MmControlService,
     MarketMakerService,
