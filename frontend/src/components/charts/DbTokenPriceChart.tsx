@@ -57,6 +57,8 @@ type Props = {
   initialVisibleBars?: number;
   /** Theo dõi nến mới (scroll realtime) — tắt trên lưới admin */
   autoFollowRealtime?: boolean;
+  /** Pane volume dưới nến (Binance-style). */
+  showVolume?: boolean;
 };
 
 type LegendState = {
@@ -291,7 +293,7 @@ function isNearRealtimeEdge(chart: IChartApi, barCount: number): boolean {
 }
 
 /**
- * Biểu đồ nến OHLC — Lightweight Charts v5 (chỉ giá, không pane volume).
+ * Biểu đồ nến OHLC + volume — Lightweight Charts v5.
  * @see docs/CHART_CANDLESTICK_SPEC.md
  */
 export default function DbTokenPriceChart({
@@ -307,6 +309,7 @@ export default function DbTokenPriceChart({
   viewportMode = "fit-all",
   initialVisibleBars = CHART_INITIAL_VISIBLE_BARS,
   autoFollowRealtime = true,
+  showVolume = true,
 }: Props) {
   const initialTf =
     defaultTimeframeId ??
@@ -332,6 +335,7 @@ export default function DbTokenPriceChart({
   const chromeRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const mainSeriesRef = useRef<ISeriesApi<SeriesType> | null>(null);
+  const volumeSeriesRef = useRef<ISeriesApi<SeriesType> | null>(null);
   const seriesModeRef = useRef<"candle" | "area" | null>(null);
   const candlesRef = useRef<ChartCandle[]>([]);
   const roRef = useRef<ResizeObserver | null>(null);
@@ -458,6 +462,7 @@ export default function DbTokenPriceChart({
     chartRef.current?.remove();
     chartRef.current = null;
     mainSeriesRef.current = null;
+    volumeSeriesRef.current = null;
     seriesModeRef.current = null;
     seriesHasDataRef.current = false;
     setChartReady(false);
@@ -547,6 +552,12 @@ export default function DbTokenPriceChart({
 
       chartRef.current = chart;
 
+      if (showVolume) {
+        const panes = chart.panes();
+        if (panes[0]) panes[0].setStretchFactor(7);
+        if (panes[1]) panes[1].setStretchFactor(3);
+      }
+
       const onRangeChange = () => {
         if (programmaticRef.current) return;
         const logical = chart.timeScale().getVisibleLogicalRange();
@@ -625,6 +636,7 @@ export default function DbTokenPriceChart({
     destroyChart,
     resetViewLocks,
     resolvePlotHeight,
+    showVolume,
   ]);
 
   useEffect(() => {
@@ -634,7 +646,7 @@ export default function DbTokenPriceChart({
 
     const mod = lcModRef.current;
     const chart = chartRef.current;
-    const { candles, lineData, mode } = chartData;
+    const { candles, lineData, volumeBars, mode } = chartData;
     const barCount = Math.max(candles.length, lineData.length, 1);
 
     chart.applyOptions({
@@ -642,6 +654,10 @@ export default function DbTokenPriceChart({
     });
 
     if (seriesModeRef.current !== mode || !mainSeriesRef.current) {
+      if (volumeSeriesRef.current) {
+        chart.removeSeries(volumeSeriesRef.current);
+        volumeSeriesRef.current = null;
+      }
       if (mainSeriesRef.current) {
         chart.removeSeries(mainSeriesRef.current);
         mainSeriesRef.current = null;
@@ -663,6 +679,20 @@ export default function DbTokenPriceChart({
           },
           0
         );
+        if (showVolume) {
+          volumeSeriesRef.current = chart.addSeries(
+            mod.HistogramSeries,
+            {
+              priceFormat: { type: "volume" },
+              lastValueVisible: false,
+              priceLineVisible: false,
+            },
+            1
+          );
+          volumeSeriesRef.current.priceScale().applyOptions({
+            scaleMargins: { top: 0.08, bottom: 0 },
+          });
+        }
       } else if (lineData.length > 0) {
         mainSeriesRef.current = chart.addSeries(
           mod.AreaSeries,
@@ -722,6 +752,27 @@ export default function DbTokenPriceChart({
         seriesHasDataRef.current = true;
       }
       prevCandlesRef.current = candles;
+
+      if (volumeSeriesRef.current && volumeBars.length > 0) {
+        const volPayload = sortUniqueChartTimes(
+          volumeBars.map((v) => ({
+            time: chartTimeForSeries(v.time, bucketMs) as Time,
+            value: v.value,
+            color: v.color,
+          }))
+        );
+        const volSeries = volumeSeriesRef.current;
+        const volLast = volPayload[volPayload.length - 1];
+        const canVolUpdate =
+          seriesHasDataRef.current &&
+          (isFormingBarOnlyChange(prevC, candles) ||
+            canIncrementalCandleUpdate(prevC, candles));
+        if (canVolUpdate && volLast) {
+          volSeries.update(volLast);
+        } else {
+          volSeries.setData(volPayload);
+        }
+      }
     } else if (linePayload.length > 0) {
       const last = linePayload[linePayload.length - 1];
       const lastTime = timeToUnixSec(
@@ -797,6 +848,7 @@ export default function DbTokenPriceChart({
     initialVisibleBars,
     plotReady,
     viewportMode,
+    showVolume,
   ]);
 
   useEffect(() => {

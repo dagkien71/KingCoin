@@ -154,3 +154,24 @@ export function formatNumber(
   if (!Number.isFinite(n)) return "—";
   return n.toFixed(decimals);
 }
+
+/** Khối lượng toolbar (vi-VN, 2 số thập phân). */
+export function formatToolbarVolume(
+  value: number | null | undefined,
+): string {
+  if (value == null || !Number.isFinite(Number(value))) return "—";
+  return Number(value).toLocaleString("vi-VN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+/** Delta giá có dấu ± (vi-VN). */
+export function formatSignedInputPrice(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(Number(value))) return "—";
+  const n = Number(value);
+  const body = formatInputPrice(Math.abs(n));
+  if (n > 0) return `+${body}`;
+  if (n < 0) return `-${body}`;
+  return body;
+}

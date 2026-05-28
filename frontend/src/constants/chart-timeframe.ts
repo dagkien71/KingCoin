@@ -19,8 +19,8 @@ export const CHART_TIMEFRAMES: ChartTimeframe[] = [
   { id: "1d", label: "1D", bucketMs: 24 * 60 * 60_000 },
 ];
 
-/** Trade: 5m mặc định (đọc được với log khớp lệch nhịp). */
-export const DEFAULT_CHART_TIMEFRAME_ID = "5m";
+/** Trade: 1m mặc định — nhiều log/khớp hơn, nến có râu rõ hơn. */
+export const DEFAULT_CHART_TIMEFRAME_ID = "1m";
 
 /** Token detail: có thể xem rộng hơn. */
 export const DEFAULT_CHART_TIMEFRAME_DETAIL_ID = "15m";

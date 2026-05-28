@@ -29,7 +29,7 @@ describe('volatility-presets.util', () => {
       prevSweep = flow.sweepMaxFills;
     }
     expect(VOLATILITY_MARKET_PROFILES.extreme.flow.bothSidesPerTick).toBe(true);
-    expect(VOLATILITY_MARKET_PROFILES.gentle.flow.bothSidesPerTick).toBe(false);
+    expect(VOLATILITY_MARKET_PROFILES.gentle.flow.bothSidesPerTick).toBe(true);
   });
 
   it('monotonic mm/flow intervals gentle → extreme', () => {

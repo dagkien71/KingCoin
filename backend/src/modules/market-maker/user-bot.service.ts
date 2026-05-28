@@ -1,4 +1,9 @@
 import { setLastFlowDirection } from '@modules/market-maker/flow-direction.util';
+import {
+  pickProbePattern,
+  probeFillCount,
+  rollFlowQty,
+} from '@modules/market-maker/flow-market-dynamics.util';
 import { MmControlService } from '@modules/market-maker/mm-control.service';
 import {
   isQuoteToken,
@@ -121,14 +126,12 @@ export class UserBotService implements OnModuleInit, OnModuleDestroy {
         return;
       }
 
-      const qty = this.qty();
+      const baseQty = this.qty();
       const baseNames = await resolveFlowBaseTokenNames(this.prisma);
       if (baseNames.length === 0) return;
 
       this.tick++;
-      const side: 'buy' | 'sell' = this.tick % 2 === 1 ? 'buy' : 'sell';
 
-      // round-robin 1 token / tick để tránh spam quá mức
       const tokenName = baseNames[this.tick % baseNames.length];
       const token = await this.prisma.tokenCrypto.findFirst({
         where: { name: tokenName },
@@ -137,17 +140,41 @@ export class UserBotService implements OnModuleInit, OnModuleDestroy {
       if (!token?.id || isQuoteToken(token)) return;
       if (this.mmControl.shouldProtectSpot(token.id)) return;
 
-      const mkt = await this.orderService.getMarketPrice(token.id, side);
       const pair = this.quotePair(token.symbol);
-      await this.orderService.create({
-        tokenId: token.id,
-        type: side,
-        price: mkt.price,
-        quantity: qty,
-        pair,
-        user: { connect: { id: userId } },
-      });
-      setLastFlowDirection(token.id, side === 'buy' ? 'up' : 'down');
+
+      const pattern = pickProbePattern(true);
+      const primary = probeFillCount(3);
+
+      const placeAtMarket = async (side: 'buy' | 'sell', qty: number) => {
+        const mkt = await this.orderService.getMarketPrice(token.id, side);
+        await this.orderService.create({
+          tokenId: token.id,
+          type: side,
+          price: mkt.price,
+          quantity: qty,
+          pair,
+          user: { connect: { id: userId } },
+        });
+        setLastFlowDirection(token.id, side === 'buy' ? 'up' : 'down');
+      };
+
+      if (pattern === 'up_then_retrace') {
+        for (let i = 0; i < primary; i++) {
+          await placeAtMarket('buy', rollFlowQty(baseQty));
+        }
+        await placeAtMarket('sell', rollFlowQty(baseQty) * 0.65);
+      } else if (pattern === 'down_then_retrace') {
+        for (let i = 0; i < primary; i++) {
+          await placeAtMarket('sell', rollFlowQty(baseQty));
+        }
+        await placeAtMarket('buy', rollFlowQty(baseQty) * 0.65);
+      } else if (pattern === 'both_sides') {
+        await placeAtMarket('buy', rollFlowQty(baseQty));
+        await placeAtMarket('sell', rollFlowQty(baseQty));
+      } else {
+        const side: 'buy' | 'sell' = this.tick % 2 === 1 ? 'buy' : 'sell';
+        await placeAtMarket(side, rollFlowQty(baseQty));
+      }
     } catch (e) {
       this.logger.debug(
         `User-bot tick: ${e instanceof Error ? e.message : String(e)}`,

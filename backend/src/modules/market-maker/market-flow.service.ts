@@ -13,6 +13,12 @@ import {
   flowPassesPerTickFromProfile,
   flowSweepMaxFillsFromProfile,
 } from '@modules/market-maker/flow-activity.util';
+import {
+  pickProbePattern,
+  probeFillCount,
+  rollFlowQty,
+  type ProbePattern,
+} from '@modules/market-maker/flow-market-dynamics.util';
 import { setLastFlowDirection } from '@modules/market-maker/flow-direction.util';
 import { pricePathDirection } from '@modules/market-maker/orderbook-path.util';
 import { spotReachedTarget } from '@modules/market-maker/trade-price-walk.util';
@@ -137,7 +143,7 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
           orderBy: { price: 'asc' },
         });
         if (!bestSell) break;
-        const q = Math.min(qtyFlow, bestSell.quantity);
+        const q = Math.min(rollFlowQty(qtyFlow), bestSell.quantity);
         if (q <= 0) break;
         await this.orderService.create({
           tokenId,
@@ -161,7 +167,7 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
           orderBy: { price: 'desc' },
         });
         if (!bestBuy) break;
-        const q = Math.min(qtyFlow, bestBuy.quantity);
+        const q = Math.min(rollFlowQty(qtyFlow), bestBuy.quantity);
         if (q <= 0) break;
         await this.orderService.create({
           tokenId,
@@ -226,7 +232,7 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
         flowUser.id,
         token,
         direction === 'up' ? 'buy' : 'sell',
-        this.flowQty(),
+        rollFlowQty(this.flowQty()),
       );
       if (!ok) break;
       fills++;
@@ -324,14 +330,67 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
     return true;
   }
 
+  /** Probe sổ: ăn nhiều bậc một phía rồi hồi — tạo râu nến từ fill thật. */
+  private async runIntraBarProbe(
+    mmIds: string[],
+    flowUserId: string,
+    token: TokenCrypto,
+    pattern: ProbePattern,
+    maxSweep: number,
+    baseQty: number,
+  ): Promise<void> {
+    const primary = probeFillCount(maxSweep);
+    const retrace = Math.max(1, probeFillCount(Math.max(1, maxSweep - 1)));
+
+    const sweepSide = async (
+      side: 'buy' | 'sell',
+      count: number,
+      qtyScale = 1,
+    ) => {
+      for (let i = 0; i < count; i++) {
+        const qty = rollFlowQty(baseQty) * qtyScale;
+        const ok = await this.tryTakerFill(
+          mmIds,
+          flowUserId,
+          token,
+          side,
+          qty,
+        );
+        if (!ok) break;
+      }
+    };
+
+    switch (pattern) {
+      case 'up_then_retrace':
+        await sweepSide('buy', primary, 1);
+        await sweepSide('sell', retrace, 0.55 + Math.random() * 0.35);
+        break;
+      case 'down_then_retrace':
+        await sweepSide('sell', primary, 1);
+        await sweepSide('buy', retrace, 0.55 + Math.random() * 0.35);
+        break;
+      case 'both_sides':
+        await sweepSide('buy', Math.max(1, Math.ceil(primary / 2)), 0.85);
+        await sweepSide('sell', Math.max(1, Math.ceil(retrace / 2)), 0.85);
+        break;
+      case 'single':
+      default: {
+        const side: 'buy' | 'sell' = Math.random() > 0.5 ? 'buy' : 'sell';
+        await sweepSide(side, primary, 1);
+        break;
+      }
+    }
+  }
+
   private async runTick(): Promise<void> {
     if (!this.mmControl.isFlowEnabled() || this.runInFlight) return;
     this.runInFlight = true;
 
-    const qtyFlow = this.flowQty();
+    const baseQty = this.flowQty();
     const flowProfile = this.platformSettings.resolveFlowProfile();
     const bothSides = flowMatchesBothSidesFromProfile(flowProfile);
     const passes = flowPassesPerTickFromProfile(flowProfile);
+    const maxSweep = flowSweepMaxFillsFromProfile(flowProfile);
 
     try {
       const mmIds = await this.resolveMmUserIds();
@@ -351,7 +410,6 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
       }
 
       this.tick++;
-      const buyTurn = this.tick % 2 === 1;
 
       const baseNames = await resolveFlowBaseTokenNames(this.prisma);
       for (let pass = 0; pass < passes; pass++) {
@@ -366,14 +424,15 @@ export class MarketFlowService implements OnModuleInit, OnModuleDestroy {
             continue;
           }
 
-          if (bothSides) {
-            await this.tryTakerFill(mmIds, flowUser.id, token, 'buy', qtyFlow);
-            await this.tryTakerFill(mmIds, flowUser.id, token, 'sell', qtyFlow);
-          } else if (buyTurn) {
-            await this.tryTakerFill(mmIds, flowUser.id, token, 'buy', qtyFlow);
-          } else {
-            await this.tryTakerFill(mmIds, flowUser.id, token, 'sell', qtyFlow);
-          }
+          const pattern = pickProbePattern(bothSides);
+          await this.runIntraBarProbe(
+            mmIds,
+            flowUser.id,
+            token,
+            pattern,
+            maxSweep,
+            baseQty,
+          );
         }
       }
     } catch (e) {

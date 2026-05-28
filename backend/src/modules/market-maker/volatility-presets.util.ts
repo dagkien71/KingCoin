@@ -75,13 +75,13 @@ export const VOLATILITY_MARKET_PROFILES: Record<
       volatilityLevel: 'gentle',
       mmIntervalMs: 900,
       flowIntervalMs: 1000,
-      spreadStep: 0.0008,
+      spreadStep: 0.001,
       flowQty: 3,
       oscillatePct: 0.0001,
       wanderPct: 0,
       levelJitterPct: 0.00008,
     },
-    flow: { passesPerTick: 1, sweepMaxFills: 1, bothSidesPerTick: false },
+    flow: { passesPerTick: 1, sweepMaxFills: 2, bothSidesPerTick: true },
     pricing: {
       bookSkewPct: 0,
       maxMidStepPctPerRefresh: 0.0005,
@@ -105,7 +105,7 @@ export const VOLATILITY_MARKET_PROFILES: Record<
       wanderPct: 0,
       levelJitterPct: 0.00012,
     },
-    flow: { passesPerTick: 1, sweepMaxFills: 2, bothSidesPerTick: false },
+    flow: { passesPerTick: 2, sweepMaxFills: 3, bothSidesPerTick: true },
     pricing: {
       bookSkewPct: 0,
       maxMidStepPctPerRefresh: 0.001,
@@ -124,7 +124,7 @@ export const VOLATILITY_MARKET_PROFILES: Record<
       oscillatePct: 0.00015,
       wanderPct: 0,
     },
-    flow: { passesPerTick: 1, sweepMaxFills: 2, bothSidesPerTick: false },
+    flow: { passesPerTick: 2, sweepMaxFills: 4, bothSidesPerTick: true },
     pricing: {
       bookSkewPct: 0,
       maxMidStepPctPerRefresh: 0.002,

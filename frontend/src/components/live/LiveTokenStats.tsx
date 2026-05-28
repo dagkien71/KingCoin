@@ -6,11 +6,13 @@ import type { ITokenCrypto } from "@/types/token.type";
 import {
   formatInputPrice,
   formatMarketCap,
+  formatSignedInputPrice,
   formatTokenPrice,
+  formatToolbarVolume,
 } from "@/utils/format-number";
-import { withQuoteUnit } from "@/constants/quote";
+import { QUOTE_STABLECOIN, withQuoteUnit } from "@/constants/quote";
 import clsx from "clsx";
-import { memo } from "react";
+import { memo, type ReactNode } from "react";
 import { FaArrowDown, FaArrowUp } from "react-icons/fa";
 
 type TokenSlice = Pick<
@@ -93,7 +95,165 @@ export const LiveTokenVol24 = memo(function LiveTokenVol24({
 type PairHeaderToken = TokenSlice & {
   name?: string | null;
   marketCap?: number | null;
+  symbol?: string | null;
+  athPriceDay?: number | null;
+  atlPriceDay?: number | null;
 };
+
+function ToolbarStatColumn({
+  label,
+  children,
+  valueClassName,
+}: {
+  label: string;
+  children: ReactNode;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="shrink-0 min-w-[5.25rem] sm:min-w-[6.5rem]">
+      <p className="whitespace-nowrap text-[11px] leading-tight text-kc-muted">
+        {label}
+      </p>
+      <div
+        className={clsx(
+          "num mt-0.5 text-sm font-medium leading-tight text-kc-fg",
+          valueClassName,
+        )}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** Giá chính + quy đổi USD (KC ≈ 1 USD) — toolbar trade. */
+export const LivePairToolbarPrice = memo(function LivePairToolbarPrice({
+  token,
+}: {
+  token: PairHeaderToken;
+}) {
+  const { live, flash } = useLiveTokenDisplay(token as TokenSlice);
+  const price = live.price ?? 0;
+  const ch24 = live.priceChange24h;
+  const isUp = ch24 == null || Number(ch24) >= 0;
+  const peg = QUOTE_STABLECOIN.pegCurrency;
+
+  return (
+    <div className="shrink-0 border-l border-kc-border/60 pl-3 sm:pl-4">
+      <PriceFlash
+        flash={flash}
+        className={clsx(
+          "num text-xl font-semibold tracking-tight sm:text-2xl",
+          !flash && (isUp ? "text-kc-up" : "text-kc-down"),
+        )}
+      >
+        {live.price != null ? formatInputPrice(price) : "—"}
+      </PriceFlash>
+      <p className="num mt-0.5 text-xs text-kc-muted">
+        {live.price != null && price > 0
+          ? `≈ ${formatInputPrice(price)} ${peg}`
+          : "—"}
+      </p>
+    </div>
+  );
+});
+
+/** Biến động 24h: delta tuyệt đối + %. */
+export const LivePairToolbarChange24 = memo(function LivePairToolbarChange24({
+  token,
+}: {
+  token: PairHeaderToken;
+}) {
+  const { live } = useLiveTokenDisplay(token as TokenSlice);
+  const price = live.price ?? 0;
+  const ch24 = live.priceChange24h;
+  const isUp = ch24 == null || Number(ch24) >= 0;
+
+  let delta: number | null = null;
+  if (ch24 != null && price > 0 && Number.isFinite(ch24)) {
+    const prev = price / (1 + ch24 / 100);
+    delta = price - prev;
+  }
+
+  return (
+    <ToolbarStatColumn
+      label="Biến động trong 24 giờ"
+      valueClassName={clsx(
+        ch24 == null ? "text-kc-muted" : isUp ? "text-kc-up" : "text-kc-down",
+      )}
+    >
+      {ch24 != null ? (
+        <span className="whitespace-nowrap">
+          {formatSignedInputPrice(delta)} {formatChangePct(ch24)}
+        </span>
+      ) : (
+        "—"
+      )}
+    </ToolbarStatColumn>
+  );
+});
+
+export const LivePairToolbarHigh24 = memo(function LivePairToolbarHigh24({
+  token,
+}: {
+  token: PairHeaderToken;
+}) {
+  const { live } = useLiveTokenDisplay(token as TokenSlice);
+  const row = live as PairHeaderToken;
+  const high =
+    row.athPriceDay != null && row.athPriceDay > 0
+      ? row.athPriceDay
+      : live.price;
+
+  return (
+    <ToolbarStatColumn label="Giá cao nhất 24h">
+      {high != null && high > 0 ? formatInputPrice(high) : "—"}
+    </ToolbarStatColumn>
+  );
+});
+
+export const LivePairToolbarLow24 = memo(function LivePairToolbarLow24({
+  token,
+}: {
+  token: PairHeaderToken;
+}) {
+  const { live } = useLiveTokenDisplay(token as TokenSlice);
+  const row = live as PairHeaderToken;
+  const low =
+    row.atlPriceDay != null && row.atlPriceDay > 0
+      ? row.atlPriceDay
+      : live.price;
+
+  return (
+    <ToolbarStatColumn label="Giá thấp nhất 24h">
+      {low != null && low > 0 ? formatInputPrice(low) : "—"}
+    </ToolbarStatColumn>
+  );
+});
+
+export const LivePairToolbarVolumes = memo(function LivePairToolbarVolumes({
+  token,
+}: {
+  token: PairHeaderToken;
+}) {
+  const { live } = useLiveTokenDisplay(token as TokenSlice);
+  const symbol = (token.symbol ?? "TOKEN").toUpperCase();
+  const volQuote = live.volumes?.volume24h;
+  const price = live.price ?? 0;
+  const volBase =
+    volQuote != null && price > 0 ? volQuote / price : null;
+
+  return (
+    <>
+      <ToolbarStatColumn label={`Khối lượng 24h(${symbol})`}>
+        {volBase != null ? formatToolbarVolume(volBase) : "—"}
+      </ToolbarStatColumn>
+      <ToolbarStatColumn label={`Khối lượng 24h(KC)`}>
+        {volQuote != null ? formatToolbarVolume(volQuote) : "—"}
+      </ToolbarStatColumn>
+    </>
+  );
+});
 
 export const LivePairTradeSubtitle = memo(function LivePairTradeSubtitle({
   token,
