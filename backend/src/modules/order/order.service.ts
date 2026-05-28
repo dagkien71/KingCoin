@@ -1,4 +1,9 @@
 import { isLiquidityBotEmail } from '../../common/system-accounts.util';
+import {
+  dedicatedKindFromEmail,
+  isDedicatedBotEmail,
+} from '@modules/market-maker/token-dedicated-bots.util';
+import { mmLiquidityEmails } from '@modules/market-maker/liquidity-bots.util';
 import { assertPositiveSpotPrice } from '../../common/spot-price.util';
 import { NotificationService } from '@modules/notification/notification.service';
 import { tradeDeeplink } from '../../common/token-route.util';
@@ -40,6 +45,19 @@ function mapApiStatus(
   if (status === 'complete') return OrderStatus.completed;
   if (status === 'cancel') return OrderStatus.canceled;
   return OrderStatus.pending;
+}
+
+/**
+ * Trả về true chỉ khi email là bot **MM maker** (đặt lệnh limit, không taker).
+ * Flow bots (taker) cần được phép khớp với MM bots để tạo ra giao dịch & thay đổi giá.
+ */
+function isMmMakerBotEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  const normalized = email.trim().toLowerCase();
+  if (isDedicatedBotEmail(normalized)) {
+    return dedicatedKindFromEmail(normalized) === 'mm';
+  }
+  return mmLiquidityEmails().some((e) => e.toLowerCase() === normalized);
 }
 
 @Injectable()
@@ -556,21 +574,23 @@ export class OrderService {
       await this.orderRepository.findPendingSellOrders(tokenId)
     ).map((o) => ({ ...o })) as PendingOrder[];
 
-    // Prevent bot-vs-bot self-trading which drains the book to 0 pending orders.
+    // Prevent MM maker bot-vs-MM maker bot matching which drains the book.
+    // Flow bots (taker kind) are intentionally allowed to match against MM maker bots
+    // so that trade fills happen and price can move.
     const userIds = [
       ...new Set(
         [...pendingBuyOrders, ...pendingSellOrders].map((o) => String(o.userId)),
       ),
     ];
-    const botUserIds = new Set<string>();
+    const mmMakerBotUserIds = new Set<string>();
     if (userIds.length > 0) {
       const users = await this.userRepository.findMany(
         { id: { in: userIds } },
         { createdAt: 'desc' },
       );
       for (const u of users) {
-        if (isLiquidityBotEmail(u.email, u.username, u.accountTags ?? null)) {
-          botUserIds.add(String(u.id));
+        if (isMmMakerBotEmail(u.email)) {
+          mmMakerBotUserIds.add(String(u.id));
         }
       }
     }
@@ -599,10 +619,11 @@ export class OrderService {
       }
 
       if (
-        botUserIds.has(String(buyOrder.userId)) &&
-        botUserIds.has(String(sellOrder.userId))
+        mmMakerBotUserIds.has(String(buyOrder.userId)) &&
+        mmMakerBotUserIds.has(String(sellOrder.userId))
       ) {
-        // Skip matching two liquidity bots. Move the newer side forward.
+        // Skip matching two MM maker bots (same side liquidity providers).
+        // Flow taker bots are NOT in mmMakerBotUserIds and will match normally.
         const buyTs = Number(buyOrder.createdAt) || 0;
         const sellTs = Number(sellOrder.createdAt) || 0;
         if (sellTs >= buyTs) sellIndex++;
