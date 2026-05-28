@@ -564,10 +564,10 @@ export class OrderService {
     ];
     const botUserIds = new Set<string>();
     if (userIds.length > 0) {
-      const users = await this.userRepository.findMany({
-        where: { id: { in: userIds } },
-        select: { id: true, email: true, username: true, accountTags: true },
-      });
+      const users = await this.userRepository.findMany(
+        { id: { in: userIds } },
+        { createdAt: 'desc' },
+      );
       for (const u of users) {
         if (isLiquidityBotEmail(u.email, u.username, u.accountTags ?? null)) {
           botUserIds.add(String(u.id));
