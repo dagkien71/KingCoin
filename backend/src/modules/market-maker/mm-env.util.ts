@@ -10,12 +10,14 @@ export function readEnvFlag(
   return null;
 }
 
-/** MM theo env — khớp MmControlService.envMmEnabled(). */
+/**
+ * MM theo env.
+ * Mặc định BẬT trên mọi môi trường — tắt bằng MARKET_MAKER_ENABLED=false.
+ */
 export function envMmEnabledFromProcess(): boolean {
   const flag = readEnvFlag('MARKET_MAKER_ENABLED');
   if (flag === false) return false;
-  if (flag === true) return true;
-  return process.env.NODE_ENV !== 'production';
+  return true;
 }
 
 export type MmEnvDiagnostics = {

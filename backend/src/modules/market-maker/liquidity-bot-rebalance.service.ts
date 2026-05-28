@@ -2,6 +2,7 @@ import { isLiquidityBotEmail } from '@common/system-accounts.util';
 import { PrismaService } from '@providers/prisma';
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { MmLiquidityBootstrapService } from './mm-liquidity-bootstrap.service';
+import { slotsForToken } from './token-dedicated-bots.util';
 import { TokenDedicatedBotsCatalogService } from './token-dedicated-bots-catalog.service';
 
 type BotRow = {
@@ -11,10 +12,14 @@ type BotRow = {
   accountTags: string[] | null;
 };
 
+/** Số cycle rebalance giữa hai lần check missing bots (~60s với interval 5s). */
+const MISSING_BOT_CHECK_INTERVAL_CYCLES = 12;
+
 @Injectable()
 export class LiquidityBotRebalanceService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(LiquidityBotRebalanceService.name);
   private handle: NodeJS.Timeout | null = null;
+  private cycleCount = 0;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -371,11 +376,14 @@ export class LiquidityBotRebalanceService implements OnModuleInit, OnModuleDestr
   }
 
   /**
-   * Kiểm tra và tạo dedicated bots cho bất kỳ token active nào chưa có bots.
-   * Chạy trước mỗi cycle để tự phục hồi sau khi thêm token mới.
+   * Kiểm tra và tạo dedicated bot users cho token chưa có trong DB.
+   * Chỉ chạy mỗi MISSING_BOT_CHECK_INTERVAL_CYCLES cycle để giảm tải DB.
    */
   private async ensureMissingBots(): Promise<void> {
     if (!this.botCatalog.usesDedicatedPool()) return;
+
+    this.cycleCount++;
+    if (this.cycleCount % MISSING_BOT_CHECK_INTERVAL_CYCLES !== 1) return;
 
     const quoteName = this.quoteName();
     const tokens = await this.prisma.tokenCrypto.findMany({
@@ -388,11 +396,19 @@ export class LiquidityBotRebalanceService implements OnModuleInit, OnModuleDestr
 
     for (const token of baseTokens) {
       if (!token.symbol) continue;
-      const groups = this.botCatalog.getTokenGroups();
-      const alreadyInCatalog = groups.some((g) => g.tokenId === token.id);
-      if (alreadyInCatalog) continue;
 
-      // Token có trong DB nhưng chưa có bots — tạo tự động.
+      // Kiểm tra bot USERS có tồn tại trong DB hay không (không chỉ catalog).
+      const expectedEmails = slotsForToken(token.symbol).map((s) => s.email);
+      const existingCount = await this.prisma.user.count({
+        where: { email: { in: expectedEmails } },
+      });
+
+      if (existingCount >= expectedEmails.length) continue;
+
+      this.logger.log(
+        `ensureMissingBots: ${token.symbol} thiếu ${expectedEmails.length - existingCount} bot users — tạo tự động`,
+      );
+
       await this.liquidityBootstrap
         .ensureBotsForToken(token.id, token.symbol)
         .catch((err) =>
