@@ -1,16 +1,15 @@
 import Layout from "@/components/layout";
+import { SeoHead } from "@/components/seo/SeoHead";
 import { MarketLiveProvider } from "@/context/market-live-context";
 import { NotificationProvider } from "@/context/notification-context";
+import { defaultSiteOg } from "@/lib/square-og";
+import "@/modules/onboarding/tour-theme.css";
 import { TourProvider } from "@/modules/onboarding/TourProvider";
 import StoreProvider from "@/store/storeProvider";
 import "@/styles/globals.css";
-import "@/modules/onboarding/tour-theme.css";
-import { SeoHead } from "@/components/seo/SeoHead";
-import { APP_URL } from "@/constant/config";
-import { defaultSiteOg } from "@/lib/square-og";
+import "driver.js/dist/driver.css";
 import type { AppProps } from "next/app";
 import { Geist, Geist_Mono } from "next/font/google";
-import "driver.js/dist/driver.css";
 import "react-toastify/dist/ReactToastify.css";
 
 const geistSans = Geist({
@@ -25,7 +24,7 @@ const geistMono = Geist_Mono({
 
 const defaultOg = defaultSiteOg(
   process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-    "https://king-coin-crypto-cex.vercel.app"
+    "https://king-coin-crypto-cex.vercel.app",
 );
 
 export default function App({ Component, pageProps }: AppProps) {

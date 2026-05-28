@@ -20,6 +20,7 @@ import { MmControlService } from './mm-control.service';
 import { MmInstantFillService } from './mm-instant-fill.service';
 import { OrderbookPathService } from './orderbook-path.service';
 import { UserBotService } from './user-bot.service';
+import { LiquidityBotRebalanceService } from './liquidity-bot-rebalance.service';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { UserBotService } from './user-bot.service';
     UserBotService,
     MmInstantFillService,
     OrderbookPathService,
+    LiquidityBotRebalanceService,
   ],
   exports: [
     PlatformLiquiditySettingsService,
