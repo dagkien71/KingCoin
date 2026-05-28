@@ -2,6 +2,7 @@ import {
   isLiquidityBotUsername,
   liquidityBotEmails,
 } from '@modules/market-maker/liquidity-bots.util';
+import { isDedicatedBotEmail } from '@modules/market-maker/token-dedicated-bots.util';
 import { Prisma, Roles } from '@prisma/client';
 
 /** Tag API admin — bot thanh khoản (MM + flow). */
@@ -16,6 +17,7 @@ export function isLiquidityBotEmail(
 ): boolean {
   if (accountTags?.includes(ACCOUNT_TAG_LIQUIDITY_BOT)) return true;
   if (isLiquidityBotUsername(username)) return true;
+  if (email && isDedicatedBotEmail(email)) return true;
   if (!email) return false;
   const normalized = email.trim().toLowerCase();
   return liquidityBotEmails().some((e) => e.toLowerCase() === normalized);

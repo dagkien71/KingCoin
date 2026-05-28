@@ -2,8 +2,9 @@
 
 import useFetchApi from "@/hooks/useFetchApi";
 import useMutation from "@/hooks/useMutation";
+import { buildDisplayTokenGroups } from "@/modules/admin/mm-bots/buildDisplayTokenGroups";
 import type { MmBotsDashboard } from "@/modules/admin/mm-bots/mm-bots-types";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 
 function botPath(email: string, suffix = "") {
@@ -92,26 +93,36 @@ export function useMmBots() {
     [postAction, run]
   );
 
-  const mmBots = data?.bots.filter((b) => b.kind === "mm") ?? [];
-  const flowBots = data?.bots.filter((b) => b.kind === "flow") ?? [];
+  const tokenGroups = data?.tokenGroups ?? [];
+  const dedicatedPool = data?.dedicatedPool ?? true;
+  const botsPerToken = data?.botsPerToken ?? 10;
+  const allBots = data?.bots ?? [];
+  const displayTokenGroups = useMemo(
+    () => buildDisplayTokenGroups(tokenGroups, allBots),
+    [tokenGroups, allBots]
+  );
+  const mmBots = allBots.filter((b) => b.kind === "mm");
+  const flowBots = allBots.filter((b) => b.kind === "flow");
   const runningMm = mmBots.filter((b) => b.running).length;
   const runningFlow = flowBots.filter((b) => b.running).length;
-
-  const unconfiguredMm = mmBots.filter((b) => !b.configured).length;
-  const unconfiguredFlow = flowBots.filter((b) => !b.configured).length;
+  const unconfiguredTotal = allBots.filter((b) => !b.configured).length;
 
   return {
     data,
     loading,
     error,
     refetch,
-    unconfiguredMm,
-    unconfiguredFlow,
+    tokenGroups,
+    displayTokenGroups,
+    dedicatedPool,
+    botsPerToken,
+    totalBots: allBots.length,
+    mmBots,
+    flowBots,
+    unconfiguredTotal,
     busyEmail,
     bootstrapping,
     bootstrapBots,
-    mmBots,
-    flowBots,
     runningMm,
     runningFlow,
     setEnabled,

@@ -6,6 +6,7 @@ import {
   HiOutlineHome,
   HiOutlineTrendingUp,
   HiOutlineUserGroup,
+  HiOutlineViewList,
 } from "react-icons/hi";
 
 export type AdminNavItem = {
@@ -33,14 +34,19 @@ export const ADMIN_NAV: AdminNavItem[] = [
     icon: HiOutlineTrendingUp,
   },
   {
+    label: "Bot MM",
+    href: "/admin/mm-bots",
+    icon: HiOutlineChip,
+  },
+  {
     label: "Cài đặt MM",
     href: "/admin/market-settings",
     icon: HiOutlineCog,
   },
   {
-    label: "Bot MM",
-    href: "/admin/mm-bots",
-    icon: HiOutlineChip,
+    label: "Lệnh bot",
+    href: "/admin/liquidity-orders",
+    icon: HiOutlineViewList,
   },
   {
     label: "Lưới biểu đồ",

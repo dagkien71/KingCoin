@@ -3,10 +3,8 @@ import {
   buildMmEnvDiagnostics,
   envMmEnabledFromProcess,
 } from '@modules/market-maker/mm-env.util';
-import {
-  flowLiquidityEmails,
-  mmLiquidityEmails,
-} from '@modules/market-maker/liquidity-bots.util';
+import { TokenDedicatedBotsCatalogService } from '@modules/market-maker/token-dedicated-bots-catalog.service';
+import { BOTS_PER_TOKEN } from '@modules/market-maker/token-dedicated-bots.util';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@providers/prisma';
 
@@ -28,6 +26,10 @@ export type MmBotAdminRow = {
   email: string;
   username: string | null;
   kind: MmBotKind;
+  slot?: number;
+  assignedTokenId?: string | null;
+  assignedTokenName?: string | null;
+  assignedTokenSymbol?: string | null;
   configured: boolean;
   enabled: boolean;
   running: boolean;
@@ -48,6 +50,7 @@ export class MmBotRegistryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mmControl: MmControlService,
+    private readonly botCatalog: TokenDedicatedBotsCatalogService,
   ) {}
 
   private key(email: string): string {
@@ -120,13 +123,19 @@ export class MmBotRegistryService {
 
   configuredEmails(): { mm: string[]; flow: string[] } {
     return {
-      mm: mmLiquidityEmails(),
-      flow: flowLiquidityEmails(),
+      mm: this.botCatalog.getMmEmails(),
+      flow: this.botCatalog.getFlowEmails(),
     };
   }
 
   /** Bật N bot đầu trong pool env; tắt phần còn lại (không xóa user). */
   applyTargetBotCounts(mmActive: number, flowActive: number): void {
+    if (this.botCatalog.usesDedicatedPool()) {
+      for (const email of this.botCatalog.getAllEmails()) {
+        this.patchBot(email, { enabled: true });
+      }
+      return;
+    }
     const { mm, flow } = this.configuredEmails();
     const mmN = Math.max(0, Math.min(mm.length, Math.floor(mmActive)));
     const flowN = Math.max(0, Math.min(flow.length, Math.floor(flowActive)));
@@ -172,14 +181,23 @@ export class MmBotRegistryService {
   }
 
   async getAdminDashboard(): Promise<{
+    dedicatedPool: boolean;
+    botsPerToken: number;
     globalMmEnabled: boolean;
     globalFlowEnabled: boolean;
     envMmEnabled: boolean;
     adminOverrideMmEnabled: boolean | null;
     adminOverrideFlowEnabled: boolean | null;
     diagnostics: ReturnType<typeof buildMmEnvDiagnostics>;
+    tokenGroups: {
+      tokenId: string;
+      tokenName: string;
+      symbol: string;
+      bots: MmBotAdminRow[];
+    }[];
     bots: MmBotAdminRow[];
   }> {
+    await this.botCatalog.reload();
     const { mm, flow } = this.configuredEmails();
     const quoteId = await this.getQuoteTokenId();
 
@@ -224,6 +242,12 @@ export class MmBotRegistryService {
       email: string,
       kind: MmBotKind,
       configured: boolean,
+      meta?: {
+        slot?: number;
+        tokenId?: string;
+        tokenName?: string;
+        symbol?: string;
+      },
     ): MmBotAdminRow => {
       const user = byEmail.get(email.toLowerCase());
       const ov = this.getOverride(email);
@@ -239,6 +263,10 @@ export class MmBotRegistryService {
         email,
         username: user?.username ?? null,
         kind,
+        slot: meta?.slot,
+        assignedTokenId: meta?.tokenId ?? null,
+        assignedTokenName: meta?.tokenName ?? null,
+        assignedTokenSymbol: meta?.symbol ?? null,
         configured: !!user && configured,
         enabled,
         running,
@@ -252,19 +280,58 @@ export class MmBotRegistryService {
       };
     };
 
-    const bots: MmBotAdminRow[] = [
-      ...mm.map((email) => buildRow(email, 'mm', true)),
-      ...flow.map((email) => buildRow(email, 'flow', true)),
-    ];
+    const bots: MmBotAdminRow[] = [];
+    if (this.botCatalog.usesDedicatedPool()) {
+      for (const g of this.botCatalog.getTokenGroups()) {
+        for (const s of g.slots) {
+          bots.push(
+            buildRow(s.email, s.kind, true, {
+              slot: s.slot,
+              tokenId: g.tokenId,
+              tokenName: g.tokenName,
+              symbol: g.symbol,
+            }),
+          );
+        }
+      }
+    } else {
+      bots.push(
+        ...mm.map((email) => buildRow(email, 'mm', true)),
+        ...flow.map((email) => buildRow(email, 'flow', true)),
+      );
+    }
+
+    const tokenGroups = this.botCatalog.getTokenGroups().map((g) => ({
+      tokenId: g.tokenId,
+      tokenName: g.tokenName,
+      symbol: g.symbol,
+      bots: g.slots.map((s) => {
+        const row = bots.find(
+          (b) => b.email.toLowerCase() === s.email.toLowerCase(),
+        );
+        return (
+          row ??
+          buildRow(s.email, s.kind, false, {
+            slot: s.slot,
+            tokenId: g.tokenId,
+            tokenName: g.tokenName,
+            symbol: g.symbol,
+          })
+        );
+      }),
+    }));
 
     const global = this.mmControl.getGlobalOverrideSnapshot();
     return {
+      dedicatedPool: this.botCatalog.usesDedicatedPool(),
+      botsPerToken: BOTS_PER_TOKEN,
       globalMmEnabled: this.mmControl.isMmEnabled(),
       globalFlowEnabled: this.mmControl.isFlowEnabled(),
       envMmEnabled: envMmEnabledFromProcess(),
       adminOverrideMmEnabled: global.mmEnabled ?? null,
       adminOverrideFlowEnabled: global.flowEnabled ?? null,
       diagnostics: buildMmEnvDiagnostics({ mm, flow }),
+      tokenGroups,
       bots,
     };
   }

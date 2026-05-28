@@ -82,9 +82,23 @@ export function MmBotCard({
             </span>
           </div>
           <h3 className="mt-2 truncate font-semibold text-kc-fg">
-            {bot.username ?? bot.email.split("@")[0]}
+            {bot.assignedTokenSymbol ? (
+              <>
+                <span className="text-violet-200">{bot.assignedTokenSymbol}</span>
+                {bot.slot != null ? (
+                  <span className="ml-1 text-kc-muted">#{bot.slot}</span>
+                ) : null}
+              </>
+            ) : (
+              (bot.username ?? bot.email.split("@")[0])
+            )}
           </h3>
           <p className="truncate text-xs text-kc-muted">{bot.email}</p>
+          {bot.assignedTokenName ? (
+            <p className="mt-0.5 truncate text-[11px] text-kc-muted/90">
+              Chỉ giao dịch {bot.assignedTokenName}
+            </p>
+          ) : null}
         </div>
 
         <label className="flex shrink-0 cursor-pointer items-center gap-2">
@@ -114,8 +128,10 @@ export function MmBotCard({
           </dd>
         </div>
         <div>
-          <dt className="text-kc-muted">Token base</dt>
-          <dd className="num font-medium text-kc-fg">{bot.baseTokenKinds}</dd>
+          <dt className="text-kc-muted">Token gán</dt>
+          <dd className="font-medium text-kc-fg">
+            {bot.assignedTokenSymbol ?? bot.baseTokenKinds}
+          </dd>
         </div>
         <div>
           <dt className="text-kc-muted">Refresh</dt>

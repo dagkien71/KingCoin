@@ -475,14 +475,14 @@ export class TokenCryptoService {
       (a, b) => (b.marketCap ?? 0) - (a.marketCap ?? 0),
     );
 
-    await Promise.all(
-      ranked.map((token, index) =>
-        this.tokenRepository.update(token.id, {
-          rank: index + 1,
-          marketCap: token.marketCap,
-        }),
-      ),
-    );
+    // Avoid hammering Mongo with concurrent updates -> P2034 write conflicts.
+    for (let index = 0; index < ranked.length; index++) {
+      const token = ranked[index];
+      await this.tokenRepository.update(token.id, {
+        rank: index + 1,
+        marketCap: token.marketCap,
+      });
+    }
   }
 
   /**

@@ -32,6 +32,7 @@
     "seed:liquidity-bots": "node scripts/ensure-liquidity-bots.js",
     "seed:user-bot": "node scripts/ensure-user-bot.js",
     "seed:bot-inventory": "node scripts/ensure-bot-inventory.js",
+    "mm:refresh": "node scripts/refresh-mm-liquidity-once.js",
     "credit:kingcoin-balance": "node scripts/credit-kingcoin-balance.js",
     "reset:market": "node scripts/reset-seed-10-tokens.js && node scripts/ensure-market-maker-user.js && node scripts/ensure-flow-trader-user.js && node scripts/ensure-bot-inventory.js && node scripts/ensure-demo-user-kc.js && node scripts/sync-price-changes.js"
   },

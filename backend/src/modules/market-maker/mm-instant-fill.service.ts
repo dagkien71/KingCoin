@@ -2,10 +2,8 @@ import type { OrderService } from '@modules/order/order.service';
 import { TokenCryptoService } from '@modules/token-crypto/token.service';
 import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { Order, OrderStatus, Prisma } from '@prisma/client';
-import {
-  liquidityBotEmails,
-  mmLiquidityEmails,
-} from '@modules/market-maker/liquidity-bots.util';
+import { isLiquidityBotEmail } from '@common/system-accounts.util';
+import { TokenDedicatedBotsCatalogService } from '@modules/market-maker/token-dedicated-bots-catalog.service';
 import { MmBotRegistryService } from '@modules/market-maker/mm-bot-registry.service';
 import { PlatformLiquiditySettingsService } from '@modules/market-maker/platform-liquidity-settings.service';
 import { PrismaService } from '@providers/prisma';
@@ -27,6 +25,7 @@ export class MmInstantFillService {
     private readonly tokenCryptoService: TokenCryptoService,
     private readonly mmBotRegistry: MmBotRegistryService,
     private readonly platformSettings: PlatformLiquiditySettingsService,
+    private readonly botCatalog: TokenDedicatedBotsCatalogService,
   ) {}
 
   private isEnabled(): boolean {
@@ -45,12 +44,12 @@ export class MmInstantFillService {
   }
 
   private async isLiquidityBot(userId: string): Promise<boolean> {
-    const emails = liquidityBotEmails();
-    const bots = await this.prisma.user.findMany({
-      where: { email: { in: emails } },
-      select: { id: true },
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, username: true, accountTags: true },
     });
-    return bots.some((b) => b.id === userId);
+    if (!user) return false;
+    return isLiquidityBotEmail(user.email, user.username, user.accountTags);
   }
 
   private isAtMarketPrice(
@@ -104,7 +103,9 @@ export class MmInstantFillService {
       return;
     }
 
-    const mmEmails = mmLiquidityEmails();
+    const mmEmails = this.botCatalog.usesDedicatedPool()
+      ? this.botCatalog.getMmEmailsForToken(tokenId)
+      : this.botCatalog.getMmEmails();
     const mmUsers = await this.prisma.user.findMany({
       where: { email: { in: mmEmails } },
     });

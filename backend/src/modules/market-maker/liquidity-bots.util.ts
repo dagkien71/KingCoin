@@ -102,5 +102,6 @@ export function isLiquidityBotUsername(username: string | null | undefined): boo
   const u = (username ?? '').trim().toLowerCase();
   if (!u) return false;
   if (u === 'marketmaker' || u === 'flowtrader' || u === 'flow') return true;
+  if (/^bot-[a-z0-9]+-\d{1,2}$/.test(u)) return true;
   return /^mm\d+$/.test(u) || /^flow\d+$/.test(u);
 }

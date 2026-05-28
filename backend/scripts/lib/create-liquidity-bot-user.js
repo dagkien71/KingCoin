@@ -9,7 +9,7 @@ const ACCOUNT_TAG_LIQUIDITY_BOT = "liquidity_bot";
  */
 async function ensureLiquidityBotUser(
   prisma,
-  { email, username, password, kcTarget },
+  { email, username, password, kcTarget, baseTokenId },
 ) {
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
@@ -20,7 +20,11 @@ async function ensureLiquidityBotUser(
         data: { accountTags: [...tags, ACCOUNT_TAG_LIQUIDITY_BOT] },
       });
     }
-    const r = await creditBotInventory(prisma, { email, kcTarget });
+    const r = await creditBotInventory(prisma, {
+      email,
+      kcTarget,
+      baseTokenIdOnly: baseTokenId,
+    });
     return { created: false, email, inventory: r };
   }
 
@@ -56,7 +60,11 @@ async function ensureLiquidityBotUser(
     },
   });
 
-  const r = await creditBotInventory(prisma, { email, kcTarget: kc });
+  const r = await creditBotInventory(prisma, {
+    email,
+    kcTarget: kc,
+    baseTokenIdOnly: baseTokenId,
+  });
   return { created: true, email, inventory: r };
 }
 

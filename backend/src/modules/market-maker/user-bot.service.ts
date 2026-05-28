@@ -1,9 +1,9 @@
 import { setLastFlowDirection } from '@modules/market-maker/flow-direction.util';
-import {
-  pickProbePattern,
-  probeFillCount,
-  rollFlowQty,
-} from '@modules/market-maker/flow-market-dynamics.util';
+import { planAsymmetricFlowSteps } from '@modules/market-maker/flow-market-dynamics.util';
+import { rollTakerChunkQty } from '@modules/market-maker/flow-liquidity-sweep.util';
+import { PlatformLiquiditySettingsService } from '@modules/market-maker/platform-liquidity-settings.service';
+import { TokenDedicatedBotsCatalogService } from '@modules/market-maker/token-dedicated-bots-catalog.service';
+import { userBotBaseQtyFromMarketCap } from '@modules/market-maker/token-mcap-qty.util';
 import { MmControlService } from '@modules/market-maker/mm-control.service';
 import {
   isQuoteToken,
@@ -28,9 +28,12 @@ export class UserBotService implements OnModuleInit, OnModuleDestroy {
     private readonly orderService: OrderService,
     private readonly mmControl: MmControlService,
     private readonly mmBotRegistry: MmBotRegistryService,
+    private readonly platformSettings: PlatformLiquiditySettingsService,
+    private readonly botCatalog: TokenDedicatedBotsCatalogService,
   ) {}
 
   private isEnabled(): boolean {
+    if (this.botCatalog.usesDedicatedPool()) return false;
     if (process.env.USER_BOT_ENABLED === 'false') return false;
     // dev mặc định bật nếu MM đang bật
     if (process.env.USER_BOT_ENABLED === 'true') return true;
@@ -41,12 +44,6 @@ export class UserBotService implements OnModuleInit, OnModuleDestroy {
     const raw = Number(process.env.USER_BOT_INTERVAL_MS ?? '250');
     if (!Number.isFinite(raw)) return 250;
     return Math.min(10_000, Math.max(80, Math.floor(raw)));
-  }
-
-  private qty(): number {
-    const raw = Number(process.env.USER_BOT_QTY ?? '2');
-    if (!Number.isFinite(raw)) return 2;
-    return Math.min(100_000, Math.max(0.0001, raw));
   }
 
   private async resolveUserId(): Promise<string | null> {
@@ -126,7 +123,6 @@ export class UserBotService implements OnModuleInit, OnModuleDestroy {
         return;
       }
 
-      const baseQty = this.qty();
       const baseNames = await resolveFlowBaseTokenNames(this.prisma);
       if (baseNames.length === 0) return;
 
@@ -135,45 +131,35 @@ export class UserBotService implements OnModuleInit, OnModuleDestroy {
       const tokenName = baseNames[this.tick % baseNames.length];
       const token = await this.prisma.tokenCrypto.findFirst({
         where: { name: tokenName },
-        select: { id: true, symbol: true, name: true, tokenKind: true },
       });
       if (!token?.id || isQuoteToken(token)) return;
       if (this.mmControl.shouldProtectSpot(token.id)) return;
 
+      const mmParams = this.mmControl.resolveParams(token.id);
+      const flowKnob = this.platformSettings.getEffective().flowQty;
+      const baseQty = userBotBaseQtyFromMarketCap(
+        token,
+        mmParams.qty,
+        mmParams.levels,
+        flowKnob,
+      );
       const pair = this.quotePair(token.symbol);
 
-      const pattern = pickProbePattern(true);
-      const primary = probeFillCount(3);
+      const steps = planAsymmetricFlowSteps(token.id, false);
+      if (steps.length === 0) return;
 
-      const placeAtMarket = async (side: 'buy' | 'sell', qty: number) => {
-        const mkt = await this.orderService.getMarketPrice(token.id, side);
+      for (const step of steps) {
+        const mkt = await this.orderService.getMarketPrice(token.id, step.side);
+        const qty = rollTakerChunkQty(baseQty) * step.qtyScale;
         await this.orderService.create({
           tokenId: token.id,
-          type: side,
+          type: step.side,
           price: mkt.price,
           quantity: qty,
           pair,
           user: { connect: { id: userId } },
         });
-        setLastFlowDirection(token.id, side === 'buy' ? 'up' : 'down');
-      };
-
-      if (pattern === 'up_then_retrace') {
-        for (let i = 0; i < primary; i++) {
-          await placeAtMarket('buy', rollFlowQty(baseQty));
-        }
-        await placeAtMarket('sell', rollFlowQty(baseQty) * 0.65);
-      } else if (pattern === 'down_then_retrace') {
-        for (let i = 0; i < primary; i++) {
-          await placeAtMarket('sell', rollFlowQty(baseQty));
-        }
-        await placeAtMarket('buy', rollFlowQty(baseQty) * 0.65);
-      } else if (pattern === 'both_sides') {
-        await placeAtMarket('buy', rollFlowQty(baseQty));
-        await placeAtMarket('sell', rollFlowQty(baseQty));
-      } else {
-        const side: 'buy' | 'sell' = this.tick % 2 === 1 ? 'buy' : 'sell';
-        await placeAtMarket(side, rollFlowQty(baseQty));
+        setLastFlowDirection(token.id, step.side === 'buy' ? 'up' : 'down');
       }
     } catch (e) {
       this.logger.debug(

@@ -5,6 +5,8 @@ import { TokenCryptoModule } from '@modules/token-crypto/token.module';
 import { Module, forwardRef } from '@nestjs/common';
 import { BotInventoryModule } from './bot-inventory.module';
 import { permissions } from './market-maker.permissions';
+import { LiquidityOrdersAdminController } from './liquidity-orders-admin.controller';
+import { LiquidityOrdersAdminService } from './liquidity-orders-admin.service';
 import { MmBotsAdminController } from './mm-bots-admin.controller';
 import { MmBotRegistryService } from './mm-bot-registry.service';
 import { MmLiquidityBootstrapService } from './mm-liquidity-bootstrap.service';
@@ -31,12 +33,14 @@ import { UserBotService } from './user-bot.service';
     MarketControlAdminController,
     MarketSettingsAdminController,
     MmBotsAdminController,
+    LiquidityOrdersAdminController,
   ],
   providers: [
     VolatilityTransitionService,
     PlatformLiquiditySettingsService,
     MmBotRegistryService,
     MmLiquidityBootstrapService,
+    LiquidityOrdersAdminService,
     MmControlService,
     MarketMakerService,
     MarketFlowService,

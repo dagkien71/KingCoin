@@ -483,7 +483,10 @@ export class OrderService {
     }
   }
 
-  async create(data: Prisma.OrderCreateInput): Promise<Order> {
+  async create(
+    data: Prisma.OrderCreateInput,
+    opts?: { deferMatch?: boolean },
+  ): Promise<Order> {
     const userId =
       typeof data.user === 'object' &&
       data.user !== null &&
@@ -522,21 +525,25 @@ export class OrderService {
       quantity,
       order.id,
     );
-    await this.matchOrders(order.tokenId);
+    if (!opts?.deferMatch) {
+      await this.matchOrders(order.tokenId);
 
-    const afterBook = (await this.orderRepository.findById(order.id)) ?? order;
-    if (
-      afterBook.status === OrderStatus.pending &&
-      Number(afterBook.quantity) > 0
-    ) {
-      await this.mmInstantFill.tryFillUserOrderAtMarket(userId, afterBook);
+      const afterBook = (await this.orderRepository.findById(order.id)) ?? order;
+      if (
+        afterBook.status === OrderStatus.pending &&
+        Number(afterBook.quantity) > 0
+      ) {
+        await this.mmInstantFill.tryFillUserOrderAtMarket(userId, afterBook);
+      }
     }
 
     const finalOrder =
       (await this.orderRepository.findById(order.id)) ?? order;
-    const token = await this.tokenCryptoService.findOne(finalOrder.tokenId);
-    await this.notifyPlacedOrder(userId, finalOrder, token);
-    await this.notifyAdminsOrderPlaced(userId, finalOrder, token);
+    if (!opts?.deferMatch) {
+      const token = await this.tokenCryptoService.findOne(finalOrder.tokenId);
+      await this.notifyPlacedOrder(userId, finalOrder, token);
+      await this.notifyAdminsOrderPlaced(userId, finalOrder, token);
+    }
     return finalOrder;
   }
 

@@ -17,6 +17,6 @@ export const NORMAL_STEADY_PRESET: PatchPlatformLiquiditySettingsDto = {
   flowQty: 6,
   oscillatePct: 0.00015,
   wanderPct: 0,
-  levelJitterPct: 0.00035,
+  levelJitterPct: 0.0011,
   multiMidStep: 0.5,
 };

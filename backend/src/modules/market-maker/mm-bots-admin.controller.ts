@@ -17,10 +17,7 @@ import {
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Roles } from '@prisma/client';
 import { PrismaService } from '@providers/prisma';
-import {
-  flowLiquidityEmails,
-  mmLiquidityEmails,
-} from '@modules/market-maker/liquidity-bots.util';
+import { TokenDedicatedBotsCatalogService } from '@modules/market-maker/token-dedicated-bots-catalog.service';
 
 @ApiTags('MmBots')
 @ApiBearerAuth()
@@ -32,6 +29,7 @@ export class MmBotsAdminController {
     private readonly liquidityBootstrap: MmLiquidityBootstrapService,
     private readonly marketMaker: MarketMakerService,
     private readonly prisma: PrismaService,
+    private readonly botCatalog: TokenDedicatedBotsCatalogService,
   ) {}
 
   @Get()
@@ -43,6 +41,7 @@ export class MmBotsAdminController {
   @Post('bootstrap')
   async bootstrapLiquidityBots() {
     const result = await this.liquidityBootstrap.ensureAllLiquidityBots();
+    await this.marketMaker.triggerRefresh();
     const dashboard = await this.registry.getAdminDashboard();
     const created =
       result.mm.filter((r) => r.created).length +
@@ -111,12 +110,7 @@ export class MmBotsAdminController {
   }
 
   private assertKnownBot(email: string): void {
-    const known = new Set(
-      [...mmLiquidityEmails(), ...flowLiquidityEmails()].map((e) =>
-        e.toLowerCase(),
-      ),
-    );
-    if (!known.has(email.toLowerCase())) {
+    if (!this.botCatalog.isKnownBotEmail(email)) {
       throw new NotFoundException('Email không thuộc danh sách bot thanh khoản');
     }
   }

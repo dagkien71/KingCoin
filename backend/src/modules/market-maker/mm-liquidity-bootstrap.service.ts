@@ -1,9 +1,6 @@
 import { ACCOUNT_TAG_LIQUIDITY_BOT } from '@common/system-accounts.util';
 import { BotInventoryService } from '@modules/market-maker/bot-inventory.service';
-import {
-  flowLiquidityEmails,
-  mmLiquidityEmails,
-} from '@modules/market-maker/liquidity-bots.util';
+import { TokenDedicatedBotsCatalogService } from '@modules/market-maker/token-dedicated-bots-catalog.service';
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@providers/prisma';
 import * as bcrypt from 'bcrypt';
@@ -23,6 +20,7 @@ export class MmLiquidityBootstrapService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly botInventory: BotInventoryService,
+    private readonly botCatalog: TokenDedicatedBotsCatalogService,
   ) {}
 
   private quoteName(): string {
@@ -150,7 +148,12 @@ export class MmLiquidityBootstrapService {
     }
 
     await this.ensureQuoteKc(balanceId, quote.id, kc);
-    await this.botInventory.syncBotInventory(email);
+    const assign = this.botCatalog.getAssignment(email);
+    if (assign) {
+      await this.botInventory.syncBotInventoryForToken(email, assign.tokenId);
+    } else {
+      await this.botInventory.syncBotInventory(email);
+    }
 
     return {
       email,
@@ -165,20 +168,31 @@ export class MmLiquidityBootstrapService {
     mm: LiquidityBotEnsureResult[];
     flow: LiquidityBotEnsureResult[];
   }> {
-    const mmEmails = mmLiquidityEmails();
-    const flowEmails = flowLiquidityEmails();
+    await this.botCatalog.reload();
     const mm: LiquidityBotEnsureResult[] = [];
     const flow: LiquidityBotEnsureResult[] = [];
 
-    for (const email of mmEmails) {
-      mm.push(await this.ensureBotUser(email, 'mm'));
-    }
-    for (const email of flowEmails) {
-      flow.push(await this.ensureBotUser(email, 'flow'));
+    if (this.botCatalog.usesDedicatedPool()) {
+      for (const g of this.botCatalog.getTokenGroups()) {
+        for (const s of g.slots) {
+          const r = await this.ensureBotUser(s.email, s.kind);
+          if (s.kind === 'mm') mm.push(r);
+          else flow.push(r);
+        }
+      }
+    } else {
+      for (const email of this.botCatalog.getMmEmails()) {
+        mm.push(await this.ensureBotUser(email, 'mm'));
+      }
+      for (const email of this.botCatalog.getFlowEmails()) {
+        flow.push(await this.ensureBotUser(email, 'flow'));
+      }
     }
 
+    const created =
+      mm.filter((r) => r.created).length + flow.filter((r) => r.created).length;
     this.logger.log(
-      `Liquidity bootstrap: ${mm.length} MM, ${flow.length} flow (${mm.filter((r) => r.created).length + flow.filter((r) => r.created).length} mới)`,
+      `Liquidity bootstrap: ${mm.length} MM, ${flow.length} flow (${created} mới) — ${this.botCatalog.usesDedicatedPool() ? '10 bot/token' : 'pool legacy'}`,
     );
 
     return { mm, flow };

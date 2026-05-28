@@ -5,7 +5,7 @@ import { MmControlService } from '@modules/market-maker/mm-control.service';
 import { pathBookRefreshMinPct } from '@modules/market-maker/orderbook-path.util';
 import { MarketFlowService } from '@modules/market-maker/market-flow.service';
 import { MmBotRegistryService } from '@modules/market-maker/mm-bot-registry.service';
-import { mmLiquidityEmails } from '@modules/market-maker/liquidity-bots.util';
+import { TokenDedicatedBotsCatalogService } from '@modules/market-maker/token-dedicated-bots-catalog.service';
 import { mmLevelQuantity } from '@modules/market-maker/mm-params.util';
 import {
   mmWanderScale,
@@ -13,6 +13,7 @@ import {
 } from '@modules/market-maker/gbm-pace.util';
 import { getLastFlowDirection } from '@modules/market-maker/flow-direction.util';
 import { PlatformLiquiditySettingsService } from '@modules/market-maker/platform-liquidity-settings.service';
+import { mmBaseQtyFromMarketCap } from '@modules/market-maker/token-mcap-qty.util';
 import {
   isQuoteToken,
   resolveMmTargetTokenNames,
@@ -47,6 +48,7 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
     private readonly marketFlow: MarketFlowService,
     private readonly mmBotRegistry: MmBotRegistryService,
     private readonly platformSettings: PlatformLiquiditySettingsService,
+    private readonly botCatalog: TokenDedicatedBotsCatalogService,
   ) {}
 
   /** Gọi từ admin — refresh sổ lệnh mọi token MM. */
@@ -60,55 +62,38 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
     const user = await this.prisma.user.findFirst({ where: { email } });
     if (!user || !this.mmBotRegistry.isBotEnabled(email, 'mm')) return;
 
-    const enabledUsers = await this.resolveMmUsers();
-    const mmIndex = enabledUsers.findIndex((u) => u.id === user.id);
+    const assign = this.botCatalog.getAssignment(email);
+    const token = assign
+      ? await this.prisma.tokenCrypto.findUnique({
+          where: { id: assign.tokenId },
+        })
+      : null;
+    if (!token?.id || isQuoteToken(token)) return;
+    if (this.mmControl.isTokenPaused(token.id)) return;
+
+    const mmUsers = await this.resolveMmUsersForToken(token.id);
+    const mmIndex = mmUsers.findIndex((u) => u.id === user.id);
     if (mmIndex < 0) return;
-    const mmTotal = enabledUsers.length;
-
-    const tokenNames = new Set(await resolveMmTargetTokenNames(this.prisma));
-    for (const id of this.mmControl.getOverrideTokenIds()) {
-      const t = await this.prisma.tokenCrypto.findUnique({
-        where: { id },
-        select: { name: true, tokenKind: true },
-      });
-      if (t?.name && !isQuoteToken(t)) tokenNames.add(t.name);
-    }
-
-    for (const tokenName of tokenNames) {
-      const token = await this.prisma.tokenCrypto.findFirst({
-        where: { name: tokenName },
-      });
-      if (!token?.id || isQuoteToken(token)) continue;
-      if (this.mmControl.isTokenPaused(token.id)) continue;
-      const params = this.mmControl.resolveParams(token.id);
-      try {
-        await this.mmBotRegistry.cancelPendingOrdersForUser(user.id, token.id);
-        await this.refreshLiquidityForToken(
-          user,
-          token,
-          params,
-          mmIndex,
-          mmTotal,
-        );
-        this.mmBotRegistry.recordRefresh(user.id, true);
-      } catch (e) {
-        this.mmBotRegistry.recordRefresh(
-          user.id,
-          false,
-          (e as Error).message,
-        );
-        throw e;
-      }
+    const params = this.mmControl.resolveParams(token.id);
+    try {
+      await this.mmBotRegistry.cancelPendingOrdersForUser(user.id, token.id);
+      await this.refreshLiquidityForToken(
+        user,
+        token,
+        params,
+        mmIndex,
+        mmUsers.length,
+      );
+      this.mmBotRegistry.recordRefresh(user.id, true);
+    } catch (e) {
+      this.mmBotRegistry.recordRefresh(user.id, false, (e as Error).message);
+      throw e;
     }
   }
 
   /** Refresh MM chỉ một token (theo id). */
   async triggerRefreshForToken(tokenId: string): Promise<void> {
     if (!this.mmControl.isMmEnabled()) {
-      return;
-    }
-    const mmUsers = await this.resolveMmUsers();
-    if (mmUsers.length === 0) {
       return;
     }
     const token = await this.prisma.tokenCrypto.findUnique({
@@ -118,6 +103,10 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
       return;
     }
     if (this.mmControl.isTokenPaused(token.id)) {
+      return;
+    }
+    const mmUsers = await this.resolveMmUsersForToken(token.id);
+    if (mmUsers.length === 0) {
       return;
     }
     const params = this.mmControl.resolveParams(token.id);
@@ -140,7 +129,8 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async resolveAllMmUsers(): Promise<User[]> {
-    const emails = mmLiquidityEmails();
+    const emails = this.botCatalog.getMmEmails();
+    if (emails.length === 0) return [];
     const rows = await this.prisma.user.findMany({
       where: { email: { in: emails } },
     });
@@ -148,6 +138,21 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
     return emails
       .map((e) => byEmail.get(e))
       .filter((u): u is User => !!u);
+  }
+
+  private async resolveMmUsersForToken(tokenId: string): Promise<User[]> {
+    const emails = this.botCatalog.usesDedicatedPool()
+      ? this.botCatalog.getMmEmailsForToken(tokenId)
+      : this.botCatalog.getMmEmails();
+    if (emails.length === 0) return [];
+    const rows = await this.prisma.user.findMany({
+      where: { email: { in: emails } },
+    });
+    const byEmail = new Map(rows.map((u) => [u.email, u]));
+    return emails
+      .map((e) => byEmail.get(e))
+      .filter((u): u is User => !!u)
+      .filter((u) => this.mmBotRegistry.isBotEnabled(u.email, 'mm'));
   }
 
   private async resolveMmUsers(): Promise<User[]> {
@@ -278,19 +283,22 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
     return spot;
   }
 
-  onModuleInit(): void {
+  async onModuleInit(): Promise<void> {
     this.platformSettings.onIntervalsChanged(() => this.reconfigureLoop());
 
     this.mmControl.registerPathBookRefreshHook((tokenId, target) =>
       this.onPathTargetBookRefresh(tokenId, target),
     );
 
+    await this.botCatalog.whenReady();
+
     if (!this.mmControl.isMmEnabled()) {
+      this.logger.log('MM: tắt — không chạy interval');
       return;
     }
 
     this.logger.log('MM: enabled (cron 45s dự phòng)');
-    setTimeout(() => void this.refreshLiquidity(), 400);
+    void this.refreshLiquidity();
     this.startRefreshLoop();
   }
 
@@ -337,72 +345,122 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
     this.refreshInFlight = true;
 
     try {
-      const mmUsers = await this.resolveMmUsers();
-      if (mmUsers.length === 0) {
+      await this.botCatalog.whenReady();
+      if (
+        this.botCatalog.usesDedicatedPool() &&
+        this.botCatalog.getTokenGroups().length === 0
+      ) {
         this.logger.warn(
-          `Market maker: không có user MM — chạy node scripts/ensure-liquidity-bots.js (emails: ${mmLiquidityEmails().join(', ')})`,
+          'Market maker: chưa có token base — seed token rồi bootstrap bot',
         );
         return;
       }
-
-      const tokenNames = new Set(await resolveMmTargetTokenNames(this.prisma));
-      for (const id of this.mmControl.getOverrideTokenIds()) {
-        const t = await this.prisma.tokenCrypto.findUnique({
-          where: { id },
-          select: { name: true, symbol: true, tokenKind: true },
-        });
-        if (t?.name && !isQuoteToken(t)) tokenNames.add(t.name);
+      if (!this.botCatalog.usesDedicatedPool()) {
+        const mmUsers = await this.resolveMmUsers();
+        if (mmUsers.length === 0) {
+          this.logger.warn(
+            'Market maker: không có user MM — chạy ensure-liquidity-bots.js',
+          );
+          return;
+        }
       }
+
       let anyToken = false;
 
-      for (const tokenName of tokenNames) {
-        const token = await this.prisma.tokenCrypto.findFirst({
-          where: { name: tokenName },
-        });
-        if (!token?.id) {
-          this.logger.warn(
-            `Market maker: bỏ qua — không có token name="${tokenName}"`,
-          );
-          continue;
+      if (this.botCatalog.usesDedicatedPool()) {
+        for (const g of this.botCatalog.getTokenGroups()) {
+          const token = await this.prisma.tokenCrypto.findUnique({
+            where: { id: g.tokenId },
+          });
+          if (!token?.id || isQuoteToken(token)) continue;
+          if (this.mmControl.isTokenPaused(token.id)) continue;
+          anyToken = true;
+          const params = this.mmControl.resolveParams(token.id);
+          await this.pruneDisabledBotOrders(token.id);
+          const tokenMmUsers = await this.resolveMmUsersForToken(token.id);
+          const n = tokenMmUsers.length;
+          for (let i = 0; i < n; i++) {
+            const user = tokenMmUsers[i];
+            try {
+              await this.mmBotRegistry.cancelPendingOrdersForUser(
+                user.id,
+                token.id,
+              );
+              await this.refreshLiquidityForToken(
+                user,
+                token,
+                params,
+                i,
+                n,
+                { deferMatch: true },
+              );
+              this.mmBotRegistry.recordRefresh(user.id, true);
+            } catch (e) {
+              this.mmBotRegistry.recordRefresh(
+                user.id,
+                false,
+                (e as Error).message,
+              );
+              this.logger.warn(
+                `MM refresh lỗi ${user.email} (${token.symbol}): ${(e as Error).message}`,
+              );
+            }
+          }
+          if (n > 0) {
+            await this.orderService.matchOrders(token.id);
+            this.realtimeService.broadcastOrderbook(token.id);
+          }
         }
-        if (isQuoteToken(token)) {
-          continue;
+      } else {
+        const mmUsers = await this.resolveMmUsers();
+        const tokenNames = new Set(await resolveMmTargetTokenNames(this.prisma));
+        for (const id of this.mmControl.getOverrideTokenIds()) {
+          const t = await this.prisma.tokenCrypto.findUnique({
+            where: { id },
+            select: { name: true, symbol: true, tokenKind: true },
+          });
+          if (t?.name && !isQuoteToken(t)) tokenNames.add(t.name);
         }
-        if (this.mmControl.isTokenPaused(token.id)) {
-          continue;
-        }
-        anyToken = true;
-        const params = this.mmControl.resolveParams(token.id);
-        await this.pruneDisabledBotOrders(token.id);
-        const n = mmUsers.length;
-        for (let i = 0; i < n; i++) {
-          const user = mmUsers[i];
-          try {
-            await this.mmBotRegistry.cancelPendingOrdersForUser(
-              user.id,
-              token.id,
-            );
-            await this.refreshLiquidityForToken(
-              user,
-              token,
-              params,
-              i,
-              n,
-            );
-            this.mmBotRegistry.recordRefresh(user.id, true);
-          } catch (e) {
-            this.mmBotRegistry.recordRefresh(
-              user.id,
-              false,
-              (e as Error).message,
-            );
+        for (const tokenName of tokenNames) {
+          const token = await this.prisma.tokenCrypto.findFirst({
+            where: { name: tokenName },
+          });
+          if (!token?.id) continue;
+          if (isQuoteToken(token)) continue;
+          if (this.mmControl.isTokenPaused(token.id)) continue;
+          anyToken = true;
+          const params = this.mmControl.resolveParams(token.id);
+          await this.pruneDisabledBotOrders(token.id);
+          const n = mmUsers.length;
+          for (let i = 0; i < n; i++) {
+            const user = mmUsers[i];
+            try {
+              await this.mmBotRegistry.cancelPendingOrdersForUser(
+                user.id,
+                token.id,
+              );
+              await this.refreshLiquidityForToken(
+                user,
+                token,
+                params,
+                i,
+                n,
+              );
+              this.mmBotRegistry.recordRefresh(user.id, true);
+            } catch (e) {
+              this.mmBotRegistry.recordRefresh(
+                user.id,
+                false,
+                (e as Error).message,
+              );
+            }
           }
         }
       }
 
       if (!anyToken) {
         this.logger.warn(
-          `Market maker: không có token base — seed token hoặc set MARKET_MAKER_TOKEN_NAMES`,
+          `Market maker: không có token base — seed token hoặc chạy bootstrap bot`,
         );
       }
     } catch (e) {
@@ -425,6 +483,7 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
     },
     mmIndex = 0,
     mmTotal = 1,
+    opts?: { deferMatch?: boolean },
   ): Promise<void> {
     const {
       levels,
@@ -488,6 +547,8 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
             ? mid * (1 + pricing.bookSkewPct)
             : mid * (1 - pricing.bookSkewPct);
       }
+      const microWander = (Math.random() * 2 - 1) * 0.00035;
+      mid = mid * (1 + microWander);
       mid = this.clampMidStep(
         mid,
         baseMid,
@@ -504,7 +565,8 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
       mid = mid * (1 + shiftPct);
     }
 
-    const qtyBase = qty;
+    const flowKnob = this.platformSettings.getEffective().flowQty;
+    const qtyBase = mmBaseQtyFromMarketCap(token, qty, levels, flowKnob);
     for (let i = 1; i <= levels; i++) {
       const offset = spreadStep * i;
       const buyJitter = (Math.random() * 2 - 1) * levelJitterPct;
@@ -525,28 +587,38 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
       }
       if (buyPrice >= sellPrice) continue;
 
-      const levelQty = mmLevelQuantity(qtyBase);
+      const touchBoost = i === 1 ? 1.65 : 1;
+      const levelQty = mmLevelQuantity(qtyBase * touchBoost);
 
-      await this.orderService.create({
-        tokenId: token.id,
-        type: 'buy',
-        price: buyPrice,
-        quantity: levelQty,
-        pair,
-        user: { connect: { id: mmUser.id } },
-      });
+      const createOpts = opts?.deferMatch ? { deferMatch: true as const } : undefined;
+      await this.orderService.create(
+        {
+          tokenId: token.id,
+          type: 'buy',
+          price: buyPrice,
+          quantity: levelQty,
+          pair,
+          user: { connect: { id: mmUser.id } },
+        },
+        createOpts,
+      );
 
-      await this.orderService.create({
-        tokenId: token.id,
-        type: 'sell',
-        price: sellPrice,
-        quantity: levelQty,
-        pair,
-        user: { connect: { id: mmUser.id } },
-      });
+      await this.orderService.create(
+        {
+          tokenId: token.id,
+          type: 'sell',
+          price: sellPrice,
+          quantity: levelQty,
+          pair,
+          user: { connect: { id: mmUser.id } },
+        },
+        createOpts,
+      );
     }
 
-    this.realtimeService.broadcastOrderbook(token.id);
+    if (!opts?.deferMatch) {
+      this.realtimeService.broadcastOrderbook(token.id);
+    }
 
     const pathWalkActive = this.mmControl.isPathWalkActive(token.id);
     const volumes = fresh?.volumes ?? token.volumes;
@@ -562,7 +634,7 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
     });
 
     this.logger.log(
-      `MM: ${mmUser.email} — ${token.name} — ${levels} bậc × 2 phía quanh mid=${mid} (DB ${baseMid}, ${modeLabel}) (${pair}), qty≈${qty}`,
+      `MM: ${mmUser.email} — ${token.name} — ${levels} bậc × 2 phía quanh mid=${mid} (DB ${baseMid}, ${modeLabel}) (${pair}), qty≈${qtyBase} (knob ${qty})`,
     );
   }
 }

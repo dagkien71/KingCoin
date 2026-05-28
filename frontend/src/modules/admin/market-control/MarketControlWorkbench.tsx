@@ -34,32 +34,27 @@ export function MarketControlWorkbench({ mc }: Props) {
     cancelModelRun,
   } = mc;
 
+  const refToken =
+    targetMode === "single"
+      ? selected
+      : targetMode === "group"
+        ? altTokens.find((t) => t.id === groupIds[0]) ?? altTokens[0]
+        : altTokens[0];
+
   return (
     <div className="space-y-5">
-{(() => {
-      const refToken =
-        targetMode === "single"
-          ? selected
-          : targetMode === "group"
-            ? altTokens.find((t) => t.id === groupIds[0]) ?? altTokens[0]
-            : altTokens[0];
-      if (targetMode === "single" && !refToken) {
-        return (
-          <p className="rounded-xl border border-dashed border-kc-border px-4 py-6 text-center text-sm text-kc-muted">
-            Chọn mã alt ở trên để dùng bàn điều khiển và xem trạng thái.
-          </p>
-        );
-      }
-      if (!refToken) return null;
-      if (targetMode === "single" && selectedIsStable) {
-        return (
-          <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100/90">
-            KC stablecoin — không dùng bàn điều khiển pump/dump. Chọn alt khác
-            hoặc phạm vi nhóm / tất cả alt.
-          </p>
-        );
-      }
-      return (
+      {targetMode === "single" && !refToken ? (
+        <p className="rounded-xl border border-dashed border-kc-border px-4 py-6 text-center text-sm text-kc-muted">
+          Chọn mã alt ở trên để dùng bàn điều khiển và xem trạng thái.
+        </p>
+      ) : null}
+
+      {!refToken ? null : targetMode === "single" && selectedIsStable ? (
+        <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100/90">
+          KC stablecoin — không dùng bàn điều khiển pump/dump. Chọn alt khác hoặc
+          phạm vi nhóm / tất cả alt.
+        </p>
+      ) : (
         <ScenarioLauncher
           applyTarget={applyTarget}
           tokenId={refToken.id}
@@ -71,9 +66,7 @@ export function MarketControlWorkbench({ mc }: Props) {
           nudgeDisabled={isStablecoinToken(refToken)}
           pathBlocked={
             targetMode === "single" &&
-            Boolean(
-              selected?.schedule?.isActive || selected?.modelRun?.isActive
-            )
+            Boolean(selected?.schedule?.isActive || selected?.modelRun?.isActive)
           }
           busy={busyId !== null}
           onBusyChange={(v) => setBusyId(v ? "scenario" : null)}
@@ -83,8 +76,7 @@ export function MarketControlWorkbench({ mc }: Props) {
             await refetch();
           }}
         />
-      );
-    })()}
+      )}
 
     {/* Trạng thái mã đang chọn / xem */}
     <AdminSection step={2} title="Trạng thái mã" subtitle="Giá spot, MM/Flow và tiến độ lịch hoặc mô hình đang chạy.">

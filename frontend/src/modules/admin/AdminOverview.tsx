@@ -18,6 +18,7 @@ import { useRouter } from "next/router";
 import { motion } from "framer-motion";
 import {
   HiOutlineChartSquareBar,
+  HiOutlineChip,
   HiOutlineTrendingUp,
 } from "react-icons/hi";
 
@@ -67,6 +68,13 @@ export function AdminOverview() {
       href: "/admin/market-control",
       icon: HiOutlineTrendingUp,
       accent: "from-violet-600/30 to-fuchsia-600/10",
+    },
+    {
+      title: "Bot MM",
+      desc: "10 bot/token — bật/tắt, bootstrap, số dư KC.",
+      href: "/admin/mm-bots",
+      icon: HiOutlineChip,
+      accent: "from-fuchsia-600/25 to-violet-600/10",
     },
     {
       title: "Lưới biểu đồ",
@@ -195,11 +203,17 @@ export function AdminOverview() {
       />
 
       <p className="text-xs text-kc-muted">
-        MM / flow: xem{" "}
-        <Link href="/admin/market-control" className="text-violet-400 hover:underline">
+        Bot MM / flow:{" "}
+        <Link href="/admin/mm-bots" className="text-violet-400 hover:underline">
+          quản lý bot
+        </Link>
+        {" · "}
+        <Link
+          href="/admin/market-control"
+          className="text-violet-400 hover:underline"
+        >
           điều khiển thị trường
-        </Link>{" "}
-        và docs/MARKET_MAKER.md trên server.
+        </Link>
       </p>
     </div>
   );

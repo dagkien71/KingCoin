@@ -352,7 +352,10 @@ export default function DbTokenPriceChart({
   const seriesHasDataRef = useRef(false);
 
   const chartData = useMemo(
-    () => buildOhlcvSeries(logs, bucketMs, spotPrice),
+    () =>
+      buildOhlcvSeries(logs, bucketMs, spotPrice, {
+        prevCandles: prevCandlesRef.current,
+      }),
     [logs, bucketMs, spotPrice]
   );
 

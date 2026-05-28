@@ -1,24 +1,37 @@
 /**
- * Tạo / top-up mọi bot MM + flow theo env (MARKET_MAKER_BOT_COUNT, MARKET_FLOW_BOT_COUNT, …).
+ * Tạo 10 bot / token (6 MM + 4 flow) — chỉ giao dịch token được gán.
  * node scripts/ensure-liquidity-bots.js
  */
 const { PrismaClient } = require("@prisma/client");
 const { ensureLiquidityBotUser } = require("./lib/create-liquidity-bot-user");
 const {
-  mmLiquidityEmails,
-  flowLiquidityEmails,
-} = require("./lib/liquidity-bot-emails");
+  isLegacyBotPool,
+  slotsForToken,
+  BOTS_PER_TOKEN,
+} = require("./lib/token-dedicated-bots");
 
 const prisma = new PrismaClient();
 
-function usernameFromEmail(email, fallback) {
-  const local = email.split("@")[0]?.trim();
-  return local || fallback;
+function usernameFromEmail(email) {
+  return email.split("@")[0]?.trim() || "bot";
+}
+
+async function listBaseTokens() {
+  const quoteName = process.env.QUOTE_TOKEN_NAME?.trim() || "KingCoin";
+  const tokens = await prisma.tokenCrypto.findMany({
+    where: { status: "active" },
+    select: { id: true, name: true, symbol: true, tokenKind: true },
+    orderBy: { rank: "asc" },
+  });
+  return tokens.filter(
+    (t) =>
+      t.symbol &&
+      t.name !== quoteName &&
+      t.tokenKind !== "stablecoin",
+  );
 }
 
 async function main() {
-  const mmEmails = mmLiquidityEmails();
-  const flowEmails = flowLiquidityEmails();
   const mmPassword =
     process.env.MARKET_MAKER_PASSWORD ?? "mm-dev-change-me";
   const flowPassword =
@@ -26,35 +39,57 @@ async function main() {
   const kcMm = process.env.MARKET_MAKER_SEED_BALANCE;
   const kcFlow = process.env.MARKET_FLOW_KC_BALANCE ?? kcMm;
 
-  console.log(`MM bots (${mmEmails.length}): ${mmEmails.join(", ")}`);
-  for (const email of mmEmails) {
-    const r = await ensureLiquidityBotUser(prisma, {
-      email,
-      username: usernameFromEmail(email, "marketmaker"),
-      password: mmPassword,
-      kcTarget: kcMm,
-    });
-    console.log(
-      `${r.created ? "Created" : "Synced"} ${email} — base topped=${r.inventory?.baseCredited ?? 0}`,
-    );
+  if (isLegacyBotPool()) {
+    const {
+      mmLiquidityEmails,
+      flowLiquidityEmails,
+    } = require("./lib/liquidity-bot-emails");
+    const mmEmails = mmLiquidityEmails();
+    const flowEmails = flowLiquidityEmails();
+    console.log(`Legacy MM (${mmEmails.length}): ${mmEmails.join(", ")}`);
+    for (const email of mmEmails) {
+      await ensureLiquidityBotUser(prisma, {
+        email,
+        username: usernameFromEmail(email),
+        password: mmPassword,
+        kcTarget: kcMm,
+      });
+    }
+    console.log(`Legacy flow (${flowEmails.length})`);
+    for (const email of flowEmails) {
+      await ensureLiquidityBotUser(prisma, {
+        email,
+        username: usernameFromEmail(email),
+        password: flowPassword,
+        kcTarget: kcFlow,
+      });
+    }
+    return;
   }
 
-  console.log(`Flow bots (${flowEmails.length}): ${flowEmails.join(", ")}`);
-  for (const email of flowEmails) {
-    const r = await ensureLiquidityBotUser(prisma, {
-      email,
-      username: usernameFromEmail(email, "flowtrader"),
-      password: flowPassword,
-      kcTarget: kcFlow,
-    });
-    console.log(
-      `${r.created ? "Created" : "Synced"} ${email} — base topped=${r.inventory?.baseCredited ?? 0}`,
-    );
-  }
-
+  const tokens = await listBaseTokens();
   console.log(
-    "\nGợi ý: prod MARKET_MAKER_BOT_COUNT=12, MARKET_FLOW_BOT_COUNT=4 — local mặc định 22 MM + 14 flow (không set env).",
+    `Dedicated pool: ${tokens.length} token × ${BOTS_PER_TOKEN} bot (6 MM + 4 flow)`,
   );
+
+  for (const t of tokens) {
+    const slots = slotsForToken(t.symbol);
+    console.log(`\n=== ${t.symbol} (${t.name}) ===`);
+    for (const s of slots) {
+      const password = s.kind === "mm" ? mmPassword : flowPassword;
+      const kc = s.kind === "mm" ? kcMm : kcFlow;
+      const r = await ensureLiquidityBotUser(prisma, {
+        email: s.email,
+        username: usernameFromEmail(s.email),
+        password,
+        kcTarget: kc,
+        baseTokenId: t.id,
+      });
+      console.log(
+        `  [${s.kind}] ${s.email} — ${r.created ? "created" : "synced"}`,
+      );
+    }
+  }
 }
 
 main()

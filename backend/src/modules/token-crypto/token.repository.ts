@@ -99,11 +99,25 @@ export class TokenCryptoRepository {
       throw new NotFoundException(TOKEN_NOT_FOUND);
     }
 
-    // Update the tokenCrypto
-    return this.prisma.tokenCrypto.update({
-      where: { id },
-      data,
-    });
+    // Update the tokenCrypto (Mongo may hit P2034 write conflicts under load).
+    const maxRetry = 6;
+    for (let attempt = 0; attempt <= maxRetry; attempt++) {
+      try {
+        return await this.prisma.tokenCrypto.update({
+          where: { id },
+          data,
+        });
+      } catch (err) {
+        const code = (err as { code?: string })?.code;
+        if (code !== 'P2034' || attempt === maxRetry) {
+          throw err;
+        }
+        const delayMs = Math.min(800, 35 * 2 ** attempt);
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
+    }
+    // unreachable
+    throw new Error('tokenCrypto.update retry exhausted');
   }
 
   async delete(id: string): Promise<void> {

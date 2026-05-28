@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { API_URL } from "@/constant/config";
 import { ADMIN_TAGLINE } from "@/modules/admin/constants";
 import { MmBotCard, MmBotsSummaryStat } from "@/modules/admin/mm-bots/MmBotCard";
+import { MmTokenBotGroup } from "@/modules/admin/mm-bots/MmTokenBotGroup";
 import { useMmBots } from "@/modules/admin/mm-bots/useMmBots";
 import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import { HiOutlineTrendingUp } from "react-icons/hi";
 
 function envMmLabel(data: ReturnType<typeof useMmBots>["data"]): string {
@@ -24,18 +26,71 @@ export function MmBotsView() {
     error,
     refetch,
     busyEmail,
+    displayTokenGroups,
+    dedicatedPool,
+    botsPerToken,
     mmBots,
     flowBots,
     runningMm,
     runningFlow,
-    unconfiguredMm,
-    unconfiguredFlow,
+    totalBots,
+    unconfiguredTotal,
     setEnabled,
     cancelOrders,
     refreshBot,
     bootstrapping,
     bootstrapBots,
   } = useMmBots();
+
+  const showLegacyPools =
+    !loading &&
+    displayTokenGroups.length === 0 &&
+    (mmBots.length > 0 || flowBots.length > 0);
+  const showEmptyCatalog =
+    !loading && !error && displayTokenGroups.length === 0 && totalBots === 0;
+
+  const groupIds = displayTokenGroups.map((g) => g.tokenId);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    setExpandedIds((prev) => {
+      const next = new Set<string>();
+      if (groupIds.length === 0) return next;
+      if (groupIds.length <= 2) {
+        groupIds.forEach((id) => next.add(id));
+        return next;
+      }
+      const first = groupIds[0];
+      if (prev.size === 0) {
+        next.add(first);
+        return next;
+      }
+      for (const id of groupIds) {
+        if (prev.has(id)) next.add(id);
+      }
+      if (next.size === 0) next.add(first);
+      return next;
+    });
+  }, [groupIds.join("|")]);
+
+  const expandAll = useCallback(() => {
+    setExpandedIds(new Set(groupIds));
+  }, [groupIds]);
+
+  const collapseAll = useCallback(() => {
+    setExpandedIds(new Set());
+  }, []);
+
+  const toggleGroup = useCallback((tokenId: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(tokenId)) next.delete(tokenId);
+      else next.add(tokenId);
+      return next;
+    });
+  }, []);
+
+  const hasTokenGroups = displayTokenGroups.length > 0;
 
   return (
     <div className="space-y-6">
@@ -45,15 +100,26 @@ export function MmBotsView() {
             Thanh khoản
           </p>
           <h1 className="mt-1 text-2xl font-semibold text-kc-fg">
-            Quản lý Market Maker
+            Bot theo token
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-kc-muted">{ADMIN_TAGLINE}</p>
           <p className="mt-2 text-xs text-kc-muted">
-            Theo dõi bot MM/Flow đang treo sổ — bật/tắt từng bot, hủy lệnh hoặc
-            refresh riêng. Dữ liệu làm mới mỗi 4 giây.
+            Mỗi token alt có đúng{" "}
+            <strong className="text-kc-fg">{botsPerToken} bot</strong> (6 MM treo
+            sổ + 4 flow taker) — chỉ mua/bán trên token đó, không quét chéo.
+            Làm mới mỗi 4 giây.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={loading || bootstrapping}
+            onClick={() => void bootstrapBots()}
+          >
+            {bootstrapping ? "Đang tạo bot…" : "Tạo/sync bot trong DB"}
+          </Button>
           <Button
             type="button"
             variant="secondary"
@@ -64,7 +130,7 @@ export function MmBotsView() {
             Làm mới
           </Button>
           <Link href="/admin/market-settings">
-            <Button type="button" variant="ghost" size="sm" className="gap-1.5">
+            <Button type="button" variant="ghost" size="sm">
               Cài đặt MM
             </Button>
           </Link>
@@ -82,148 +148,188 @@ export function MmBotsView() {
           <p className="font-medium">Không tải được dữ liệu bot từ API</p>
           <p className="mt-1 text-red-100/90">{error}</p>
           <p className="mt-2 text-xs text-red-100/80">
-            Frontend đang gọi:{" "}
-            <code className="break-all">{API_URL}/admin/mm-bots</code>. Trên
-            Vercel cần{" "}
-            <code className="text-xs">NEXT_PUBLIC_API_URL=https://kingcoin-mlnz.onrender.com/api/v1</code>{" "}
-            rồi redeploy web. Đăng nhập tài khoản <strong>admin</strong>.
+            API:{" "}
+            <code className="break-all">{API_URL}/admin/mm-bots</code>
           </p>
         </div>
       ) : null}
 
-      {!loading && !error && !data ? (
-        <p className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/90">
-          API không trả dữ liệu — kiểm tra token admin hoặc URL API ở trên.
-        </p>
-      ) : null}
-
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <MmBotsSummaryStat
-          label="MM đang chạy"
-          value={`${runningMm} / ${mmBots.length}`}
+          label="Token có bot"
+          value={String(displayTokenGroups.length)}
+        />
+        <MmBotsSummaryStat
+          label="Bot đang chạy"
+          value={`${runningMm + runningFlow} / ${totalBots}`}
           accent={
             data?.globalMmEnabled ? "text-emerald-300" : "text-amber-200"
           }
         />
         <MmBotsSummaryStat
-          label="Flow đang chạy"
-          value={`${runningFlow} / ${flowBots.length}`}
-          accent={
-            data?.globalFlowEnabled ? "text-emerald-300" : "text-amber-200"
-          }
+          label="MM / Flow chạy"
+          value={`${runningMm} MM · ${runningFlow} flow`}
         />
         <MmBotsSummaryStat
-          label="MM global"
-          value={data?.globalMmEnabled ? "Bật" : "Tắt"}
-        />
-        <MmBotsSummaryStat
-          label="Env MARKET_MAKER"
-          value={envMmLabel(data)}
+          label="Chế độ pool"
+          value={dedicatedPool ? `${botsPerToken} bot/token` : "Legacy"}
         />
       </div>
-
-      {data?.diagnostics ? (
-        <details className="rounded-lg border border-kc-border/60 bg-kc-surface/40 px-4 py-3 text-xs text-kc-muted">
-          <summary className="cursor-pointer font-medium text-kc-fg">
-            Runtime server (Render)
-          </summary>
-          <ul className="mt-2 space-y-1 font-mono">
-            <li>NODE_ENV: {data.diagnostics.nodeEnv ?? "—"}</li>
-            <li>
-              MARKET_MAKER_ENABLED:{" "}
-              {data.diagnostics.marketMakerEnabledRaw ?? "(không set)"}
-            </li>
-            <li>
-              MARKET_MAKER_BOT_COUNT:{" "}
-              {data.diagnostics.marketMakerBotCountRaw ?? "(mặc định prod=12)"}
-            </li>
-            <li>
-              MARKET_MAKER_QTY:{" "}
-              {data.diagnostics.marketMakerQtyRaw ?? "(mặc định prod=350)"}
-            </li>
-            <li>
-              MARKET_MAKER_LEVELS:{" "}
-              {data.diagnostics.marketMakerLevelsRaw ?? "(mặc định prod=10)"}
-            </li>
-            <li>
-              MARKET_FLOW_QTY:{" "}
-              {data.diagnostics.marketFlowQtyRaw ?? "(mặc định prod=48)"}
-            </li>
-            <li>
-              Cấu hình MM: {data.diagnostics.configuredMmEmails.length} email —{" "}
-              {data.diagnostics.configuredMmEmails.slice(0, 3).join(", ")}
-              {data.diagnostics.configuredMmEmails.length > 3 ? "…" : ""}
-            </li>
-            <li>
-              Cấu hình Flow: {data.diagnostics.configuredFlowEmails.length}{" "}
-              email
-            </li>
-            {data.adminOverrideMmEnabled != null ? (
-              <li className="text-amber-200">
-                Admin override MM: {String(data.adminOverrideMmEnabled)} (từ Điều
-                khiển thị trường — mất khi restart server)
-              </li>
-            ) : null}
-          </ul>
-        </details>
-      ) : null}
 
       {!data?.globalMmEnabled && data && !error ? (
         <p className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/90">
           MM toàn cục đang tắt — bật tại{" "}
           <Link href="/admin/market-control" className="underline">
             Điều khiển thị trường
-          </Link>{" "}
-          hoặc set <code className="text-xs">MARKET_MAKER_ENABLED=true</code> trên
-          server.
+          </Link>
+          .
         </p>
       ) : null}
 
-      {data && unconfiguredMm + unconfiguredFlow > 0 ? (
+      {unconfiguredTotal > 0 ? (
         <p className="rounded-lg border border-violet-500/25 bg-violet-500/10 px-4 py-3 text-sm text-violet-100/90">
-          {unconfiguredMm + unconfiguredFlow} bot chưa có user trong DB — bấm{" "}
-          <strong>Tạo/sync bot trong DB</strong> (không cần Shell Render). Mỗi
-          lần deploy backend, script bootstrap trên server cũng chạy tự động.
+          {unconfiguredTotal} bot chưa có user trong DB — bấm{" "}
+          <strong>Tạo/sync bot trong DB</strong>.
         </p>
       ) : null}
 
-      <section>
-        <h2 className="mb-3 text-sm font-semibold text-kc-fg">
-          Bot MM treo sổ ({mmBots.length})
-        </h2>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {mmBots.map((bot) => (
-            <MmBotCard
-              key={bot.email}
-              bot={bot}
-              busy={busyEmail === bot.email}
-              onToggle={(enabled) => void setEnabled(bot.email, enabled)}
-              onCancelOrders={() => void cancelOrders(bot.email)}
-              onRefresh={() => void refreshBot(bot.email)}
-            />
-          ))}
+      {showEmptyCatalog ? (
+        <div className="rounded-xl border border-violet-500/25 bg-violet-500/[0.06] px-5 py-6 text-sm text-kc-muted">
+          <p className="font-medium text-kc-fg">Chưa có bot nào để hiển thị</p>
+          <p className="mt-2">
+            Cần ít nhất một token alt đang{" "}
+            <code className="text-xs text-violet-200">active</code> trên sàn và
+            API đã restart sau khi bật pool 10 bot/token. Sau đó bấm{" "}
+            <strong className="text-kc-fg">Tạo/sync bot trong DB</strong>.
+          </p>
+          <p className="mt-2 text-xs">
+            Đường dẫn:{" "}
+            <code className="text-violet-200">/admin/mm-bots</code> — mục sidebar{" "}
+            <strong className="text-kc-fg">Bot MM</strong> (ngay dưới Điều khiển
+            thị trường).
+          </p>
         </div>
-        {loading && mmBots.length === 0 ? (
-          <p className="text-sm text-kc-muted">Đang tải…</p>
-        ) : null}
-      </section>
+      ) : null}
 
-      <section>
-        <h2 className="mb-3 text-sm font-semibold text-kc-fg">
-          Bot Flow khớp taker ({flowBots.length})
-        </h2>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {flowBots.map((bot) => (
-            <MmBotCard
-              key={bot.email}
-              bot={bot}
-              busy={busyEmail === bot.email}
-              onToggle={(enabled) => void setEnabled(bot.email, enabled)}
-              onCancelOrders={() => void cancelOrders(bot.email)}
-            />
-          ))}
+      {loading && displayTokenGroups.length === 0 && totalBots === 0 ? (
+        <p className="text-sm text-kc-muted">Đang tải…</p>
+      ) : null}
+
+      {hasTokenGroups ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-kc-muted">
+            {expandedIds.size}/{displayTokenGroups.length} token đang mở
+          </p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={expandAll}
+            >
+              Mở tất cả
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={collapseAll}
+            >
+              Thu gọn tất cả
+            </Button>
+          </div>
         </div>
-      </section>
+      ) : null}
+
+      <div className="space-y-3">
+        {displayTokenGroups.map((group) => (
+          <MmTokenBotGroup
+            key={group.tokenId}
+            group={group}
+            botsPerToken={botsPerToken}
+            expanded={expandedIds.has(group.tokenId)}
+            onToggleExpanded={() => toggleGroup(group.tokenId)}
+            busyEmail={busyEmail}
+            onSetEnabled={(email, enabled) => void setEnabled(email, enabled)}
+            onCancelOrders={(email) => void cancelOrders(email)}
+            onRefreshBot={(email) => void refreshBot(email)}
+          />
+        ))}
+      </div>
+
+      {showLegacyPools ? (
+        <>
+          {!dedicatedPool ? (
+            <p className="text-xs text-amber-200/80">
+              Pool legacy — bật 10 bot/token: bỏ{" "}
+              <code className="text-[11px]">MARKET_LEGACY_BOT_POOL</code> và
+              restart API.
+            </p>
+          ) : (
+            <p className="text-xs text-amber-200/80">
+              API chưa trả nhóm theo token — hiển thị danh sách phẳng. Restart
+              backend và làm mới trang.
+            </p>
+          )}
+          <section>
+            <h2 className="mb-3 text-sm font-semibold text-kc-fg">
+              Bot MM ({mmBots.length})
+            </h2>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+              {mmBots.map((bot) => (
+                <MmBotCard
+                  key={bot.email}
+                  bot={bot}
+                  busy={busyEmail === bot.email}
+                  onToggle={(enabled) => void setEnabled(bot.email, enabled)}
+                  onCancelOrders={() => void cancelOrders(bot.email)}
+                  onRefresh={() => void refreshBot(bot.email)}
+                />
+              ))}
+            </div>
+          </section>
+          <section>
+            <h2 className="mb-3 text-sm font-semibold text-kc-fg">
+              Bot Flow ({flowBots.length})
+            </h2>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+              {flowBots.map((bot) => (
+                <MmBotCard
+                  key={bot.email}
+                  bot={bot}
+                  busy={busyEmail === bot.email}
+                  onToggle={(enabled) => void setEnabled(bot.email, enabled)}
+                  onCancelOrders={() => void cancelOrders(bot.email)}
+                  onRefresh={() => void refreshBot(bot.email)}
+                />
+              ))}
+            </div>
+          </section>
+        </>
+      ) : null}
+
+      {!dedicatedPool && data?.bots.length && displayTokenGroups.length > 0 ? (
+        <p className="text-xs text-amber-200/80">
+          Đang dùng pool legacy (MARKET_LEGACY_BOT_POOL). Để bật 10 bot/token,
+          bỏ env đó và restart API.
+        </p>
+      ) : null}
+
+      {data?.diagnostics ? (
+        <details className="rounded-lg border border-kc-border/60 bg-kc-surface/40 px-4 py-3 text-xs text-kc-muted">
+          <summary className="cursor-pointer font-medium text-kc-fg">
+            Runtime server
+          </summary>
+          <ul className="mt-2 space-y-1 font-mono">
+            <li>NODE_ENV: {data.diagnostics.nodeEnv ?? "—"}</li>
+            <li>MARKET_MAKER_ENABLED: {envMmLabel(data)}</li>
+            <li>
+              Bot email: {data.diagnostics.configuredMmEmails.length} MM +{" "}
+              {data.diagnostics.configuredFlowEmails.length} flow
+            </li>
+          </ul>
+        </details>
+      ) : null}
     </div>
   );
 }

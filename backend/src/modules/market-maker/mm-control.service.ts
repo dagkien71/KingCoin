@@ -23,7 +23,7 @@ import {
   mmLevelsFromEnv,
   mmQtyFromEnv,
 } from '@modules/market-maker/mm-params.util';
-import { mmLiquidityEmails } from '@modules/market-maker/liquidity-bots.util';
+import { TokenDedicatedBotsCatalogService } from '@modules/market-maker/token-dedicated-bots-catalog.service';
 import {
   anchorPathParamsToSpot,
   defaultParamsForModel,
@@ -106,6 +106,7 @@ export class MmControlService implements OnModuleInit, OnModuleDestroy {
     private readonly tokenService: TokenCryptoService,
     private readonly tokenLogService: TokenCryptoLogService,
     private readonly realtimeService: RealtimeService,
+    private readonly botCatalog: TokenDedicatedBotsCatalogService,
   ) {}
 
   private mmEmail(): string {
@@ -114,7 +115,9 @@ export class MmControlService implements OnModuleInit, OnModuleDestroy {
 
   /** Hủy mọi lệnh MM pending — gọi trước khi đổi giá đột ngột (±%). */
   async cancelPendingOrdersForToken(tokenId: string): Promise<number> {
-    const emails = mmLiquidityEmails();
+    const emails = this.botCatalog.usesDedicatedPool()
+      ? this.botCatalog.getMmEmailsForToken(tokenId)
+      : this.botCatalog.getMmEmails();
     const mmUsers = await this.prisma.user.findMany({
       where: { email: { in: emails } },
       select: { id: true },

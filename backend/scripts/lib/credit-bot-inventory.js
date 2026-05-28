@@ -11,10 +11,10 @@ async function getQuoteToken(prisma) {
 
 /**
  * @param {import('@prisma/client').PrismaClient} prisma
- * @param {{ email: string, kcTarget?: number, basePerToken?: number }} opts
+ * @param {{ email: string, kcTarget?: number, basePerToken?: number, baseTokenIdOnly?: string }} opts
  */
 async function creditBotInventory(prisma, opts) {
-  const { email, kcTarget, basePerToken } = opts;
+  const { email, kcTarget, basePerToken, baseTokenIdOnly } = opts;
   const kcMin = Number(kcTarget ?? process.env.MARKET_MAKER_SEED_BALANCE ?? "500000000");
   const baseMin = Number(
     basePerToken ?? process.env.MARKET_MAKER_BASE_BALANCE ?? "5000000",
@@ -42,9 +42,14 @@ async function creditBotInventory(prisma, opts) {
   const quote = await getQuoteToken(prisma);
   const quoteId = quote?.id ?? null;
 
-  const allTokens = await prisma.tokenCrypto.findMany({
-    select: { id: true, name: true, symbol: true },
-  });
+  const allTokens = baseTokenIdOnly
+    ? await prisma.tokenCrypto.findMany({
+        where: { id: baseTokenIdOnly },
+        select: { id: true, name: true, symbol: true },
+      })
+    : await prisma.tokenCrypto.findMany({
+        select: { id: true, name: true, symbol: true },
+      });
 
   let kcCredited = 0;
   let baseCredited = 0;

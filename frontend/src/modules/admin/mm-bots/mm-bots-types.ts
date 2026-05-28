@@ -5,6 +5,10 @@ export type MmBotRow = {
   email: string;
   username: string | null;
   kind: MmBotKind;
+  slot?: number;
+  assignedTokenId?: string | null;
+  assignedTokenName?: string | null;
+  assignedTokenSymbol?: string | null;
   configured: boolean;
   enabled: boolean;
   running: boolean;
@@ -15,6 +19,13 @@ export type MmBotRow = {
   lastRefreshOk: boolean;
   lastError: string | null;
   refreshCount: number;
+};
+
+export type TokenBotGroup = {
+  tokenId: string;
+  tokenName: string;
+  symbol: string;
+  bots: MmBotRow[];
 };
 
 export type MmEnvDiagnostics = {
@@ -31,11 +42,14 @@ export type MmEnvDiagnostics = {
 };
 
 export type MmBotsDashboard = {
+  dedicatedPool: boolean;
+  botsPerToken: number;
   globalMmEnabled: boolean;
   globalFlowEnabled: boolean;
   envMmEnabled: boolean;
   adminOverrideMmEnabled: boolean | null;
   adminOverrideFlowEnabled: boolean | null;
   diagnostics: MmEnvDiagnostics;
+  tokenGroups: TokenBotGroup[];
   bots: MmBotRow[];
 };

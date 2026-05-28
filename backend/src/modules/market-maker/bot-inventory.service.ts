@@ -1,12 +1,15 @@
 import { PrismaService } from '@providers/prisma';
 import { Injectable, Logger } from '@nestjs/common';
-import { liquidityBotEmails } from './liquidity-bots.util';
+import { TokenDedicatedBotsCatalogService } from './token-dedicated-bots-catalog.service';
 
 @Injectable()
 export class BotInventoryService {
   private readonly logger = new Logger(BotInventoryService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly botCatalog: TokenDedicatedBotsCatalogService,
+  ) {}
 
   private quoteName(): string {
     return process.env.QUOTE_TOKEN_NAME ?? 'KingCoin';
@@ -166,7 +169,12 @@ export class BotInventoryService {
       return;
     }
 
-    const emails = liquidityBotEmails();
+    const emails = this.botCatalog.usesDedicatedPool()
+      ? [
+          ...this.botCatalog.getMmEmailsForToken(tokenId),
+          ...this.botCatalog.getFlowEmailsForToken(tokenId),
+        ]
+      : this.botCatalog.getAllEmails();
     let ok = 0;
     for (const email of emails) {
       const credited = await this.creditTokenToBot(email, tokenId);
@@ -175,7 +183,7 @@ export class BotInventoryService {
 
     if (ok < emails.length) {
       this.logger.warn(
-        `Bot inventory: chỉ ${ok}/${emails.length} bot nhận ${token.symbol ?? tokenId} — chạy ensure-bot-inventory.js`,
+        `Bot inventory: chỉ ${ok}/${emails.length} bot nhận ${token.symbol ?? tokenId}`,
       );
     } else {
       this.logger.log(
@@ -184,8 +192,28 @@ export class BotInventoryService {
     }
   }
 
-  /** Đồng bộ mọi token base cho một bot (giống script ensure-bot-inventory). */
+  /** Chỉ token được gán cho bot (pool 10 bot/token). */
+  async syncBotInventoryForToken(
+    email: string,
+    tokenId: string,
+  ): Promise<void> {
+    const quote = await this.prisma.tokenCrypto.findFirst({
+      where: { name: this.quoteName() },
+    });
+    const quoteId = quote?.id ?? null;
+    if (quoteId && tokenId === quoteId) return;
+    await this.creditTokenToBot(email, tokenId);
+  }
+
+  /** Đồng bộ mọi token base cho một bot (legacy pool). */
   async syncBotInventory(email: string): Promise<void> {
+    if (this.botCatalog.usesDedicatedPool()) {
+      const assign = this.botCatalog.getAssignment(email);
+      if (assign) {
+        await this.syncBotInventoryForToken(email, assign.tokenId);
+      }
+      return;
+    }
     const quote = await this.prisma.tokenCrypto.findFirst({
       where: { name: this.quoteName() },
     });

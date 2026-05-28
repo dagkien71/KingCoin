@@ -331,7 +331,8 @@ function applyFormingBar(
   candles: ChartCandle[],
   volumeBars: ChartVolumeBar[],
   spotPrice: number,
-  bucketMs: number
+  bucketMs: number,
+  prevLast?: ChartCandle | null
 ): { candles: ChartCandle[]; volumeBars: ChartVolumeBar[] } {
   if (!Number.isFinite(spotPrice)) {
     return { candles, volumeBars };
@@ -362,11 +363,18 @@ function applyFormingBar(
 
   if (last.time === nowSec) {
     const c = spotPrice;
+    const prevHigh =
+      prevLast && prevLast.time === nowSec ? Number(prevLast.high) : -Infinity;
+    const prevLow =
+      prevLast && prevLast.time === nowSec ? Number(prevLast.low) : Infinity;
+    const prevOpen =
+      prevLast && prevLast.time === nowSec ? Number(prevLast.open) : last.open;
     outC[outC.length - 1] = {
       ...last,
+      open: Number.isFinite(prevOpen) ? prevOpen : last.open,
       close: c,
-      high: Math.max(last.high, c),
-      low: Math.min(last.low, c),
+      high: Math.max(last.high, prevHigh, c),
+      low: Math.min(last.low, prevLow, c),
     };
     const v = outV[outV.length - 1];
     if (v) {
@@ -515,6 +523,8 @@ export function buildOhlcvSeries(
   options?: {
     fillSmallGaps?: boolean;
     maxBars?: number;
+    /** Giữ forming-bar wick qua các lần render (spot nhảy nhanh). */
+    prevCandles?: ChartCandle[];
   }
 ): OhlcvSeriesResult {
   const ticks = logsToTicks(logs);
@@ -536,11 +546,16 @@ export function buildOhlcvSeries(
   }
 
   if (spotPrice != null && Number.isFinite(spotPrice)) {
+    const prevLast =
+      options?.prevCandles && options.prevCandles.length > 0
+        ? options.prevCandles[options.prevCandles.length - 1]
+        : null;
     ({ candles, volumeBars } = applyFormingBar(
       candles,
       volumeBars,
       spotPrice,
-      bucketMs
+      bucketMs,
+      prevLast
     ));
   }
 
