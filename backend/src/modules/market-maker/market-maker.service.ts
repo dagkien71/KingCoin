@@ -19,7 +19,12 @@ import {
   resolveMmTargetTokenNames,
 } from '@modules/market-maker/liquidity-target-tokens.util';
 import { PrismaService } from '@providers/prisma';
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { TokenCrypto, User } from '@prisma/client';
 
@@ -119,11 +124,7 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
         await this.refreshLiquidityForToken(user, token, params, i, n);
         this.mmBotRegistry.recordRefresh(user.id, true);
       } catch (e) {
-        this.mmBotRegistry.recordRefresh(
-          user.id,
-          false,
-          (e as Error).message,
-        );
+        this.mmBotRegistry.recordRefresh(user.id, false, (e as Error).message);
       }
     }
   }
@@ -135,9 +136,7 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
       where: { email: { in: emails } },
     });
     const byEmail = new Map(rows.map((u) => [u.email, u]));
-    return emails
-      .map((e) => byEmail.get(e))
-      .filter((u): u is User => !!u);
+    return emails.map((e) => byEmail.get(e)).filter((u): u is User => !!u);
   }
 
   private async resolveMmUsersForToken(tokenId: string): Promise<User[]> {
@@ -243,10 +242,7 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
     return Number((baseMid + Math.sign(delta) * maxDelta).toFixed(8));
   }
 
-  private async resolveBookMid(
-    tokenId: string,
-    spot: number,
-  ): Promise<number> {
+  private async resolveBookMid(tokenId: string, spot: number): Promise<number> {
     const [bestBuy, bestSell] = await Promise.all([
       this.prisma.order.findFirst({
         where: {
@@ -271,13 +267,7 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
     ]);
     const bid = bestBuy?.price;
     const ask = bestSell?.price;
-    if (
-      bid != null &&
-      ask != null &&
-      bid > 0 &&
-      ask > 0 &&
-      bid < ask
-    ) {
+    if (bid != null && ask != null && bid > 0 && ask > 0 && bid < ask) {
       return Number(((bid + ask) / 2).toFixed(8));
     }
     return spot;
@@ -386,14 +376,9 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
                 user.id,
                 token.id,
               );
-              await this.refreshLiquidityForToken(
-                user,
-                token,
-                params,
-                i,
-                n,
-                { deferMatch: true },
-              );
+              await this.refreshLiquidityForToken(user, token, params, i, n, {
+                deferMatch: true,
+              });
               this.mmBotRegistry.recordRefresh(user.id, true);
             } catch (e) {
               this.mmBotRegistry.recordRefresh(
@@ -402,7 +387,9 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
                 (e as Error).message,
               );
               this.logger.warn(
-                `MM refresh lỗi ${user.email} (${token.symbol}): ${(e as Error).message}`,
+                `MM refresh lỗi ${user.email} (${token.symbol}): ${
+                  (e as Error).message
+                }`,
               );
             }
           }
@@ -413,7 +400,9 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
         }
       } else {
         const mmUsers = await this.resolveMmUsers();
-        const tokenNames = new Set(await resolveMmTargetTokenNames(this.prisma));
+        const tokenNames = new Set(
+          await resolveMmTargetTokenNames(this.prisma),
+        );
         for (const id of this.mmControl.getOverrideTokenIds()) {
           const t = await this.prisma.tokenCrypto.findUnique({
             where: { id },
@@ -439,13 +428,7 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
                 user.id,
                 token.id,
               );
-              await this.refreshLiquidityForToken(
-                user,
-                token,
-                params,
-                i,
-                n,
-              );
+              await this.refreshLiquidityForToken(user, token, params, i, n);
               this.mmBotRegistry.recordRefresh(user.id, true);
             } catch (e) {
               this.mmBotRegistry.recordRefresh(
@@ -485,14 +468,8 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
     mmTotal = 1,
     opts?: { deferMatch?: boolean },
   ): Promise<void> {
-    const {
-      levels,
-      spreadStep,
-      qty,
-      oscillatePct,
-      levelJitterPct,
-      wanderPct,
-    } = params;
+    const { levels, spreadStep, qty, oscillatePct, levelJitterPct, wanderPct } =
+      params;
     const symbol = token.symbol ?? 'BASE';
     const quoteSym = this.quotePairSuffix();
     if (isQuoteToken(token)) {
@@ -508,8 +485,8 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
       fresh?.price && fresh.price > 0
         ? fresh.price
         : token.price && token.price > 0
-          ? token.price
-          : 1;
+        ? token.price
+        : 1;
     const tick = this.priceTick(baseMid);
     const pathMid = this.mmControl.getPathMid(token.id);
     const spotAnchor = this.mmControl.getSpotAnchor(token.id);
@@ -549,19 +526,14 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
       }
       const microWander = (Math.random() * 2 - 1) * 0.00035;
       mid = mid * (1 + microWander);
-      mid = this.clampMidStep(
-        mid,
-        baseMid,
-        pricing.maxMidStepPctPerRefresh,
-      );
+      mid = this.clampMidStep(mid, baseMid, pricing.maxMidStepPctPerRefresh);
       mid = this.mmControl.finalizeMid(token.id, mid, baseMid);
       modeLabel = 'khớp lệnh';
     }
 
     if (mmTotal > 1) {
       const center = (mmTotal - 1) / 2;
-      const shiftPct =
-        (mmIndex - center) * this.multiMidStep() * spreadStep;
+      const shiftPct = (mmIndex - center) * this.multiMidStep() * spreadStep;
       mid = mid * (1 + shiftPct);
     }
 
@@ -571,14 +543,8 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
       const offset = spreadStep * i;
       const buyJitter = (Math.random() * 2 - 1) * levelJitterPct;
       const sellJitter = (Math.random() * 2 - 1) * levelJitterPct;
-      let buyPrice = this.roundToTick(
-        mid * (1 - offset + buyJitter),
-        tick,
-      );
-      let sellPrice = this.roundToTick(
-        mid * (1 + offset + sellJitter),
-        tick,
-      );
+      let buyPrice = this.roundToTick(mid * (1 - offset + buyJitter), tick);
+      let sellPrice = this.roundToTick(mid * (1 + offset + sellJitter), tick);
 
       if (buyPrice <= 0 || sellPrice <= 0) continue;
       if (buyPrice >= sellPrice) {
@@ -590,7 +556,9 @@ export class MarketMakerService implements OnModuleInit, OnModuleDestroy {
       const touchBoost = i === 1 ? 1.65 : 1;
       const levelQty = mmLevelQuantity(qtyBase * touchBoost);
 
-      const createOpts = opts?.deferMatch ? { deferMatch: true as const } : undefined;
+      const createOpts = opts?.deferMatch
+        ? { deferMatch: true as const }
+        : undefined;
       await this.orderService.create(
         {
           tokenId: token.id,
