@@ -556,6 +556,25 @@ export class OrderService {
       await this.orderRepository.findPendingSellOrders(tokenId)
     ).map((o) => ({ ...o })) as PendingOrder[];
 
+    // Prevent bot-vs-bot self-trading which drains the book to 0 pending orders.
+    const userIds = [
+      ...new Set(
+        [...pendingBuyOrders, ...pendingSellOrders].map((o) => String(o.userId)),
+      ),
+    ];
+    const botUserIds = new Set<string>();
+    if (userIds.length > 0) {
+      const users = await this.userRepository.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, email: true, username: true, accountTags: true },
+      });
+      for (const u of users) {
+        if (isLiquidityBotEmail(u.email, u.username, u.accountTags ?? null)) {
+          botUserIds.add(String(u.id));
+        }
+      }
+    }
+
     pendingBuyOrders.sort(
       (a, b) => b.price - a.price || Number(a.createdAt) - Number(b.createdAt),
     );
@@ -576,6 +595,18 @@ export class OrderService {
 
       if (buyOrder.userId === sellOrder.userId) {
         sellIndex++;
+        continue;
+      }
+
+      if (
+        botUserIds.has(String(buyOrder.userId)) &&
+        botUserIds.has(String(sellOrder.userId))
+      ) {
+        // Skip matching two liquidity bots. Move the newer side forward.
+        const buyTs = Number(buyOrder.createdAt) || 0;
+        const sellTs = Number(sellOrder.createdAt) || 0;
+        if (sellTs >= buyTs) sellIndex++;
+        else buyIndex++;
         continue;
       }
 
